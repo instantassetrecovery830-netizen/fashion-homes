@@ -5,7 +5,7 @@ import { TrendAnalysis } from "../types";
 // Note: In a real app, strict error handling for missing keys is needed.
 const getClient = () => {
   if (!process.env.API_KEY) {
-    console.warn("API_KEY not found in environment variables.");
+    console.warn("API_KEY not found in environment variables. Using mock data.");
     return null;
   }
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -13,6 +13,13 @@ const getClient = () => {
 
 export const generateSeasonalTrend = async (): Promise<TrendAnalysis> => {
   const client = getClient();
+  
+  // Default fallback data to use when API is unavailable or limits are reached
+  const fallbackTrend: TrendAnalysis = {
+    title: "DIGITAL BOTANICALS",
+    description: "A fusion of organic shapes and cybernetic aesthetics. Nature reclaimed by the digital void.",
+    colorPalette: ["#2E4A3B", "#8FBC8F", "#000000", "#FFFFFF"]
+  };
   
   // Fallback for demo purposes if no key is present
   if (!client) {
@@ -37,18 +44,25 @@ export const generateSeasonalTrend = async (): Promise<TrendAnalysis> => {
     // Sanitize in case model wraps in ```json ... ```
     const jsonStr = text.replace(/```json|```/g, "").trim();
     return JSON.parse(jsonStr) as TrendAnalysis;
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return {
-      title: "DIGITAL BOTANICALS",
-      description: "A fusion of organic shapes and cybernetic aesthetics. Nature reclaimed by the digital void.",
-      colorPalette: ["#2E4A3B", "#8FBC8F", "#000000", "#FFFFFF"]
-    };
+  } catch (error: any) {
+    // Gracefully handle 429 (Quota Exceeded) or other API errors
+    const isRateLimit = error?.status === 429 || 
+                        error?.response?.status === 429 || 
+                        error?.message?.includes('429') ||
+                        (error?.error && error.error.code === 429);
+
+    if (isRateLimit) {
+        console.warn("Gemini API Quota Exceeded. Serving curated fallback trend data.");
+    } else {
+        console.warn("Gemini API Error (Trends):", error.message || error);
+    }
+    return fallbackTrend;
   }
 };
 
 export const getStyleMatch = async (productName: string): Promise<string> => {
   const client = getClient();
+  const fallbackTip = "Style with monochromatic layers for an elevated silhouette.";
   
   if (!client) {
     return new Promise(resolve => setTimeout(() => resolve(`To style the ${productName}, pair it with wide-leg trousers in charcoal and chunky silver jewelry for a brutalist look.`), 1000));
@@ -60,7 +74,18 @@ export const getStyleMatch = async (productName: string): Promise<string> => {
       contents: `Suggest a styling tip for a fashion product named "${productName}". Keep it editorial, concise, and luxurious. Max 30 words.`,
     });
     return response.text || "Pair with confidence and minimalist accessories.";
-  } catch (error) {
-    return "Style with monochromatic layers for an elevated silhouette.";
+  } catch (error: any) {
+    const isRateLimit = error?.status === 429 || 
+                        error?.response?.status === 429 || 
+                        error?.message?.includes('429') ||
+                        (error?.error && error.error.code === 429);
+                        
+    if (isRateLimit) {
+        // Silent fallback for style match on rate limit to avoid UI disruption
+        console.warn("Gemini API Quota Exceeded (Style Match). Using fallback.");
+    } else {
+        console.warn("Gemini Style Match Error:", error.message || error);
+    }
+    return fallbackTip;
   }
 };

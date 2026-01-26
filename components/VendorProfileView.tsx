@@ -1,5 +1,5 @@
-import React from 'react';
-import { BadgeCheck, MapPin, Users, Star, ArrowLeft, Heart, Share2, Instagram, Twitter, Globe } from 'lucide-react';
+import React, { useState } from 'react';
+import { BadgeCheck, MapPin, Users, Star, ArrowLeft, Heart, Share2, Instagram, Twitter, Globe, Check } from 'lucide-react';
 import { Vendor, Product, ViewState } from '../types';
 
 interface VendorProfileViewProps {
@@ -10,8 +10,31 @@ interface VendorProfileViewProps {
 }
 
 export const VendorProfileView: React.FC<VendorProfileViewProps> = ({ vendor, onProductSelect, onNavigate, products }) => {
+  const [isFollowing, setIsFollowing] = useState(false);
+  
   // Filter products for this specific vendor from the passed active products
   const vendorProducts = products.filter(p => p.designer === vendor.name);
+
+  const handleFollow = () => {
+    setIsFollowing(!isFollowing);
+  };
+
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `LUMIERRE | ${vendor.name}`,
+          text: `Discover ${vendor.name} on LUMIERRE, the luxury fashion ecosystem.`,
+          url: window.location.href,
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert("Profile link copied to clipboard.");
+      }
+    } catch (error) {
+      console.log('Error sharing:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white animate-fade-in">
@@ -55,15 +78,27 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({ vendor, on
                 <h1 className="text-3xl md:text-5xl font-serif italic mb-2">{vendor.name}</h1>
                 <div className="flex items-center gap-4 text-sm text-gray-500">
                   <span className="flex items-center gap-1"><MapPin size={14} /> Paris, France</span>
-                  <span className="flex items-center gap-1"><Users size={14} /> 12.4K Followers</span>
+                  <span className="flex items-center gap-1"><Users size={14} /> {isFollowing ? '12.5K' : '12.4K'} Followers</span>
                   <span className="flex items-center gap-1"><Star size={14} className="fill-luxury-gold text-luxury-gold" /> 4.9 Rating</span>
                 </div>
               </div>
               <div className="flex gap-3">
-                 <button className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors">
-                   Follow
+                 <button 
+                   onClick={handleFollow}
+                   className={`px-8 py-3 text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
+                       isFollowing 
+                       ? 'bg-white border border-black text-black' 
+                       : 'bg-black text-white hover:bg-luxury-gold border border-transparent'
+                   }`}
+                 >
+                   {isFollowing && <Check size={14} />}
+                   {isFollowing ? 'Following' : 'Follow'}
                  </button>
-                 <button className="border border-gray-200 p-3 hover:border-black transition-colors">
+                 <button 
+                   onClick={handleShare}
+                   className="border border-gray-200 p-3 hover:border-black transition-colors"
+                   title="Share Profile"
+                 >
                    <Share2 size={16} />
                  </button>
               </div>

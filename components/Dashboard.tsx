@@ -9,7 +9,7 @@ import {
   Palette, Layout, Type, FileText, Newspaper, ExternalLink,
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield,
-  Power, Lock, MessageSquare, Flag
+  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus } from '../types';
 import { MOCK_PRODUCTS } from '../constants';
@@ -41,7 +41,7 @@ interface DashboardProps {
   onProductSelect?: (product: Product) => void;
 }
 
-type DashboardTab = 'OVERVIEW' | 'PRODUCTS' | 'UPLOAD' | 'ORDERS' | 'SETTINGS' | 'MARKETPLACE' | 'PROFILE' | 'STORE_DESIGN' | 'SAVED' | 'FULFILLMENT' | 'SUBSCRIPTIONS' | 'FOLLOWERS' | 'SUBSCRIPTION_PLAN' | 'VERIFICATION' | 'USERS' | 'REVIEWS' | 'TRANSACTIONS';
+type DashboardTab = 'OVERVIEW' | 'PRODUCTS' | 'UPLOAD' | 'ORDERS' | 'SETTINGS' | 'MARKETPLACE' | 'PROFILE' | 'STORE_DESIGN' | 'SAVED' | 'FULFILLMENT' | 'SUBSCRIPTIONS' | 'FOLLOWERS' | 'SUBSCRIPTION_PLAN' | 'VERIFICATION' | 'USERS' | 'REVIEWS' | 'TRANSACTIONS' | 'STORE_PREVIEW';
 
 const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '39', '40', '41', '42', 'One Size'];
 
@@ -144,7 +144,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     brandName: currentVendor?.name || 'Maison Margaux',
     location: currentVendor?.location || 'Paris, France',
     coverImage: currentVendor?.coverImage || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070',
-    bio: currentVendor?.bio || "Founded in 2023..."
+    bio: currentVendor?.bio || "Founded in 2023...",
+    theme: 'Editorial',
+    layout: 'Grid',
+    accentColor: '#000000'
   });
   
   // Form State for Upload / Edit
@@ -179,12 +182,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         instagram: currentVendor.instagram || '',
         twitter: currentVendor.twitter || ''
       });
-      setStoreDesign({
+      setStoreDesign(prev => ({
+        ...prev,
         brandName: currentVendor.name,
         location: currentVendor.location || 'Paris, France',
         coverImage: currentVendor.coverImage || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070',
         bio: currentVendor.bio
-      });
+      }));
     }
   }, [currentVendor]);
 
@@ -296,6 +300,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setUsers(prev => prev.map(u => u.id === id ? { ...u, status: u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' } : u));
   };
 
+  const handleRoleUpdate = (userId: string, newRole: string) => {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+  };
+
   const handleSubscriptionToggle = (vendorId: string) => {
     if (!setVendors) return;
     const updatedVendors = vendors.map(v => {
@@ -382,6 +390,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ];
     
     if (isVendor) {
+      items.push({ id: 'STORE_PREVIEW', label: 'View Live Store', icon: Store });
       items.push({ id: 'FULFILLMENT', label: 'Client Orders', icon: Truck });
       items.push({ id: 'ORDERS', label: 'My Purchases', icon: ShoppingBag });
       items.push({ id: 'FOLLOWERS', label: 'Followers', icon: Users });
@@ -678,12 +687,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   
   const renderUsers = () => (
     <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-8">User Management</h3>
+        <h3 className="text-xl font-serif italic mb-8">User & Role Management</h3>
         <div className="overflow-x-auto">
             <table className="w-full text-left">
                 <thead className="border-b border-gray-100">
                     <tr>
                         <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">User</th>
+                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Role</th>
                         <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Location</th>
                         <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Status</th>
                         <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Lifetime Spend</th>
@@ -701,6 +711,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     <div>
                                         <p className="font-bold text-sm">{user.name}</p>
                                         <p className="text-[10px] text-gray-400">{user.email}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td className="py-4">
+                                <div className="relative">
+                                    <select 
+                                        value={user.role}
+                                        onChange={(e) => handleRoleUpdate(user.id, e.target.value)}
+                                        className="bg-transparent border-b border-gray-200 text-xs font-bold uppercase py-1 pr-6 focus:border-black outline-none cursor-pointer hover:border-luxury-gold transition-colors appearance-none"
+                                    >
+                                        <option value="BUYER">Buyer</option>
+                                        <option value="VENDOR">Vendor</option>
+                                        <option value="ADMIN">Admin</option>
+                                    </select>
+                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                        <ChevronDown size={12} />
                                     </div>
                                 </div>
                             </td>
@@ -1493,6 +1519,98 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
         </div>
+
+        {/* Visual Identity Section */}
+        <div className="mt-12 pt-8 border-t border-gray-100">
+            <h4 className="text-lg font-serif italic mb-6">Visual Identity</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                {/* Theme Selection */}
+                <div>
+                    <label className="text-xs text-gray-500 uppercase tracking-widest mb-4 block">Aesthetic Theme</label>
+                    <div className="space-y-4">
+                        {['Editorial', 'Minimalist', 'Avant-Garde'].map((theme) => (
+                            <button
+                                key={theme}
+                                onClick={() => setStoreDesign({...storeDesign, theme})}
+                                className={`w-full text-left p-4 border transition-all flex justify-between items-center ${
+                                    storeDesign.theme === theme 
+                                    ? 'border-black bg-gray-50' 
+                                    : 'border-gray-200 hover:border-gray-400'
+                                }`}
+                            >
+                                <div>
+                                    <p className="text-sm font-bold uppercase tracking-wide">{theme}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {theme === 'Editorial' ? 'Classic serif typography, balanced spacing.' : 
+                                         theme === 'Minimalist' ? 'Clean sans-serif, maximizing white space.' : 
+                                         'Bold monochrome contrasts, heavy structure.'}
+                                    </p>
+                                </div>
+                                {storeDesign.theme === theme && <CheckCircle size={16} className="text-black" />}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Accent Color & Layout */}
+                <div className="space-y-8">
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-widest mb-4 block">Brand Accent Color</label>
+                        <div className="flex gap-4">
+                            {[
+                                { color: '#000000', name: 'Noir' },
+                                { color: '#D4AF37', name: 'Gold' },
+                                { color: '#800020', name: 'Burgundy' },
+                                { color: '#2E4A3B', name: 'Hunter' },
+                                { color: '#1E3A8A', name: 'Royal' }
+                            ].map((preset) => (
+                                <button
+                                    key={preset.color}
+                                    onClick={() => setStoreDesign({...storeDesign, accentColor: preset.color})}
+                                    className={`w-10 h-10 rounded-full border-2 transition-all relative ${
+                                        storeDesign.accentColor === preset.color ? 'border-black scale-110' : 'border-transparent'
+                                    }`}
+                                    style={{ backgroundColor: preset.color }}
+                                    title={preset.name}
+                                >
+                                    {storeDesign.accentColor === preset.color && (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <Check size={12} className="text-white mix-blend-difference" />
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-widest mb-4 block">Product Grid Layout</label>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => setStoreDesign({...storeDesign, layout: 'Grid'})}
+                                className={`flex-1 p-4 border flex flex-col items-center justify-center gap-2 transition-all ${
+                                    storeDesign.layout === 'Grid' ? 'border-black bg-gray-50' : 'border-gray-200 hover:border-gray-400'
+                                }`}
+                            >
+                                <Grid size={20} />
+                                <span className="text-[10px] font-bold uppercase">Standard Grid</span>
+                            </button>
+                            <button
+                                onClick={() => setStoreDesign({...storeDesign, layout: 'Masonry'})}
+                                className={`flex-1 p-4 border flex flex-col items-center justify-center gap-2 transition-all ${
+                                    storeDesign.layout === 'Masonry' ? 'border-black bg-gray-50' : 'border-gray-200 hover:border-gray-400'
+                                }`}
+                            >
+                                <Columns size={20} />
+                                <span className="text-[10px] font-bold uppercase">Editorial Masonry</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div className="mt-8 pt-8 border-t border-gray-100">
              <button 
                 onClick={handleSaveStoreDesign}
@@ -1502,6 +1620,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
         </div>
       </div>
+  );
+
+  const renderStorePreview = () => (
+    <div className="bg-white rounded-sm shadow-sm border border-gray-100 animate-slide-up overflow-hidden">
+        {/* Cover Image */}
+      <div className="h-64 w-full relative overflow-hidden bg-gray-200">
+         <img 
+           src={storeDesign.coverImage || currentVendor?.coverImage} 
+           alt="Cover" 
+           className="w-full h-full object-cover"
+         />
+         <div className="absolute inset-0 bg-black/10" />
+         <div className="absolute bottom-0 left-0 w-full p-8 bg-gradient-to-t from-black/60 to-transparent text-white">
+             <h1 className="text-4xl font-serif italic mb-2">{storeDesign.brandName || currentVendor?.name}</h1>
+             <p className="text-sm opacity-90 flex items-center gap-2"><MapPin size={14}/> {storeDesign.location || currentVendor?.location}</p>
+         </div>
+      </div>
+
+      <div className="p-8">
+          <div className="flex gap-8">
+               <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden -mt-20 relative z-10 bg-white">
+                   <img src={profileForm.avatar || currentVendor?.avatar} className="w-full h-full object-cover" alt="Profile" />
+               </div>
+               <div className="flex-1 pt-2">
+                   <p className="text-gray-600 font-light leading-relaxed max-w-2xl mb-8">
+                      {storeDesign.bio || currentVendor?.bio}
+                   </p>
+               </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-8 mt-4">
+              <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-bold uppercase tracking-widest">Store Inventory</h3>
+                  <span className="text-xs text-gray-400">{vendorProducts.length} Items</span>
+              </div>
+              
+              {vendorProducts.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400">
+                      <p>No active listings visible to customers.</p>
+                  </div>
+              ) : (
+                  <div className={`grid gap-6 ${storeDesign.layout === 'Masonry' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-3 lg:grid-cols-4'}`}>
+                      {vendorProducts.map((product, index) => (
+                          <div key={product.id} className={`group cursor-pointer ${storeDesign.layout === 'Masonry' && index % 2 !== 0 ? 'mt-12' : ''}`}>
+                              <div className="aspect-[3/4] bg-gray-100 mb-3 overflow-hidden relative">
+                                  <img src={product.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={product.name} />
+                                  {product.isNewSeason && <span className="absolute top-2 left-2 bg-white text-[10px] font-bold px-2 py-1 uppercase" style={{ color: storeDesign.accentColor }}>New</span>}
+                              </div>
+                              <h4 className="font-bold text-sm" style={{ fontFamily: storeDesign.theme === 'Minimalist' ? 'sans-serif' : 'serif' }}>{product.name}</h4>
+                              <p className="text-xs text-gray-500" style={{ color: storeDesign.accentColor }}>${product.price}</p>
+                          </div>
+                      ))}
+                  </div>
+              )}
+          </div>
+      </div>
+    </div>
   );
 
   const renderSaved = () => (
@@ -1556,7 +1731,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div className="mb-8">
             <h1 className="text-3xl font-serif font-medium mb-2 capitalize">
-              {activeTab === 'MARKETPLACE' ? 'Marketplace' : activeTab === 'SUBSCRIPTION_PLAN' ? 'My Subscription' : activeTab === 'VERIFICATION' ? 'Verification' : activeTab === 'USERS' ? 'User Management' : activeTab === 'REVIEWS' ? 'Review Moderation' : activeTab.toLowerCase().replace('_', ' ')}
+              {activeTab === 'MARKETPLACE' ? 'Marketplace' : activeTab === 'SUBSCRIPTION_PLAN' ? 'My Subscription' : activeTab === 'VERIFICATION' ? 'Verification' : activeTab === 'USERS' ? 'User Management' : activeTab === 'REVIEWS' ? 'Review Moderation' : activeTab === 'STORE_PREVIEW' ? 'Live Store Preview' : activeTab.toLowerCase().replace('_', ' ')}
             </h1>
           </div>
 
@@ -1576,6 +1751,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {activeTab === 'TRANSACTIONS' && isAdmin && renderTransactions()}
           {activeTab === 'FOLLOWERS' && renderFollowers()}
           {activeTab === 'SUBSCRIPTION_PLAN' && renderSubscriptionPlan()}
+          {activeTab === 'STORE_PREVIEW' && renderStorePreview()}
         </div>
       </div>
     </div>

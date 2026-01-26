@@ -152,7 +152,15 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case 'LANDING':
-        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} />;
+        return (
+          <LandingView 
+            onNavigate={handleNavigate} 
+            isLoggedIn={isLoggedIn} 
+            userRole={userRole} 
+            vendors={vendors}
+            onDesignerClick={handleDesignerSelect}
+          />
+        );
       case 'MARKETPLACE':
         return (
           <MarketplaceView 
@@ -177,11 +185,14 @@ const App: React.FC = () => {
           />
         ) : <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />;
       case 'PRODUCT_DETAIL':
+        const associatedVendor = vendors.find(v => v.name === selectedProduct?.designer);
         return selectedProduct ? (
           <ProductDetail 
-            product={selectedProduct} 
+            product={selectedProduct}
+            vendor={associatedVendor}
             onAddToCart={handleAddToCart} 
             onBack={() => handleNavigate('MARKETPLACE')}
+            onViewDesigner={() => associatedVendor && handleDesignerSelect(associatedVendor.name)}
             featureFlags={featureFlags}
           />
         ) : (
@@ -232,7 +243,7 @@ const App: React.FC = () => {
       case 'PRICING':
         return <PricingView onNavigate={handleNavigate} onLogin={() => handleLogin(UserRole.VENDOR)} />;
       default:
-        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} />;
+        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} onDesignerClick={handleDesignerSelect} />;
     }
   };
 

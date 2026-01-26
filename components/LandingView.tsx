@@ -1,16 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, Sparkles, Loader, Diamond } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService';
-import { TrendAnalysis, ViewState, UserRole } from '../types';
+import { TrendAnalysis, ViewState, UserRole, Vendor } from '../types';
 import { MOCK_PRODUCTS } from '../constants';
 
 interface LandingViewProps {
   onNavigate: (view: ViewState) => void;
   isLoggedIn: boolean;
   userRole: UserRole;
+  vendors: Vendor[];
+  onDesignerClick: (designerName: string) => void;
 }
 
-export const LandingView: React.FC<LandingViewProps> = ({ onNavigate, isLoggedIn, userRole }) => {
+export const LandingView: React.FC<LandingViewProps> = ({ 
+  onNavigate, 
+  isLoggedIn, 
+  userRole, 
+  vendors = [], 
+  onDesignerClick 
+}) => {
   const [trend, setTrend] = useState<TrendAnalysis | null>(null);
   const [loadingTrend, setLoadingTrend] = useState(false);
 
@@ -29,6 +37,8 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate, isLoggedIn
     else if (userRole === UserRole.VENDOR) onNavigate('VENDOR_DASHBOARD');
     else onNavigate('BUYER_DASHBOARD');
   };
+
+  const activeVendors = vendors.filter(v => v.subscriptionStatus === 'ACTIVE');
 
   return (
     <div className="w-full">
@@ -87,7 +97,6 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate, isLoggedIn
              </React.Fragment>
           ))}
         </div>
-        {/* Style to support the custom animation if not in tailwind config */}
         <style>{`
           @keyframes marquee {
             0% { transform: translateX(0); }
@@ -95,6 +104,49 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate, isLoggedIn
           }
         `}</style>
       </div>
+
+      {/* Shop by Designer Section */}
+      <section className="py-24 bg-white border-b border-gray-50">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-[0.3em] text-gray-400 mb-4 block">The Ateliers</span>
+            <h2 className="text-4xl md:text-5xl font-serif italic">Shop by Designer</h2>
+          </div>
+          
+          <div className="flex flex-wrap justify-center gap-12 md:gap-20">
+            {activeVendors.slice(0, 4).map((vendor) => (
+              <div 
+                key={vendor.id} 
+                className="group flex flex-col items-center cursor-pointer"
+                onClick={() => onDesignerClick(vendor.name)}
+              >
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border border-gray-100 p-1 mb-6 transition-all duration-500 group-hover:border-luxury-gold group-hover:scale-105 shadow-sm group-hover:shadow-xl">
+                  <div className="w-full h-full rounded-full overflow-hidden bg-gray-50 relative">
+                    <img 
+                      src={vendor.avatar} 
+                      alt={vendor.name} 
+                      className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 ease-out" 
+                    />
+                  </div>
+                </div>
+                <h3 className="text-sm font-bold uppercase tracking-widest border-b border-transparent group-hover:border-black pb-1 transition-all duration-300">
+                  {vendor.name}
+                </h3>
+                <p className="text-[10px] text-gray-400 mt-2 font-serif italic">{vendor.location}</p>
+              </div>
+            ))}
+          </div>
+          
+          <div className="text-center mt-16">
+             <button 
+                onClick={() => onNavigate('DESIGNERS')}
+                className="text-xs font-bold uppercase tracking-widest border-b border-black pb-1 hover:text-luxury-gold hover:border-luxury-gold transition-colors"
+             >
+                View All Ateliers
+             </button>
+          </div>
+        </div>
+      </section>
 
       {/* AI Curator Section */}
       <section className="py-24 bg-luxury-black text-luxury-cream overflow-hidden">

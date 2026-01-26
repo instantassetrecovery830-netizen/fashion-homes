@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler } from 'lucide-react';
-import { Product } from '../types';
+import { Product, Vendor } from '../types';
 import { getStyleMatch } from '../services/geminiService';
 
 interface ProductDetailProps {
   product: Product;
+  vendor?: Vendor;
   onAddToCart: (product: Product, size: string, measurements?: string) => void;
   onBack: () => void;
+  onViewDesigner?: () => void;
   featureFlags: { enableAiStyleMatch: boolean; enableReviews: boolean; };
 }
 
@@ -18,7 +20,7 @@ interface Review {
   date: string;
 }
 
-export const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onBack, featureFlags }) => {
+export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, onAddToCart, onBack, onViewDesigner, featureFlags }) => {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState(false);
   const [measurements, setMeasurements] = useState('');
@@ -139,6 +141,24 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCa
               {product.description} Constructed with precision and tailored for the modern silhouette. 
               This piece embodies the philosophy of {product.designer}, merging utility with high-fashion aesthetics.
             </p>
+
+            {/* Designer Story Section */}
+            {vendor && (
+                <div className="border-l-2 border-luxury-gold pl-6 py-2 my-8 animate-fade-in">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Designer Story</h4>
+                    <div className="flex items-center gap-4 mb-3">
+                        <img src={vendor.avatar} alt={vendor.name} className="w-10 h-10 rounded-full object-cover" />
+                        <span className="font-serif italic text-lg">{vendor.name}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed mb-3 line-clamp-3">{vendor.bio}</p>
+                    <button 
+                        onClick={onViewDesigner}
+                        className="text-xs font-bold uppercase tracking-widest border-b border-black pb-0.5 hover:text-luxury-gold hover:border-luxury-gold transition-colors"
+                    >
+                        View Profile
+                    </button>
+                </div>
+            )}
 
             {/* AI Style Match */}
             {featureFlags.enableAiStyleMatch && (
