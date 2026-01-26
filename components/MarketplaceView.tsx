@@ -1,17 +1,23 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Filter, ChevronDown, Heart } from 'lucide-react';
-import { MOCK_PRODUCTS } from '../constants';
-import { Product, ViewState } from '../types';
+import { Product, ViewState, Vendor } from '../types';
 
 interface MarketplaceViewProps {
   onProductSelect: (product: Product) => void;
   onNavigate: (view: ViewState) => void;
   initialDesigner?: string | null;
+  products: Product[];
+  vendors: Vendor[];
 }
 
 const FILTERS = ['All', 'Outerwear', 'Bottoms', 'Knitwear', 'Footwear', 'Accessories'];
 
-export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onProductSelect, initialDesigner }) => {
+export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ 
+  onProductSelect, 
+  initialDesigner, 
+  products,
+  vendors
+}) => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeDesigner, setActiveDesigner] = useState('All Designers');
 
@@ -24,13 +30,13 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onProductSelec
     }
   }, [initialDesigner]);
 
-  // Extract unique designers
+  // Extract unique active designers from passed products
   const designers = useMemo(() => {
-    const unique = Array.from(new Set(MOCK_PRODUCTS.map(p => p.designer)));
+    const unique = Array.from(new Set(products.map(p => p.designer)));
     return ['All Designers', ...unique.sort()];
-  }, []);
+  }, [products]);
 
-  const filteredProducts = MOCK_PRODUCTS.filter(p => {
+  const filteredProducts = products.filter(p => {
     const matchesCategory = activeCategory === 'All' || p.category === activeCategory;
     const matchesDesigner = activeDesigner === 'All Designers' || p.designer === activeDesigner;
     return matchesCategory && matchesDesigner;

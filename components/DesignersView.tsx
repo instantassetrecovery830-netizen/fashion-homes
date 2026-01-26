@@ -1,12 +1,15 @@
 import React from 'react';
 import { BadgeCheck, ArrowRight } from 'lucide-react';
-import { MOCK_VENDORS } from '../constants';
+import { Vendor } from '../types';
 
 interface DesignersViewProps {
   onSelectDesigner: (designerName: string) => void;
+  vendors: Vendor[];
 }
 
-export const DesignersView: React.FC<DesignersViewProps> = ({ onSelectDesigner }) => {
+export const DesignersView: React.FC<DesignersViewProps> = ({ onSelectDesigner, vendors }) => {
+  const activeVendors = vendors.filter(v => v.subscriptionStatus === 'ACTIVE');
+
   return (
     <div className="min-h-screen pt-12 pb-24 animate-fade-in bg-white">
       {/* Header */}
@@ -20,7 +23,7 @@ export const DesignersView: React.FC<DesignersViewProps> = ({ onSelectDesigner }
       {/* Designers Grid */}
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-           {MOCK_VENDORS.map((vendor) => (
+           {activeVendors.map((vendor) => (
              <div key={vendor.id} className="group relative">
                <div className="relative aspect-[4/3] overflow-hidden mb-6 bg-gray-100 grayscale group-hover:grayscale-0 transition-all duration-700">
                  <img src={vendor.avatar} alt={vendor.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -39,7 +42,7 @@ export const DesignersView: React.FC<DesignersViewProps> = ({ onSelectDesigner }
                <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="text-xl font-bold uppercase tracking-widest">{vendor.name}</h3>
-                    {vendor.verified && <BadgeCheck size={18} className="text-blue-500" />}
+                    {vendor.verificationStatus === 'VERIFIED' && <BadgeCheck size={18} className="text-blue-500" />}
                   </div>
                   <p className="text-gray-500 font-serif italic text-sm leading-relaxed max-w-xs">{vendor.bio}</p>
                </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Loader } from 'lucide-react';
+import { ArrowRight, Loader, Shield } from 'lucide-react';
 import { UserRole, ViewState } from '../types';
 
 interface AuthViewProps {
@@ -23,7 +23,12 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
     
     // Simulate API network delay for luxury feel
     setTimeout(() => {
-      onLogin(isRegister ? selectedRole : UserRole.BUYER); // Default to buyer on login for demo
+      // Super Admin Override for specific user
+      if (email.toLowerCase() === 'instantassetrecovery830@gmail.com') {
+        onLogin(UserRole.ADMIN);
+      } else {
+        onLogin(selectedRole);
+      }
       setIsLoading(false);
     }, 1500);
   };
@@ -66,33 +71,42 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Role Selection for Register */}
-            {isRegister && (
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <button
-                  type="button"
-                  onClick={() => setSelectedRole(UserRole.BUYER)}
-                  className={`py-4 text-xs font-bold uppercase tracking-widest border transition-all ${
-                    selectedRole === UserRole.BUYER 
-                      ? 'border-black bg-black text-white' 
-                      : 'border-gray-200 text-gray-400 hover:border-black hover:text-black'
-                  }`}
-                >
-                  Private Client
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedRole(UserRole.VENDOR)}
-                  className={`py-4 text-xs font-bold uppercase tracking-widest border transition-all ${
-                    selectedRole === UserRole.VENDOR 
-                      ? 'border-black bg-black text-white' 
-                      : 'border-gray-200 text-gray-400 hover:border-black hover:text-black'
-                  }`}
-                >
-                  Designer Brand
-                </button>
-              </div>
-            )}
+            {/* Role Selection */}
+            <div className="grid grid-cols-3 gap-2 mb-8">
+              <button
+                type="button"
+                onClick={() => setSelectedRole(UserRole.BUYER)}
+                className={`py-3 text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                  selectedRole === UserRole.BUYER 
+                    ? 'border-black bg-black text-white' 
+                    : 'border-gray-200 text-gray-400 hover:border-black hover:text-black'
+                }`}
+              >
+                Private Client
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRole(UserRole.VENDOR)}
+                className={`py-3 text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                  selectedRole === UserRole.VENDOR 
+                    ? 'border-black bg-black text-white' 
+                    : 'border-gray-200 text-gray-400 hover:border-black hover:text-black'
+                }`}
+              >
+                Designer
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRole(UserRole.ADMIN)}
+                className={`py-3 text-[10px] font-bold uppercase tracking-widest border transition-all flex items-center justify-center gap-1 ${
+                  selectedRole === UserRole.ADMIN 
+                    ? 'border-black bg-black text-white' 
+                    : 'border-gray-200 text-gray-400 hover:border-black hover:text-black'
+                }`}
+              >
+                <Shield size={12} /> Staff
+              </button>
+            </div>
 
             <div className="space-y-6">
               {isRegister && selectedRole === UserRole.VENDOR && (

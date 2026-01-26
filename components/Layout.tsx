@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle } from 'lucide-react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler } from 'lucide-react';
 import { NAV_LINKS } from '../constants';
-import { UserRole, ViewState, Product } from '../types';
+import { UserRole, ViewState, CartItem } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   role: UserRole;
-  cart: Product[];
+  cart: CartItem[];
   isCartOpen: boolean;
   setIsCartOpen: (isOpen: boolean) => void;
+  onUpdateCartItem: (index: number, updates: Partial<CartItem>) => void;
   onRemoveFromCart: (index: number) => void;
   onNavigate: (view: ViewState) => void;
   onRoleChange: (role: UserRole) => void;
@@ -23,6 +24,7 @@ export const Layout: React.FC<LayoutProps> = ({
   cart,
   isCartOpen,
   setIsCartOpen,
+  onUpdateCartItem,
   onRemoveFromCart,
   onNavigate,
   onRoleChange,
@@ -33,6 +35,7 @@ export const Layout: React.FC<LayoutProps> = ({
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
+  const [measurementError, setMeasurementError] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -51,6 +54,17 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   const handleCheckout = () => {
+    // Validate Pre-Orders
+    const hasInvalidPreOrder = cart.some(item => 
+      item.isPreOrder && (!item.measurements || item.measurements.length < 5)
+    );
+
+    if (hasInvalidPreOrder) {
+      setMeasurementError(true);
+      return;
+    }
+    setMeasurementError(false);
+
     setOrderComplete(true);
     setTimeout(() => {
       setOrderComplete(false);
@@ -125,6 +139,13 @@ export const Layout: React.FC<LayoutProps> = ({
                     >
                       <Settings size={14} /> Dashboard
                     </button>
+
+                    <button
+                      onClick={() => onNavigate('PROFILE_SETTINGS')}
+                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      <User size={14} /> Profile Settings
+                    </button>
                     
                     <button
                       onClick={onLogout}
@@ -184,6 +205,12 @@ export const Layout: React.FC<LayoutProps> = ({
                 {link.label}
               </a>
             ))}
+             <button 
+                onClick={() => { setMobileMenuOpen(false); onNavigate('PRICING'); }}
+                className="text-lg font-serif italic hover:text-luxury-gold transition-colors text-left"
+              >
+                Membership & Pricing
+              </button>
             <div className="border-t border-gray-100 pt-6 mt-2">
               <button 
                 onClick={() => { setMobileMenuOpen(false); onNavigate('AUTH'); }}
@@ -234,26 +261,49 @@ export const Layout: React.FC<LayoutProps> = ({
               </div>
             ) : (
               cart.map((item, index) => (
-                <div key={`${item.id}-${index}`} className="flex gap-4 animate-fade-in">
-                  <div className="w-24 h-32 bg-gray-100 shrink-0">
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1 flex flex-col justify-between py-1">
-                    <div>
-                      <h3 className="text-xs font-bold uppercase tracking-widest mb-1">{item.designer}</h3>
-                      <p className="font-serif italic text-sm text-gray-600 leading-tight">{item.name}</p>
-                      <p className="text-xs text-gray-400 mt-2">Size: M (Sample)</p>
+                <div key={`${item.id}-${index}`} className="animate-fade-in">
+                  <div className="flex gap-4 mb-4">
+                    <div className="w-24 h-32 bg-gray-100 shrink-0">
+                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     </div>
-                    <div className="flex justify-between items-end">
-                      <span className="text-sm font-medium">${item.price}</span>
-                      <button 
-                        onClick={() => onRemoveFromCart(index)}
-                        className="text-gray-400 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    <div className="flex-1 flex flex-col justify-between py-1">
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-widest mb-1">{item.designer}</h3>
+                        <p className="font-serif italic text-sm text-gray-600 leading-tight">{item.name}</p>
+                        <p className="text-xs text-gray-400 mt-2">Size: {item.size}</p>
+                      </div>
+                      <div className="flex justify-between items-end">
+                        <span className="text-sm font-medium">${item.price}</span>
+                        <button 
+                          onClick={() => onRemoveFromCart(index)}
+                          className="text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Pre-Order Custom Fit Section */}
+                  {item.isPreOrder && (
+                    <div className={`p-4 bg-gray-50 border ${measurementError && (!item.measurements || item.measurements.length < 5) ? 'border-red-300 bg-red-50' : 'border-gray-100'} rounded-sm`}>
+                      <div className="flex items-center gap-2 mb-2 text-luxury-gold">
+                        <Ruler size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Pre-Order: Custom Fit</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-2">This piece is made-to-order. Please provide your measurements (Bust, Waist, Hips, Height).</p>
+                      <textarea
+                        value={item.measurements || ''}
+                        onChange={(e) => onUpdateCartItem(index, { measurements: e.target.value })}
+                        placeholder="e.g. Bust: 85cm, Waist: 64cm, Hips: 92cm, Height: 175cm"
+                        className="w-full text-xs p-3 border border-gray-200 outline-none focus:border-black bg-white resize-none font-sans"
+                        rows={3}
+                      />
+                      {measurementError && (!item.measurements || item.measurements.length < 5) && (
+                        <p className="text-[10px] text-red-500 mt-1">* Measurements required for checkout</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -303,7 +353,7 @@ export const Layout: React.FC<LayoutProps> = ({
             <ul className="space-y-4 text-sm text-gray-400">
               <li>About Us</li>
               <li>Careers</li>
-              <li>Editorial</li>
+              <li className="cursor-pointer hover:text-luxury-gold" onClick={() => onNavigate('PRICING')}>Membership & Pricing</li>
               <li>Sustainability</li>
             </ul>
           </div>

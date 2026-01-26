@@ -1,14 +1,14 @@
 import React from 'react';
 import { Heart } from 'lucide-react';
-import { MOCK_PRODUCTS } from '../constants';
 import { Product } from '../types';
 
 interface NewArrivalsViewProps {
   onProductSelect: (product: Product) => void;
+  products: Product[];
 }
 
-export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ onProductSelect }) => {
-  const newArrivals = MOCK_PRODUCTS.filter(p => p.isNewSeason);
+export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ onProductSelect, products }) => {
+  const newArrivals = products.filter(p => p.isNewSeason);
 
   return (
     <div className="min-h-screen pt-12 pb-24 animate-fade-in">

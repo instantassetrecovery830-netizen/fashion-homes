@@ -5,10 +5,13 @@ import { LandingView } from './components/LandingView';
 import { MarketplaceView } from './components/MarketplaceView';
 import { NewArrivalsView } from './components/NewArrivalsView';
 import { DesignersView } from './components/DesignersView';
+import { VendorProfileView } from './components/VendorProfileView';
 import { ProductDetail } from './components/ProductDetail';
 import { Dashboard } from './components/Dashboard';
 import { AuthView } from './components/AuthView';
-import { FeatureFlags, Product, UserRole, ViewState } from './types';
+import { PricingView } from './components/PricingView';
+import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order } from './types';
+import { MOCK_VENDORS, MOCK_PRODUCTS, MOCK_ORDERS } from './constants';
 
 const App: React.FC = () => {
   // State
@@ -16,11 +19,23 @@ const App: React.FC = () => {
   const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
   // Track if user is "officially" logged in for UI purposes
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [cart, setCart] = useState<Product[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string | null>(null);
   
+  // Data State
+  const [vendors, setVendors] = useState<Vendor[]>(MOCK_VENDORS);
+  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
+  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
+
+  // Derived State: Active Products (only from active vendors)
+  const activeProducts = products.filter(product => {
+      const vendor = vendors.find(v => v.name === product.designer);
+      return vendor ? vendor.subscriptionStatus === 'ACTIVE' : true; // Default to true if no vendor found
+  });
+
   // Feature Flags Management
   const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({
     enableMarketplace: true,
@@ -41,8 +56,16 @@ const App: React.FC = () => {
   };
 
   const handleDesignerSelect = (designerName: string) => {
-    setSelectedDesignerFilter(designerName);
-    handleNavigate('MARKETPLACE');
+    // Try to find the full vendor object
+    const vendor = vendors.find(v => v.name === designerName);
+    if (vendor) {
+      setSelectedVendor(vendor);
+      handleNavigate('VENDOR_PROFILE');
+    } else {
+      // Fallback to simple filtering if no profile exists
+      setSelectedDesignerFilter(designerName);
+      handleNavigate('MARKETPLACE');
+    }
   };
 
   const handleLogin = (role: UserRole) => {
@@ -69,9 +92,21 @@ const App: React.FC = () => {
     handleNavigate('PRODUCT_DETAIL');
   };
 
-  const handleAddToCart = (product: Product) => {
-    setCart([...cart, product]);
+  const handleAddToCart = (product: Product, size: string, measurements?: string) => {
+    const newItem: CartItem = {
+      ...product,
+      quantity: 1,
+      size: size,
+      measurements: measurements || ''
+    };
+    setCart([...cart, newItem]);
     setIsCartOpen(true); // Open cart when item added
+  };
+
+  const handleUpdateCartItem = (index: number, updates: Partial<CartItem>) => {
+    const newCart = [...cart];
+    newCart[index] = { ...newCart[index], ...updates };
+    setCart(newCart);
   };
 
   const handleRemoveFromCart = (index: number) => {
@@ -80,8 +115,24 @@ const App: React.FC = () => {
     setCart(newCart);
   };
 
+  const handleAddProduct = (product: Product) => {
+    setProducts(prev => [product, ...prev]);
+  };
+
+  const handleUpdateProduct = (updatedProduct: Product) => {
+    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    setProducts(prev => prev.filter(p => p.id !== productId));
+  };
+
   const toggleFeatureFlag = (key: keyof FeatureFlags) => {
     setFeatureFlags(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleUpdateOrderStatus = (orderId: string, status: Order['status']) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
 
   // View Routing
@@ -101,13 +152,30 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case 'LANDING':
-        return <LandingView onNavigate={handleNavigate} />;
+        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} />;
       case 'MARKETPLACE':
-        return <MarketplaceView onNavigate={handleNavigate} onProductSelect={handleProductSelect} initialDesigner={selectedDesignerFilter} />;
+        return (
+          <MarketplaceView 
+            onNavigate={handleNavigate} 
+            onProductSelect={handleProductSelect} 
+            initialDesigner={selectedDesignerFilter}
+            products={activeProducts}
+            vendors={vendors}
+          />
+        );
       case 'NEW_ARRIVALS':
-        return <NewArrivalsView onProductSelect={handleProductSelect} />;
+        return <NewArrivalsView onProductSelect={handleProductSelect} products={activeProducts} />;
       case 'DESIGNERS':
-        return <DesignersView onSelectDesigner={handleDesignerSelect} />;
+        return <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />;
+      case 'VENDOR_PROFILE':
+        return selectedVendor ? (
+          <VendorProfileView 
+            vendor={selectedVendor} 
+            onProductSelect={handleProductSelect}
+            onNavigate={handleNavigate}
+            products={activeProducts}
+          />
+        ) : <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />;
       case 'PRODUCT_DETAIL':
         return selectedProduct ? (
           <ProductDetail 
@@ -116,7 +184,14 @@ const App: React.FC = () => {
             onBack={() => handleNavigate('MARKETPLACE')}
             featureFlags={featureFlags}
           />
-        ) : <MarketplaceView onNavigate={handleNavigate} onProductSelect={handleProductSelect} />;
+        ) : (
+            <MarketplaceView 
+                onNavigate={handleNavigate} 
+                onProductSelect={handleProductSelect} 
+                products={activeProducts}
+                vendors={vendors}
+            />
+        );
       case 'VENDOR_DASHBOARD':
       case 'ADMIN_PANEL':
       case 'BUYER_DASHBOARD':
@@ -126,16 +201,41 @@ const App: React.FC = () => {
             featureFlags={featureFlags} 
             toggleFeatureFlag={toggleFeatureFlag}
             onNavigate={handleNavigate}
+            vendors={vendors}
+            setVendors={setVendors}
+            orders={orders}
+            onUpdateOrderStatus={handleUpdateOrderStatus}
+            products={products}
+            onAddProduct={handleAddProduct}
+            onUpdateProduct={handleUpdateProduct}
+            onDeleteProduct={handleDeleteProduct}
+            onProductSelect={handleProductSelect}
           />
         );
+      case 'PROFILE_SETTINGS':
+        return (
+          <Dashboard 
+            role={userRole} 
+            featureFlags={featureFlags} 
+            toggleFeatureFlag={toggleFeatureFlag}
+            onNavigate={handleNavigate}
+            initialTab="PROFILE"
+            vendors={vendors}
+            setVendors={setVendors}
+            products={products}
+            onAddProduct={handleAddProduct}
+            onUpdateProduct={handleUpdateProduct}
+            onDeleteProduct={handleDeleteProduct}
+            onProductSelect={handleProductSelect}
+          />
+        );
+      case 'PRICING':
+        return <PricingView onNavigate={handleNavigate} onLogin={() => handleLogin(UserRole.VENDOR)} />;
       default:
-        return <LandingView onNavigate={handleNavigate} />;
+        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} />;
     }
   };
 
-  // If we are in AUTH view, we might not want the main layout (nav/footer) interfering, 
-  // or we want a minimal layout. The AuthView component handles its own layout, 
-  // so we can render it directly.
   if (currentView === 'AUTH') {
     return renderView();
   }
@@ -146,6 +246,7 @@ const App: React.FC = () => {
       cart={cart}
       isCartOpen={isCartOpen}
       setIsCartOpen={setIsCartOpen}
+      onUpdateCartItem={handleUpdateCartItem}
       onRemoveFromCart={handleRemoveFromCart}
       onNavigate={handleNavigate}
       onRoleChange={setUserRole}

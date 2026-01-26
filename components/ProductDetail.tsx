@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Star, Truck, ShieldCheck, Sparkles, User, Send } from 'lucide-react';
+import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler } from 'lucide-react';
 import { Product } from '../types';
 import { getStyleMatch } from '../services/geminiService';
 
 interface ProductDetailProps {
   product: Product;
-  onAddToCart: (product: Product) => void;
+  onAddToCart: (product: Product, size: string, measurements?: string) => void;
   onBack: () => void;
   featureFlags: { enableAiStyleMatch: boolean; enableReviews: boolean; };
 }
@@ -20,6 +20,8 @@ interface Review {
 
 export const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onBack, featureFlags }) => {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [sizeError, setSizeError] = useState(false);
+  const [measurements, setMeasurements] = useState('');
   const [styleTip, setStyleTip] = useState<string | null>(null);
   const [loadingStyle, setLoadingStyle] = useState(false);
   const [activeImage, setActiveImage] = useState(product.image);
@@ -35,6 +37,8 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCa
   useEffect(() => {
     setActiveImage(product.image);
     setSelectedSize(null);
+    setMeasurements('');
+    setSizeError(false);
     setStyleTip(null);
   }, [product]);
 
@@ -51,6 +55,15 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCa
     const tip = await getStyleMatch(product.name);
     setStyleTip(tip);
     setLoadingStyle(false);
+  };
+
+  const handleAddToCartClick = () => {
+    if (!selectedSize) {
+      setSizeError(true);
+      return;
+    }
+    setSizeError(false);
+    onAddToCart(product, selectedSize, measurements);
   };
 
   const handleReviewSubmit = (e: React.FormEvent) => {
@@ -78,12 +91,17 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCa
           {/* Gallery */}
           <div className="space-y-4">
             {/* Main Image */}
-            <div className="aspect-[3/4] overflow-hidden bg-gray-50 cursor-zoom-in">
+            <div className="aspect-[3/4] overflow-hidden bg-gray-50 cursor-zoom-in relative">
               <img 
                 src={activeImage} 
                 alt={product.name} 
                 className="w-full h-full object-cover hover:scale-110 transition-transform duration-700 ease-out" 
               />
+              {product.isPreOrder && (
+                 <div className="absolute top-4 left-4 bg-luxury-gold text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+                   <Clock size={12} /> Pre-Order
+                 </div>
+              )}
             </div>
             {/* Thumbnails */}
             <div className="grid grid-cols-4 gap-4">
@@ -144,13 +162,18 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCa
             )}
 
             <div className="space-y-4">
-              <p className="text-xs font-bold uppercase">Select Size</p>
-              <div className="flex gap-3">
-                {['XS', 'S', 'M', 'L', 'XL'].map(size => (
+              <div className="flex justify-between items-center">
+                <p className={`text-xs font-bold uppercase ${sizeError ? 'text-red-500' : ''}`}>Select Size</p>
+                {sizeError && <span className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12}/> Required</span>}
+              </div>
+              
+              <div className="flex flex-wrap gap-3">
+                {product.sizes && product.sizes.length > 0 ? (
+                  product.sizes.map(size => (
                   <button
                     key={size}
-                    onClick={() => setSelectedSize(size)}
-                    className={`w-12 h-12 flex items-center justify-center border text-sm transition-all ${
+                    onClick={() => { setSelectedSize(size); setSizeError(false); }}
+                    className={`min-w-[48px] h-12 px-3 flex items-center justify-center border text-sm transition-all ${
                       selectedSize === size 
                         ? 'bg-black text-white border-black' 
                         : 'border-gray-200 hover:border-black'
@@ -158,16 +181,43 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCa
                   >
                     {size}
                   </button>
-                ))}
+                ))) : (
+                  <span className="text-sm text-gray-500 italic">One Size Only</span>
+                )}
               </div>
+
+              {/* Custom Measurements Section for Pre-Order */}
+              {product.isPreOrder && (
+                <div className="pt-4 animate-fade-in border-t border-gray-50 mt-4">
+                  <div className="flex items-center gap-2 mb-3 text-luxury-gold">
+                    <Ruler size={16} />
+                    <span className="text-xs font-bold uppercase tracking-widest">Custom Measurements</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+                     For our made-to-order pieces, we ensure the perfect fit. Please provide your measurements (Bust, Waist, Hips, Height).
+                  </p>
+                  <textarea
+                    value={measurements}
+                    onChange={(e) => setMeasurements(e.target.value)}
+                    placeholder="e.g. Bust: 85cm, Waist: 64cm, Hips: 92cm, Height: 175cm"
+                    className="w-full p-4 border border-gray-200 bg-gray-50 text-sm focus:border-black outline-none min-h-[100px] resize-none font-serif placeholder-gray-400"
+                  />
+                </div>
+              )}
             </div>
 
             <button 
-              onClick={() => onAddToCart(product)}
+              onClick={handleAddToCartClick}
               className="w-full bg-black text-white py-5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
             >
-              Add to Bag
+              {product.isPreOrder ? 'Pre-Order Now' : 'Add to Bag'}
             </button>
+            
+            {product.isPreOrder && (
+              <p className="text-[10px] text-gray-500 text-center italic">
+                * This item is made-to-measure. You will be asked for measurements at checkout.
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-4 text-xs text-gray-500 pt-8 border-t border-gray-100">
               <div className="flex items-center gap-2">

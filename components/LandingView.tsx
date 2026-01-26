@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, Sparkles, Loader } from 'lucide-react';
+import { ArrowRight, Sparkles, Loader, Diamond } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService';
-import { TrendAnalysis, ViewState } from '../types';
+import { TrendAnalysis, ViewState, UserRole } from '../types';
 import { MOCK_PRODUCTS } from '../constants';
 
 interface LandingViewProps {
   onNavigate: (view: ViewState) => void;
+  isLoggedIn: boolean;
+  userRole: UserRole;
 }
 
-export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
+export const LandingView: React.FC<LandingViewProps> = ({ onNavigate, isLoggedIn, userRole }) => {
   const [trend, setTrend] = useState<TrendAnalysis | null>(null);
   const [loadingTrend, setLoadingTrend] = useState(false);
 
@@ -21,6 +23,12 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
     };
     fetchTrend();
   }, []);
+
+  const handleDashboardClick = () => {
+    if (userRole === UserRole.ADMIN) onNavigate('ADMIN_PANEL');
+    else if (userRole === UserRole.VENDOR) onNavigate('VENDOR_DASHBOARD');
+    else onNavigate('BUYER_DASHBOARD');
+  };
 
   return (
     <div className="w-full">
@@ -39,13 +47,31 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
             ETHEREAL <br /> 
             <span className="italic font-light">FORMS</span>
           </h1>
-          <button 
-            onClick={() => onNavigate('MARKETPLACE')}
-            className="group relative inline-flex items-center gap-3 px-8 py-4 bg-white text-black text-xs font-bold tracking-widest uppercase hover:bg-luxury-gold hover:text-white transition-all duration-300"
-          >
-            Shop Collection
-            <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-          </button>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+            <button 
+              onClick={() => onNavigate('MARKETPLACE')}
+              className="group relative inline-flex items-center gap-3 px-8 py-4 bg-white text-black text-xs font-bold tracking-widest uppercase hover:bg-luxury-gold hover:text-white transition-all duration-300 min-w-[200px] justify-center"
+            >
+              Shop Collection
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+            
+            <button 
+              onClick={() => onNavigate('PRICING')}
+              className="group relative inline-flex items-center gap-2 px-8 py-4 bg-black/30 backdrop-blur-md border border-white/30 text-white text-xs font-bold tracking-widest uppercase hover:bg-white hover:text-black transition-all duration-300 min-w-[200px] justify-center"
+            >
+              <Diamond size={12} /> Membership Access
+            </button>
+
+            {isLoggedIn && (
+               <button 
+                onClick={handleDashboardClick}
+                className="group relative inline-flex items-center gap-3 px-8 py-4 border border-white text-white text-xs font-bold tracking-widest uppercase hover:bg-white hover:text-black transition-all duration-300 backdrop-blur-sm min-w-[200px] justify-center"
+              >
+                Dashboard
+              </button>
+            )}
+          </div>
         </div>
       </section>
 

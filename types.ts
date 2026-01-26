@@ -15,20 +15,43 @@ export interface Product {
   rating: number;
   isNewSeason?: boolean;
   stock: number;
+  sizes: string[];
+  isPreOrder?: boolean;
 }
+
+export type SubscriptionStatus = 'ACTIVE' | 'INACTIVE';
+export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
 export interface Vendor {
   id: string;
   name: string;
   bio: string;
   avatar: string;
-  verified: boolean;
+  verificationStatus: VerificationStatus;
+  subscriptionStatus: SubscriptionStatus;
+  location?: string;
+  coverImage?: string;
+  email?: string;
+  subscriptionPlan?: 'Atelier' | 'Maison' | 'Couture';
+  website?: string;
+  instagram?: string;
+  twitter?: string;
 }
 
 export interface CartItem extends Product {
   quantity: number;
   size: string;
   stock: number;
+  measurements?: string;
+}
+
+export interface Order {
+  id: string;
+  customerName: string;
+  date: string;
+  total: number;
+  status: 'Processing' | 'Shipped' | 'Delivered';
+  items: CartItem[];
 }
 
 export interface FeatureFlags {
@@ -43,11 +66,14 @@ export type ViewState =
   | 'MARKETPLACE' 
   | 'NEW_ARRIVALS'
   | 'DESIGNERS'
+  | 'VENDOR_PROFILE'
   | 'PRODUCT_DETAIL' 
   | 'VENDOR_DASHBOARD' 
   | 'ADMIN_PANEL'
   | 'BUYER_DASHBOARD'
-  | 'AUTH';
+  | 'AUTH'
+  | 'PROFILE_SETTINGS'
+  | 'PRICING';
 
 export interface TrendAnalysis {
   title: string;
