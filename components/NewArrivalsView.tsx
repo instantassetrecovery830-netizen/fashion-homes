@@ -1,0 +1,71 @@
+import React from 'react';
+import { Heart } from 'lucide-react';
+import { MOCK_PRODUCTS } from '../constants';
+import { Product } from '../types';
+
+interface NewArrivalsViewProps {
+  onProductSelect: (product: Product) => void;
+}
+
+export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ onProductSelect }) => {
+  const newArrivals = MOCK_PRODUCTS.filter(p => p.isNewSeason);
+
+  return (
+    <div className="min-h-screen pt-12 pb-24 animate-fade-in">
+      {/* Editorial Header */}
+      <div className="max-w-7xl mx-auto px-6 mb-16">
+        <div className="flex flex-col items-center text-center space-y-6">
+          <span className="text-xs font-bold uppercase tracking-[0.3em] text-luxury-gold">Just Landed</span>
+          <h1 className="text-5xl md:text-7xl font-serif italic">New Season</h1>
+          <p className="max-w-xl text-gray-500 font-light leading-relaxed">
+            The latest drops from our curated selection of avant-garde designers. 
+            Discover the silhouettes defining this season's narrative.
+          </p>
+        </div>
+      </div>
+
+      {/* Grid */}
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-16">
+          {newArrivals.map((product) => (
+            <div 
+              key={product.id} 
+              className="group cursor-pointer"
+              onClick={() => onProductSelect(product)}
+            >
+              <div className="relative aspect-[3/4] overflow-hidden bg-gray-100 mb-6">
+                <img 
+                  src={product.image} 
+                  alt={product.name} 
+                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+                />
+                
+                <span className="absolute top-4 left-4 bg-white text-black text-[10px] font-bold px-2 py-1 uppercase tracking-wide">
+                    New Season
+                </span>
+
+                <div className="absolute inset-0 bg-black/10 transition-opacity duration-500 opacity-0 group-hover:opacity-100 flex items-end justify-center pb-8">
+                  <button className="bg-white text-black text-xs font-bold uppercase tracking-widest px-8 py-3 hover:bg-luxury-black hover:text-white transition-all duration-500 shadow-xl transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100">
+                    Quick View
+                  </button>
+                </div>
+                
+                <button className="absolute top-4 right-4 text-white mix-blend-difference hover:scale-110 transition-transform opacity-0 group-hover:opacity-100 duration-500">
+                  <Heart size={20} strokeWidth={1.5} />
+                </button>
+              </div>
+
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest mb-1">{product.designer}</h3>
+                  <p className="font-serif text-gray-600 italic group-hover:text-black transition-colors">{product.name}</p>
+                </div>
+                <span className="text-sm font-medium">${product.price}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};

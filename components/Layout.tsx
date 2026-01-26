@@ -1,0 +1,327 @@
+import React, { useState, useEffect } from 'react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle } from 'lucide-react';
+import { NAV_LINKS } from '../constants';
+import { UserRole, ViewState, Product } from '../types';
+
+interface LayoutProps {
+  children: React.ReactNode;
+  role: UserRole;
+  cart: Product[];
+  isCartOpen: boolean;
+  setIsCartOpen: (isOpen: boolean) => void;
+  onRemoveFromCart: (index: number) => void;
+  onNavigate: (view: ViewState) => void;
+  onRoleChange: (role: UserRole) => void;
+  currentView: ViewState;
+  isLoggedIn: boolean;
+  onLogout: () => void;
+}
+
+export const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  role, 
+  cart,
+  isCartOpen,
+  setIsCartOpen,
+  onRemoveFromCart,
+  onNavigate,
+  onRoleChange,
+  currentView,
+  isLoggedIn,
+  onLogout
+}) => {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [orderComplete, setOrderComplete] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
+
+  const handleDashboardClick = () => {
+    if (role === UserRole.ADMIN) onNavigate('ADMIN_PANEL');
+    else if (role === UserRole.VENDOR) onNavigate('VENDOR_DASHBOARD');
+    else onNavigate('BUYER_DASHBOARD');
+  };
+
+  const handleCheckout = () => {
+    setOrderComplete(true);
+    setTimeout(() => {
+      setOrderComplete(false);
+      setIsCartOpen(false);
+      if (isLoggedIn) {
+        handleDashboardClick();
+      } else {
+        onNavigate('AUTH');
+      }
+    }, 2000);
+  };
+
+  return (
+    <div className="min-h-screen bg-luxury-cream text-luxury-black font-sans selection:bg-luxury-gold selection:text-white transition-colors duration-500">
+      {/* Navigation */}
+      <nav 
+        className={`fixed top-0 w-full z-50 transition-all duration-300 border-b border-transparent ${
+          isScrolled || mobileMenuOpen ? 'bg-white/95 backdrop-blur-md border-gray-100 py-3' : 'bg-transparent py-6'
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+          
+          {/* Mobile Menu Button */}
+          <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+
+          {/* Logo */}
+          <div 
+            className="text-2xl md:text-3xl font-serif font-bold tracking-widest cursor-pointer hover:opacity-70 transition-opacity"
+            onClick={() => onNavigate('LANDING')}
+          >
+            LUMIERRE
+          </div>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex gap-8 text-xs font-medium tracking-widest uppercase">
+            {NAV_LINKS.map((link) => (
+              <a 
+                key={link.label} 
+                onClick={() => onNavigate(link.view)}
+                className={`hover:text-luxury-gold transition-colors cursor-pointer ${currentView === link.view ? 'text-luxury-gold border-b border-luxury-gold pb-0.5' : ''}`}
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+
+          {/* Icons */}
+          <div className="flex items-center gap-6">
+            <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
+            
+            {/* User / Auth Menu */}
+            <div className="relative group">
+              <User 
+                size={20} 
+                className={`cursor-pointer transition-colors ${isLoggedIn ? 'text-luxury-black' : 'text-gray-400 hover:text-luxury-gold'}`}
+                onClick={() => !isLoggedIn && onNavigate('AUTH')}
+              />
+              
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-200">
+                {isLoggedIn ? (
+                  <>
+                    <div className="p-4 border-b border-gray-50">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signed in as</p>
+                      <p className="font-bold text-sm">{role}</p>
+                    </div>
+                    
+                    <button
+                      onClick={handleDashboardClick}
+                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      <Settings size={14} /> Dashboard
+                    </button>
+                    
+                    <button
+                      onClick={onLogout}
+                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-500"
+                    >
+                      <LogOut size={14} /> Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <div className="p-2">
+                    <button 
+                      onClick={() => onNavigate('AUTH')}
+                      className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors"
+                    >
+                      Sign In / Join
+                    </button>
+                    <div className="mt-2 border-t border-gray-100 pt-2">
+                      <p className="text-[10px] text-gray-300 uppercase px-2 mb-1">Dev: Quick Switch</p>
+                      {Object.values(UserRole).map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => onRoleChange(r)}
+                          className={`block w-full text-left px-2 py-1 text-xs hover:bg-gray-50 text-gray-400`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div 
+              className="relative cursor-pointer hover:text-luxury-gold transition-colors" 
+              onClick={() => setIsCartOpen(true)}
+            >
+              <ShoppingBag size={20} />
+              {cart.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-luxury-black text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full">
+                  {cart.length}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Menu Overlay */}
+        {mobileMenuOpen && (
+          <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 py-8 px-6 flex flex-col gap-6 animate-slide-up h-screen">
+             {NAV_LINKS.map((link) => (
+              <a 
+                key={link.label} 
+                onClick={() => { setMobileMenuOpen(false); onNavigate(link.view); }}
+                className="text-lg font-serif italic hover:text-luxury-gold transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
+            <div className="border-t border-gray-100 pt-6 mt-2">
+              <button 
+                onClick={() => { setMobileMenuOpen(false); onNavigate('AUTH'); }}
+                className="text-lg font-serif italic hover:text-luxury-gold transition-colors"
+              >
+                Sign In / Register
+              </button>
+            </div>
+          </div>
+        )}
+      </nav>
+
+      {/* Cart Drawer */}
+      <div 
+        className={`fixed inset-0 z-[60] transition-visibility duration-500 ${isCartOpen ? 'visible' : 'invisible'}`}
+      >
+        <div 
+          className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-500 ${isCartOpen ? 'opacity-100' : 'opacity-0'}`}
+          onClick={() => setIsCartOpen(false)}
+        />
+        <div 
+          className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl transform transition-transform duration-500 ease-out flex flex-col ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        >
+          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10">
+             <h2 className="text-xl font-serif italic">Your Selection</h2>
+             <button onClick={() => setIsCartOpen(false)} className="hover:rotate-90 transition-transform duration-300">
+               <X size={24} />
+             </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            {orderComplete ? (
+              <div className="h-full flex flex-col items-center justify-center text-center animate-fade-in">
+                <CheckCircle size={64} className="text-green-500 mb-6" />
+                <h3 className="text-2xl font-serif italic mb-2">Order Confirmed</h3>
+                <p className="text-gray-500 text-sm max-w-xs">Your pieces are being prepared by the atelier. You will receive a confirmation shortly.</p>
+              </div>
+            ) : cart.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                <ShoppingBag size={48} className="mb-4 opacity-20" />
+                <p className="text-sm uppercase tracking-widest">Your bag is empty</p>
+                <button 
+                  onClick={() => { setIsCartOpen(false); onNavigate('MARKETPLACE'); }}
+                  className="mt-6 text-xs underline hover:text-black"
+                >
+                  Start Shopping
+                </button>
+              </div>
+            ) : (
+              cart.map((item, index) => (
+                <div key={`${item.id}-${index}`} className="flex gap-4 animate-fade-in">
+                  <div className="w-24 h-32 bg-gray-100 shrink-0">
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 flex flex-col justify-between py-1">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-widest mb-1">{item.designer}</h3>
+                      <p className="font-serif italic text-sm text-gray-600 leading-tight">{item.name}</p>
+                      <p className="text-xs text-gray-400 mt-2">Size: M (Sample)</p>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <span className="text-sm font-medium">${item.price}</span>
+                      <button 
+                        onClick={() => onRemoveFromCart(index)}
+                        className="text-gray-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {cart.length > 0 && !orderComplete && (
+            <div className="p-6 bg-gray-50 border-t border-gray-100">
+              <div className="flex justify-between items-center mb-6 text-sm">
+                <span className="uppercase tracking-widest text-gray-500">Subtotal</span>
+                <span className="font-bold text-lg">${cartTotal}</span>
+              </div>
+              <button 
+                onClick={handleCheckout}
+                className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group"
+              >
+                Checkout
+                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <main className="pt-20 min-h-screen">
+        {children}
+      </main>
+
+      <footer className="bg-luxury-black text-luxury-cream py-20 px-6 mt-20">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+          <div>
+            <h3 className="text-2xl font-serif font-bold tracking-widest mb-6">LUMIERRE</h3>
+            <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
+              Redefining luxury digital commerce through curation, technology, and sustainable innovation.
+            </p>
+          </div>
+          <div>
+            <h4 className="uppercase text-xs font-bold tracking-widest mb-6 text-white">Client Services</h4>
+            <ul className="space-y-4 text-sm text-gray-400">
+              <li>FAQ</li>
+              <li>Shipping & Returns</li>
+              <li>Size Guide</li>
+              <li>Track Order</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="uppercase text-xs font-bold tracking-widest mb-6 text-white">The Company</h4>
+            <ul className="space-y-4 text-sm text-gray-400">
+              <li>About Us</li>
+              <li>Careers</li>
+              <li>Editorial</li>
+              <li>Sustainability</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="uppercase text-xs font-bold tracking-widest mb-6 text-white">Newsletter</h4>
+            <div className="flex border-b border-gray-600 pb-2">
+              <input type="email" placeholder="EMAIL ADDRESS" className="bg-transparent w-full outline-none text-white placeholder-gray-600 text-sm" />
+              <button className="text-xs uppercase hover:text-luxury-gold">Join</button>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-gray-900 flex justify-between items-center text-xs text-gray-600">
+          <div>© 2024 LUMIERRE. ALL RIGHTS RESERVED.</div>
+          <div className="flex gap-4">
+             <Globe size={14} /> <span>US / USD</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
