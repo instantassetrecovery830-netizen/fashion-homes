@@ -362,12 +362,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (currentVendor && setVendors) {
         const updatedVendors = vendors.map(v => {
             if (v.id === currentVendor.id) {
-                return { ...v, subscriptionPlan: planName as any } as Vendor;
+                return { ...v, subscriptionPlan: planName as any, subscriptionStatus: 'ACTIVE' } as Vendor;
             }
             return v;
         });
         setVendors(updatedVendors);
-        alert(`Plan switched to ${planName}.`);
+        alert(`Plan switched to ${planName} and subscription activated.`);
     }
   };
 
@@ -467,14 +467,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const renderSubscriptionPlan = () => (
     <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
         <h3 className="text-xl font-serif italic mb-6">Subscription Plan</h3>
-        <p className="text-sm text-gray-500 mb-8">Current Plan: <span className="font-bold text-black uppercase">{currentVendor?.subscriptionPlan || 'None'}</span></p>
+        <div className="flex items-center justify-between mb-8">
+            <p className="text-sm text-gray-500">
+                Current Plan: <span className="font-bold text-black uppercase">{currentVendor?.subscriptionPlan || 'None'}</span>
+            </p>
+            {!isSubscribed && (
+                 <span className="bg-red-100 text-red-600 px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full">
+                    Subscription Expired
+                 </span>
+            )}
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {SUBSCRIPTION_PLANS.map((plan, idx) => {
-                const isCurrent = currentVendor?.subscriptionPlan === plan.name;
+                const isCurrentPlan = currentVendor?.subscriptionPlan === plan.name;
+                // It is the active plan if it matches AND the subscription is active.
+                const isActivePlan = isCurrentPlan && isSubscribed;
+                
                 return (
-                    <div key={idx} className={`border p-6 relative flex flex-col ${isCurrent ? 'border-black bg-gray-50' : 'border-gray-200'}`}>
-                        {isCurrent && <div className="absolute top-0 right-0 bg-black text-white px-2 py-1 text-[10px] uppercase font-bold">Current</div>}
+                    <div key={idx} className={`border p-6 relative flex flex-col ${isActivePlan ? 'border-black bg-gray-50' : 'border-gray-200'}`}>
+                        {isActivePlan && <div className="absolute top-0 right-0 bg-black text-white px-2 py-1 text-[10px] uppercase font-bold">Active</div>}
                         <h4 className="text-lg font-serif italic mb-2">{plan.name}</h4>
                         <p className="text-2xl font-bold mb-4">{plan.price}<span className="text-xs font-normal text-gray-500">{plan.period}</span></p>
                         <ul className="text-xs text-gray-500 space-y-2 mb-6 flex-1">
@@ -486,10 +498,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </ul>
                         <button 
                             onClick={() => handlePlanChange(plan.name)}
-                            disabled={isCurrent}
-                            className={`w-full py-3 text-xs font-bold uppercase tracking-widest ${isCurrent ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-black text-white hover:bg-luxury-gold'}`}
+                            disabled={isActivePlan} 
+                            className={`w-full py-3 text-xs font-bold uppercase tracking-widest ${
+                                isActivePlan 
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                                : 'bg-black text-white hover:bg-luxury-gold'
+                            }`}
                         >
-                            {isCurrent ? 'Active' : 'Switch Plan'}
+                            {isActivePlan ? 'Current Plan' : (isCurrentPlan && !isSubscribed ? 'Renew Plan' : 'Switch Plan')}
                         </button>
                     </div>
                 );

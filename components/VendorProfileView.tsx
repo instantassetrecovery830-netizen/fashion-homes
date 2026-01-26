@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BadgeCheck, MapPin, Users, Star, ArrowLeft, Heart, Share2, Instagram, Twitter, Globe, Check } from 'lucide-react';
+import { BadgeCheck, MapPin, Users, Star, ArrowLeft, Heart, Share2, Instagram, Twitter, Globe, Check, X, Link, Facebook, Mail } from 'lucide-react';
 import { Vendor, Product, ViewState } from '../types';
 
 interface VendorProfileViewProps {
@@ -11,6 +11,8 @@ interface VendorProfileViewProps {
 
 export const VendorProfileView: React.FC<VendorProfileViewProps> = ({ vendor, onProductSelect, onNavigate, products }) => {
   const [isFollowing, setIsFollowing] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   
   // Filter products for this specific vendor from the passed active products
   const vendorProducts = products.filter(p => p.designer === vendor.name);
@@ -19,25 +21,96 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({ vendor, on
     setIsFollowing(!isFollowing);
   };
 
-  const handleShare = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: `LUMIERRE | ${vendor.name}`,
-          text: `Discover ${vendor.name} on LUMIERRE, the luxury fashion ecosystem.`,
-          url: window.location.href,
-        });
-      } else {
-        await navigator.clipboard.writeText(window.location.href);
-        alert("Profile link copied to clipboard.");
+  const handleShareClick = () => {
+    setShowShareModal(true);
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const handleSocialShare = (platform: string) => {
+      const url = encodeURIComponent(window.location.href);
+      const text = encodeURIComponent(`Check out ${vendor.name} on LUMIERRE.`);
+      let shareUrl = '';
+
+      switch(platform) {
+          case 'twitter':
+              shareUrl = `https://twitter.com/intent/tweet?url=${url}&text=${text}`;
+              break;
+          case 'facebook':
+              shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+              break;
+          case 'email':
+              shareUrl = `mailto:?subject=${text}&body=${url}`;
+              break;
       }
-    } catch (error) {
-      console.log('Error sharing:', error);
-    }
+      
+      if (shareUrl) window.open(shareUrl, '_blank');
   };
 
   return (
-    <div className="min-h-screen bg-white animate-fade-in">
+    <div className="min-h-screen bg-white animate-fade-in relative">
+      {/* Share Modal Overlay */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white w-full max-w-md p-8 shadow-2xl relative animate-slide-up">
+                <button 
+                    onClick={() => setShowShareModal(false)}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-black transition-colors"
+                >
+                    <X size={24} />
+                </button>
+                
+                <h3 className="text-2xl font-serif italic mb-2 text-center">Share Profile</h3>
+                <p className="text-center text-gray-500 text-sm mb-8">Spread the word about {vendor.name}</p>
+
+                <div className="grid grid-cols-4 gap-4 mb-8">
+                     {/* Copy Link */}
+                     <button onClick={handleCopyLink} className="flex flex-col items-center gap-2 group">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${linkCopied ? 'bg-green-100 text-green-600' : 'bg-gray-50 group-hover:bg-black group-hover:text-white'}`}>
+                            {linkCopied ? <Check size={20} /> : <Link size={20} />}
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{linkCopied ? 'Copied' : 'Copy'}</span>
+                     </button>
+
+                     {/* Twitter */}
+                     <button onClick={() => handleSocialShare('twitter')} className="flex flex-col items-center gap-2 group">
+                        <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
+                            <Twitter size={20} />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Twitter</span>
+                     </button>
+                     
+                     {/* Facebook */}
+                      <button onClick={() => handleSocialShare('facebook')} className="flex flex-col items-center gap-2 group">
+                        <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
+                            <Facebook size={20} />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Facebook</span>
+                     </button>
+
+                     {/* Email */}
+                      <button onClick={() => handleSocialShare('email')} className="flex flex-col items-center gap-2 group">
+                        <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
+                            <Mail size={20} />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Email</span>
+                     </button>
+                </div>
+
+                <div className="bg-gray-50 p-3 flex items-center justify-between border border-gray-100">
+                    <span className="text-xs text-gray-500 truncate max-w-[200px]">{window.location.href}</span>
+                    <button onClick={handleCopyLink} className="text-xs font-bold uppercase tracking-widest hover:text-luxury-gold px-2">
+                        {linkCopied ? 'Copied' : 'Copy Link'}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Cover Image */}
       <div className="h-64 md:h-80 w-full relative overflow-hidden">
          <img 
@@ -95,7 +168,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({ vendor, on
                    {isFollowing ? 'Following' : 'Follow'}
                  </button>
                  <button 
-                   onClick={handleShare}
+                   onClick={handleShareClick}
                    className="border border-gray-200 p-3 hover:border-black transition-colors"
                    title="Share Profile"
                  >
