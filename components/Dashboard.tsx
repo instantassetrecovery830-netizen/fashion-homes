@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid 
 } from 'recharts';
@@ -9,7 +9,7 @@ import {
   Palette, Layout, Type, FileText, Newspaper, ExternalLink,
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield,
-  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star
+  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus } from '../types';
 import { MOCK_PRODUCTS } from '../constants';
@@ -168,6 +168,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const vendorProducts = isVendor 
     ? products.filter(p => p.designer === (currentVendor?.name || 'Maison Margaux'))
     : products; // Admin sees all
+
+  // Calculate stats dynamically
+  const stats = useMemo(() => {
+    let revenue = 0;
+    let activeOrders = 0;
+    let clients = new Set<string>();
+    
+    // Filter orders based on role
+    const relevantOrders = isVendor && currentVendor
+      ? orders.filter(o => o.items.some(i => i.designer === currentVendor.name))
+      : orders;
+
+    relevantOrders.forEach(order => {
+       if (isVendor && currentVendor) {
+           // Calculate only vendor's share of the revenue
+           const vendorItems = order.items.filter(i => i.designer === currentVendor.name);
+           revenue += vendorItems.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+       } else {
+           revenue += order.total;
+       }
+       
+       if (order.status !== 'Delivered') activeOrders++;
+       clients.add(order.customerName);
+    });
+
+    return {
+        revenue,
+        activeOrders,
+        clients: clients.size,
+        aov: relevantOrders.length ? revenue / relevantOrders.length : 0
+    };
+  }, [orders, isVendor, currentVendor]);
 
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -844,7 +876,121 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
   );
 
-  const renderFulfillment = () => renderOrders();
+  const renderFulfillment = () => {
+    // Determine the relevant vendor name.
+    const vendorName = currentVendor?.name;
+    
+    if (!vendorName) return <p className="text-center py-12 text-gray-500">Vendor profile not active.</p>;
+
+    const vendorOrders = orders.filter(order => 
+      order.items.some(item => item.designer === vendorName)
+    );
+
+    return (
+      <div className="space-y-8 animate-fade-in">
+          {vendorOrders.length === 0 ? (
+              <div className="text-center py-24 bg-white border border-dashed border-gray-200">
+                  <Package size={48} className="mx-auto text-gray-200 mb-4" />
+                  <h3 className="text-lg font-serif italic text-gray-400">No pending orders</h3>
+                  <p className="text-xs text-gray-300 uppercase tracking-widest mt-2">New client purchases will appear here</p>
+              </div>
+          ) : (
+              vendorOrders.map(order => {
+                  const myItems = order.items.filter(item => item.designer === vendorName);
+                  const orderValue = myItems.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0);
+
+                  return (
+                      <div key={order.id} className="bg-white border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-50 pb-6 mb-6 gap-6">
+                              <div className="flex items-center gap-4">
+                                   <div className="w-12 h-12 bg-black text-white flex items-center justify-center">
+                                       <span className="font-bold text-xs">#{order.id.split('_')[1] || order.id.slice(-4)}</span>
+                                   </div>
+                                   <div>
+                                       <div className="flex items-center gap-2">
+                                           <h4 className="font-serif italic text-xl">{order.customerName}</h4>
+                                           <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded-full text-gray-500">{order.date}</span>
+                                       </div>
+                                       <p className="text-xs text-gray-400 uppercase tracking-widest mt-1">
+                                           {myItems.length} Item{myItems.length > 1 ? 's' : ''} to Fulfill
+                                       </p>
+                                   </div>
+                              </div>
+
+                              <div className="flex items-center gap-8">
+                                  <div className="text-right">
+                                      <p className="text-[10px] text-gray-400 uppercase tracking-widest">Revenue</p>
+                                      <p className="font-bold text-lg">${orderValue}</p>
+                                  </div>
+                                  
+                                  <div className="flex flex-col items-end gap-2">
+                                     <div className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border flex items-center gap-1 ${
+                                         order.status === 'Delivered' ? 'border-green-200 bg-green-50 text-green-600' :
+                                         order.status === 'Shipped' ? 'border-blue-200 bg-blue-50 text-blue-600' :
+                                         'border-orange-200 bg-orange-50 text-orange-600'
+                                     }`}>
+                                         {order.status === 'Delivered' && <CheckCircle size={10} />}
+                                         {order.status === 'Shipped' && <Truck size={10} />}
+                                         {order.status === 'Processing' && <Loader className="animate-spin" size={10} />}
+                                         {order.status}
+                                     </div>
+                                     <select 
+                                         value={order.status} 
+                                         onChange={(e) => onUpdateOrderStatus && onUpdateOrderStatus(order.id, e.target.value as any)}
+                                         className="text-xs border-b border-gray-200 py-1 outline-none focus:border-black cursor-pointer bg-transparent text-right"
+                                     >
+                                         <option value="Processing">Mark Processing</option>
+                                         <option value="Shipped">Mark Shipped</option>
+                                         <option value="Delivered">Mark Delivered</option>
+                                     </select>
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div className="space-y-3">
+                              {myItems.map((item, idx) => (
+                                  <div key={`${order.id}-item-${idx}`} className="flex gap-4 p-4 bg-gray-50 border border-gray-100">
+                                      <div className="w-16 h-20 bg-white shrink-0">
+                                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                      </div>
+                                      <div className="flex-1">
+                                          <div className="flex justify-between items-start">
+                                              <div>
+                                                  <h5 className="font-bold text-sm">{item.name}</h5>
+                                                  <p className="text-xs text-gray-500 mt-1">Size: <span className="text-black font-medium">{item.size}</span></p>
+                                                  <p className="text-xs text-gray-500">Qty: {item.quantity || 1}</p>
+                                              </div>
+                                              <span className="font-medium text-sm">${item.price}</span>
+                                          </div>
+                                          
+                                          {item.measurements && (
+                                              <div className="mt-3 text-xs bg-white border border-gray-200 p-3">
+                                                  <p className="font-bold text-[10px] uppercase tracking-widest text-luxury-gold mb-1 flex items-center gap-1">
+                                                      <Ruler size={10} /> Custom Measurements
+                                                  </p>
+                                                  <p className="text-gray-600 font-mono text-[10px]">{item.measurements}</p>
+                                              </div>
+                                          )}
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+
+                          <div className="mt-6 pt-4 border-t border-gray-50 flex justify-end gap-3">
+                              <button className="px-6 py-3 border border-gray-200 text-xs font-bold uppercase tracking-widest hover:border-black transition-colors">
+                                  Invoice
+                              </button>
+                              <button className="px-6 py-3 bg-black text-white text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2">
+                                  <Truck size={14} /> Generate Shipping Label
+                              </button>
+                          </div>
+                      </div>
+                  )
+              })
+          )}
+      </div>
+    );
+  };
 
   const renderSubscriptions = () => (
       <div className="space-y-4 animate-fade-in">
@@ -1176,7 +1322,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </h1>
           </div>
 
-          {activeTab === 'OVERVIEW' && renderOverview(SALES_DATA)}
+          {activeTab === 'OVERVIEW' && renderOverview(SALES_DATA, stats)}
           {activeTab === 'PRODUCTS' && renderProducts()}
           {activeTab === 'UPLOAD' && renderUpload()}
           {activeTab === 'ORDERS' && renderOrders()}
@@ -1209,14 +1355,14 @@ const AreaChartComponent = ({ data }: { data: any[] }) => (
   </LineChart>
 );
 
-const renderOverview = (data: any[]) => (
+const renderOverview = (data: any[], stats: { revenue: number, activeOrders: number, clients: number, aov: number }) => (
   <div className="space-y-8 animate-fade-in">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
-          { label: 'Total Revenue', value: '$45,231', icon: DollarSign, trend: '+12%' },
-          { label: 'Active Orders', value: '12', icon: Package, trend: '+2' },
-          { label: 'Total Clients', value: '1,203', icon: Users, trend: '+5%' },
-          { label: 'Avg. Order Value', value: '$340', icon: Activity, trend: '-1%' },
+          { label: 'Total Revenue', value: `$${stats.revenue.toLocaleString()}`, icon: DollarSign, trend: '+12%' },
+          { label: 'Active Orders', value: stats.activeOrders.toString(), icon: Package, trend: '+2' },
+          { label: 'Total Clients', value: stats.clients.toString(), icon: Users, trend: '+5%' },
+          { label: 'Avg. Order Value', value: `$${Math.round(stats.aov).toLocaleString()}`, icon: Activity, trend: '-1%' },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-6 border border-gray-100 shadow-sm flex flex-col justify-between h-32">
             <div className="flex justify-between items-start">

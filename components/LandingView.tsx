@@ -43,17 +43,27 @@ export const LandingView: React.FC<LandingViewProps> = ({
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative h-[90vh] w-full overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/30 z-10" />
-        <img 
-          src="https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop" 
-          alt="African Luxury Campaign" 
-          className="absolute inset-0 w-full h-full object-cover animate-fade-in"
-        />
+      <section className="relative h-[90vh] w-full overflow-hidden flex items-center justify-center bg-luxury-black">
+        <div className="absolute inset-0 bg-black/40 z-10" />
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          poster="https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop"
+          className="absolute inset-0 w-full h-full object-cover animate-fade-in opacity-90"
+        >
+          <source src="https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4" type="video/mp4" />
+          <img 
+            src="https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop" 
+            alt="African Luxury Campaign" 
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </video>
         
         <div className="relative z-20 text-center text-white px-4 animate-slide-up">
-          <h2 className="text-sm md:text-base tracking-[0.3em] uppercase mb-4 opacity-90">The New Vanguard</h2>
-          <h1 className="text-5xl md:text-8xl font-serif font-medium mb-8 leading-tight">
+          <h2 className="text-sm md:text-base tracking-[0.3em] uppercase mb-4 opacity-90 text-luxury-gold">The New Vanguard</h2>
+          <h1 className="text-5xl md:text-8xl font-serif font-medium mb-8 leading-tight drop-shadow-2xl">
             AFRICAN <br /> 
             <span className="italic font-light">LUXURY</span>
           </h1>
@@ -191,21 +201,61 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </div>
       </section>
 
+      {/* Campaign / Visual Section */}
+      <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+           <div className="mb-12 text-center">
+              <span className="text-xs font-bold uppercase tracking-[0.3em] text-gray-400 mb-2 block">The Campaign</span>
+              <h2 className="text-4xl font-serif italic">Urban Chronicles</h2>
+           </div>
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-auto md:h-[600px] auto-rows-fr">
+              <div 
+                onClick={() => onNavigate('MARKETPLACE')}
+                className="col-span-1 md:col-span-2 row-span-2 relative group overflow-hidden h-[400px] md:h-full cursor-pointer"
+              >
+                 <img src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 1" />
+                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                 <div className="absolute bottom-6 left-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    <p className="text-xs font-bold uppercase tracking-widest">Street Edition</p>
+                 </div>
+              </div>
+              <div 
+                onClick={() => onNavigate('MARKETPLACE')}
+                className="col-span-1 relative group overflow-hidden h-[200px] md:h-full cursor-pointer"
+              >
+                 <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 2" />
+              </div>
+              <div 
+                onClick={() => onNavigate('MARKETPLACE')}
+                className="col-span-1 relative group overflow-hidden h-[200px] md:h-full cursor-pointer"
+              >
+                 <img src="https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 3" />
+              </div>
+               <div 
+                 onClick={() => onNavigate('MARKETPLACE')}
+                 className="col-span-2 relative group overflow-hidden h-[200px] md:h-full cursor-pointer"
+               >
+                 <img src="https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 4" />
+              </div>
+           </div>
+        </div>
+      </section>
+
       {/* Spotlight Products */}
-      <section className="py-24 max-w-7xl mx-auto px-6">
+      <section className="py-24 max-w-7xl mx-auto px-6 bg-luxury-cream/30">
         <div className="flex justify-between items-end mb-12">
            <h2 className="text-3xl font-serif italic">Editor's Picks</h2>
            <button onClick={() => onNavigate('MARKETPLACE')} className="text-xs uppercase border-b border-black pb-1 hover:text-luxury-gold hover:border-luxury-gold transition-colors">View All</button>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-12">
-          {MOCK_PRODUCTS.slice(0, 3).map((product) => (
+          {MOCK_PRODUCTS.map((product) => (
             <div key={product.id} className="group cursor-pointer" onClick={() => onNavigate('MARKETPLACE')}>
               <div className="relative overflow-hidden mb-6 aspect-[3/4]">
                 <img 
                   src={product.image} 
                   alt={product.name} 
-                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out"
+                  className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
                 />
                 {product.isNewSeason && (
                   <span className="absolute top-4 left-4 bg-white text-black text-[10px] font-bold px-2 py-1 uppercase tracking-wide">
