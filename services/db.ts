@@ -1,4 +1,10 @@
-import { Pool } from '@neondatabase/serverless';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+
+// Suppress security warning for browser usage
+// This allows the app to function without flooding the console, 
+// accepting the risks of client-side DB access for this prototype.
+// @ts-ignore
+neonConfig.disableWarningInBrowsers = true;
 
 // In a real production environment, this should be in an environment variable.
 // For this demo, we use the provided connection string.
