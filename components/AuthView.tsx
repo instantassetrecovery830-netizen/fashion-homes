@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader, Shield, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, RefreshCw } from 'lucide-react';
 import { UserRole, ViewState, Vendor } from '../types';
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle } from '../services/firebase';
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, onAuthStateChanged } from '../services/firebase';
 import { createVendorInDb, createUserInDb } from '../services/dataService';
 
 interface AuthViewProps {
@@ -29,6 +29,22 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [avatar, setAvatar] = useState<string>('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+
+  // Check for existing unverified session on mount (e.g. refresh)
+  useEffect(() => {
+    if (auth.currentUser && !auth.currentUser.emailVerified) {
+        setVerificationEmail(auth.currentUser.email || '');
+        setVerificationNeeded(true);
+    }
+    // Also listen for auth state changes just in case
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user && !user.emailVerified) {
+            setVerificationEmail(user.email || '');
+            setVerificationNeeded(true);
+        }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -64,7 +80,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
   const handleResendVerification = async () => {
     const user = auth.currentUser;
     if (!user) {
-        // If for some reason user is not found, we cannot use SDK.
         setError("Session expired. Please sign in again to resend email.");
         return;
     }
