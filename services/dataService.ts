@@ -67,6 +67,18 @@ export const seedDatabase = async () => {
       );
     `);
 
+    // Create Users Table (For Buyers/Admins)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        email TEXT,
+        role TEXT,
+        avatar TEXT,
+        joined_date TEXT
+      );
+    `);
+
     // Create Products Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
@@ -189,6 +201,22 @@ export const updateVendorInDb = async (vendor: Vendor) => {
     SET name=$2, bio=$3, avatar=$4, location=$5, cover_image=$6, email=$7, website=$8, instagram=$9, twitter=$10, subscription_plan=$11, subscription_status=$12, verification_status=$13
     WHERE id=$1
   `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.location, vendor.coverImage, vendor.email, vendor.website, vendor.instagram, vendor.twitter, vendor.subscriptionPlan, vendor.subscriptionStatus, vendor.verificationStatus]);
+};
+
+export const createVendorInDb = async (vendor: Vendor) => {
+  await pool.query(`
+    INSERT INTO vendors (id, name, bio, avatar, verification_status, subscription_status, location, cover_image, email, subscription_plan, website, instagram, twitter)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.website, vendor.instagram, vendor.twitter]);
+};
+
+// --- WRITE OPERATIONS (USERS/BUYERS) ---
+
+export const createUserInDb = async (user: { id: string, name: string, email: string, role: string, avatar: string }) => {
+  await pool.query(`
+    INSERT INTO users (id, name, email, role, avatar, joined_date)
+    VALUES ($1, $2, $3, $4, $5, $6)
+  `, [user.id, user.name, user.email, user.role, user.avatar, new Date().toISOString()]);
 };
 
 // --- WRITE OPERATIONS (ORDERS) ---

@@ -18,6 +18,8 @@ import {
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb
 } from './services/dataService';
 import { Loader } from 'lucide-react';
+import { auth } from './services/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 const App: React.FC = () => {
   // State
@@ -59,12 +61,42 @@ const App: React.FC = () => {
         await refreshData();
       } catch (error) {
         console.error("Database initialization failed.", error);
-        // Even if fail, we might show empty states rather than full mocks to enforce 'real' mode
       } finally {
         setIsLoadingData(false);
       }
     };
     initData();
+  }, []);
+
+  // Listen for Auth State Changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsLoggedIn(true);
+        // Determine Role
+        const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
+        if (adminEmails.includes(user.email?.toLowerCase() || '')) {
+            setUserRole(UserRole.ADMIN);
+        } else {
+            // Check if user is a vendor in DB
+            // Note: This relies on vendors being fetched. 
+            // We fetch vendors fresh to ensure we catch new registrations.
+            const currentVendors = await fetchVendors();
+            const matchingVendor = currentVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
+            
+            if (matchingVendor) {
+                setUserRole(UserRole.VENDOR);
+            } else {
+                setUserRole(UserRole.BUYER);
+            }
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUserRole(UserRole.BUYER);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Derived State: Active Products (only from active vendors)
@@ -103,8 +135,8 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (role: UserRole) => {
-    setUserRole(role);
-    setIsLoggedIn(true);
+    // This is called by AuthView on success. 
+    // AuthListener will handle state, we just navigate.
     if (role === UserRole.ADMIN) {
       handleNavigate('ADMIN_PANEL');
     } else if (role === UserRole.VENDOR) {
@@ -114,10 +146,13 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUserRole(UserRole.BUYER);
-    handleNavigate('LANDING');
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      handleNavigate('LANDING');
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
   };
 
   const handleProductSelect = (product: Product) => {
@@ -166,17 +201,6 @@ const App: React.FC = () => {
   };
   
   const handleSetVendors = async (updatedVendors: Vendor[]) => {
-    // This receives the full array, but we need to find diffs or update individually.
-    // For the Dashboard implementation, it usually passes the full list but implies a single update.
-    // We will assume simpler single updates are better, but for compatibility with Dashboard signature:
-    // We will just find the changed vendor and update it.
-    
-    // In a real app, the Dashboard would call updateVendor directly. 
-    // Here we iterate and update (or better, modify Dashboard to call specific update)
-    // For now, let's just assume the Dashboard modifies one vendor and calls this.
-    // To be safe, we will just update all vendors in the passed array (not efficient but functional for demo-removal)
-    // BETTER: Modify Dashboard to not require setVendors for single updates, but for now we iterate.
-    
     for (const v of updatedVendors) {
        await updateVendorInDb(v);
     }
