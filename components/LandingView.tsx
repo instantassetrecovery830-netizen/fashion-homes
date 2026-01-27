@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, Sparkles, Loader, Diamond } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService';
-import { TrendAnalysis, ViewState, UserRole, Vendor } from '../types';
-import { MOCK_PRODUCTS } from '../constants';
+import { TrendAnalysis, ViewState, UserRole, Vendor, Product } from '../types';
 
 interface LandingViewProps {
   onNavigate: (view: ViewState) => void;
   isLoggedIn: boolean;
   userRole: UserRole;
   vendors: Vendor[];
+  products: Product[];
   onDesignerClick: (designerName: string) => void;
 }
 
@@ -17,6 +17,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   isLoggedIn, 
   userRole, 
   vendors = [], 
+  products = [],
   onDesignerClick 
 }) => {
   const [trend, setTrend] = useState<TrendAnalysis | null>(null);
@@ -39,6 +40,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   };
 
   const activeVendors = vendors.filter(v => v.subscriptionStatus === 'ACTIVE');
+  const spotlightProducts = products.slice(0, 3); // Display first 3 real products
 
   return (
     <div className="w-full">
@@ -249,7 +251,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-12">
-          {MOCK_PRODUCTS.map((product) => (
+          {spotlightProducts.length > 0 ? spotlightProducts.map((product) => (
             <div key={product.id} className="group cursor-pointer" onClick={() => onNavigate('MARKETPLACE')}>
               <div className="relative overflow-hidden mb-6 aspect-[3/4]">
                 <img 
@@ -267,7 +269,11 @@ export const LandingView: React.FC<LandingViewProps> = ({
               <p className="font-serif text-lg italic text-gray-600 mb-2">{product.name}</p>
               <p className="text-sm font-medium">${product.price}</p>
             </div>
-          ))}
+          )) : (
+            <div className="col-span-3 text-center text-gray-400 py-12">
+              <p>No products featured at the moment.</p>
+            </div>
+          )}
         </div>
       </section>
     </div>

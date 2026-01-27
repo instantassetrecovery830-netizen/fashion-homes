@@ -172,6 +172,26 @@ export const fetchOrders = async (): Promise<Order[]> => {
   }
 };
 
+export const fetchUsers = async (): Promise<any[]> => {
+  try {
+    const res = await pool.query('SELECT * FROM users ORDER BY joined_date DESC');
+    return res.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+      avatar: row.avatar,
+      joined: new Date(row.joined_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      status: 'ACTIVE', // Defaulting for display
+      spend: '-',
+      location: 'Global'
+    }));
+  } catch (e) {
+    console.error("Failed to fetch users", e);
+    return [];
+  }
+};
+
 // --- WRITE OPERATIONS (PRODUCTS) ---
 
 export const addProductToDb = async (product: Product) => {

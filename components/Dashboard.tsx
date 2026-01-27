@@ -35,6 +35,7 @@ interface DashboardProps {
   orders?: Order[];
   onUpdateOrderStatus?: (orderId: string, status: Order['status']) => void;
   products?: Product[];
+  users?: any[];
   onAddProduct?: (product: Product) => Promise<void>;
   onUpdateProduct?: (product: Product) => Promise<void>;
   onDeleteProduct?: (productId: string) => Promise<void>;
@@ -54,11 +55,6 @@ const MOCK_FOLLOWERS = [
 
 const MOCK_USERS_LIST = [
   { id: 'u0', name: 'Admin', email: 'instantassetrecovery830@gmail.com', role: 'ADMIN', status: 'ACTIVE', joined: 'Jan 2024', spend: '-', location: 'Global' },
-  { id: 'u_admin2', name: 'Julie M.', email: 'juliemtrice7@proton.me', role: 'ADMIN', status: 'ACTIVE', joined: 'Feb 2024', spend: '-', location: 'Global' },
-  { id: 'u1', name: 'Alice V.', email: 'alice@example.com', role: 'BUYER', status: 'ACTIVE', joined: 'Oct 2023', spend: '$12,450', location: 'New York, USA' },
-  { id: 'u2', name: 'James B.', email: 'james@example.com', role: 'BUYER', status: 'ACTIVE', joined: 'Nov 2023', spend: '$8,200', location: 'London, UK' },
-  { id: 'u3', name: 'Elena K.', email: 'elena@example.com', role: 'BUYER', status: 'SUSPENDED', joined: 'Dec 2023', spend: '$1,500', location: 'Moscow, RU' },
-  { id: 'u4', name: 'Marc D.', email: 'marc@example.com', role: 'BUYER', status: 'ACTIVE', joined: 'Jan 2024', spend: '$24,000', location: 'Paris, FR' },
 ];
 
 const MOCK_ADMIN_REVIEWS = [
@@ -109,6 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   orders = [],
   onUpdateOrderStatus,
   products = MOCK_PRODUCTS,
+  users = [],
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
@@ -126,7 +123,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [activeTab, setActiveTab] = useState<DashboardTab>('OVERVIEW');
   const [savedItems, setSavedItems] = useState<Product[]>(products.slice(0, 3)); 
   const [followers, setFollowers] = useState(MOCK_FOLLOWERS);
-  const [users, setUsers] = useState(MOCK_USERS_LIST);
+  // Use passed users from DB, fallback to mock if empty (though logic handles empty arrays)
+  const [userList, setUserList] = useState(users.length > 0 ? users : MOCK_USERS_LIST);
   const [adminReviews, setAdminReviews] = useState(MOCK_ADMIN_REVIEWS);
   const [transactions, setTransactions] = useState(MOCK_TRANSACTIONS);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -205,6 +203,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
   }, [initialTab]);
+  
+  // Update local user list when props change (e.g. after fetch)
+  useEffect(() => {
+    if (users.length > 0) {
+      setUserList(users);
+    }
+  }, [users]);
 
   useEffect(() => {
     if (currentVendor) {
@@ -341,11 +346,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
   
   const toggleUserStatus = (id: string) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' } : u));
+    setUserList(prev => prev.map(u => u.id === id ? { ...u, status: u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' } : u));
   };
 
   const handleRoleUpdate = (userId: string, newRole: string) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    setUserList(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
   };
 
   const handleSubscriptionToggle = (vendorId: string) => {
@@ -1085,11 +1090,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </tr>
               </thead>
               <tbody>
-                  {users.map(user => (
+                  {userList.map(user => (
                       <tr key={user.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                           <td className="p-4">
                               <div className="font-bold text-sm">{user.name}</div>
                               <div className="text-xs text-gray-400">{user.email}</div>
+                              <div className="text-[10px] text-gray-300 mt-0.5">Joined: {user.joined}</div>
                           </td>
                           <td className="p-4">
                               <select 

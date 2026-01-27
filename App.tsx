@@ -13,13 +13,12 @@ import { PricingView } from './components/PricingView';
 import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order } from './types';
 import { MOCK_VENDORS, MOCK_PRODUCTS, MOCK_ORDERS } from './constants';
 import { 
-  seedDatabase, fetchVendors, fetchProducts, fetchOrders,
+  seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb
 } from './services/dataService';
 import { Loader } from 'lucide-react';
-import { auth } from './services/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth, onAuthStateChanged, signOut } from './services/firebase';
 
 const App: React.FC = () => {
   // State
@@ -36,19 +35,22 @@ const App: React.FC = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   // Initialize DB and Fetch Data
   const refreshData = async () => {
     try {
-      const [dbVendors, dbProducts, dbOrders] = await Promise.all([
+      const [dbVendors, dbProducts, dbOrders, dbUsers] = await Promise.all([
         fetchVendors(), 
         fetchProducts(),
-        fetchOrders()
+        fetchOrders(),
+        fetchUsers()
       ]);
       setVendors(dbVendors);
       setProducts(dbProducts);
       setOrders(dbOrders);
+      setAllUsers(dbUsers);
     } catch (error) {
       console.error("Failed to refresh data", error);
     }
@@ -71,7 +73,8 @@ const App: React.FC = () => {
   // Listen for Auth State Changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+      // Strictly require email verification for login state
+      if (user && user.emailVerified) {
         setIsLoggedIn(true);
         // Determine Role
         const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
@@ -245,6 +248,7 @@ const App: React.FC = () => {
             isLoggedIn={isLoggedIn} 
             userRole={userRole} 
             vendors={vendors}
+            products={activeProducts}
             onDesignerClick={handleDesignerSelect}
           />
         );
@@ -304,6 +308,7 @@ const App: React.FC = () => {
             orders={orders}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             products={products}
+            users={allUsers}
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
@@ -321,6 +326,7 @@ const App: React.FC = () => {
             vendors={vendors}
             setVendors={handleSetVendors}
             products={products}
+            users={allUsers}
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
@@ -330,7 +336,7 @@ const App: React.FC = () => {
       case 'PRICING':
         return <PricingView onNavigate={handleNavigate} onLogin={() => handleLogin(UserRole.VENDOR)} />;
       default:
-        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} onDesignerClick={handleDesignerSelect} />;
+        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} products={activeProducts} onDesignerClick={handleDesignerSelect} />;
     }
   };
 
