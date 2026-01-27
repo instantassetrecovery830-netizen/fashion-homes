@@ -36,14 +36,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
         setVerificationEmail(auth.currentUser.email || '');
         setVerificationNeeded(true);
     }
-    // Also listen for auth state changes just in case
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user && !user.emailVerified) {
-            setVerificationEmail(user.email || '');
-            setVerificationNeeded(true);
-        }
-    });
-    return () => unsubscribe();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,7 +237,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
                     Verify it and log in.
                 </p>
                 <button 
-                    onClick={() => {
+                    onClick={async () => {
+                        // Sign out so they can log in again to refresh their token status
+                        await signOut(auth);
                         setVerificationNeeded(false);
                         setIsRegister(false); // Switch to login mode
                         setPassword(''); // Clear password for security

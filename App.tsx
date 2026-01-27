@@ -71,32 +71,33 @@ const App: React.FC = () => {
   // Listen for Auth State Changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // Strictly require email verification for login state
-      if (user && user.emailVerified) {
-        setIsLoggedIn(true);
-        // Determine Role
-        const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
-        if (adminEmails.includes(user.email?.toLowerCase() || '')) {
-            setUserRole(UserRole.ADMIN);
+      if (user) {
+        if (user.emailVerified) {
+          setIsLoggedIn(true);
+          // Determine Role
+          const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
+          if (adminEmails.includes(user.email?.toLowerCase() || '')) {
+              setUserRole(UserRole.ADMIN);
+          } else {
+              // Check if user is a vendor in DB
+              // Note: This relies on vendors being fetched. 
+              // We fetch vendors fresh to ensure we catch new registrations.
+              const currentVendors = await fetchVendors();
+              const matchingVendor = currentVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
+              
+              if (matchingVendor) {
+                  setUserRole(UserRole.VENDOR);
+              } else {
+                  setUserRole(UserRole.BUYER);
+              }
+          }
         } else {
-            // Check if user is a vendor in DB
-            // Note: This relies on vendors being fetched. 
-            // We fetch vendors fresh to ensure we catch new registrations.
-            const currentVendors = await fetchVendors();
-            const matchingVendor = currentVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
-            
-            if (matchingVendor) {
-                setUserRole(UserRole.VENDOR);
-            } else {
-                setUserRole(UserRole.BUYER);
-            }
+          // User exists but email is not verified
+          setIsLoggedIn(false);
+          setUserRole(UserRole.BUYER);
+          // Redirect to Auth view so verification screen can be shown
+          setCurrentView('AUTH');
         }
-      } else if (user && !user.emailVerified) {
-        // User is authenticated but not verified. 
-        // Redirect to AuthView to show verification screen.
-        setIsLoggedIn(false);
-        setUserRole(UserRole.BUYER);
-        setCurrentView('AUTH');
       } else {
         setIsLoggedIn(false);
         setUserRole(UserRole.BUYER);
