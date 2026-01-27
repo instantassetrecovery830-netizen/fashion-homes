@@ -26,7 +26,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
     // For now, we instantly log the user in based on their selection
     
     setTimeout(() => {
-        if (email.toLowerCase() === 'instantassetrecovery830@gmail.com') {
+        const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
+        if (adminEmails.includes(email.toLowerCase())) {
           onLogin(UserRole.ADMIN);
         } else {
           onLogin(selectedRole);

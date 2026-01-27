@@ -54,6 +54,7 @@ const MOCK_FOLLOWERS = [
 
 const MOCK_USERS_LIST = [
   { id: 'u0', name: 'Admin', email: 'instantassetrecovery830@gmail.com', role: 'ADMIN', status: 'ACTIVE', joined: 'Jan 2024', spend: '-', location: 'Global' },
+  { id: 'u_admin2', name: 'Julie M.', email: 'juliemtrice7@proton.me', role: 'ADMIN', status: 'ACTIVE', joined: 'Feb 2024', spend: '-', location: 'Global' },
   { id: 'u1', name: 'Alice V.', email: 'alice@example.com', role: 'BUYER', status: 'ACTIVE', joined: 'Oct 2023', spend: '$12,450', location: 'New York, USA' },
   { id: 'u2', name: 'James B.', email: 'james@example.com', role: 'BUYER', status: 'ACTIVE', joined: 'Nov 2023', spend: '$8,200', location: 'London, UK' },
   { id: 'u3', name: 'Elena K.', email: 'elena@example.com', role: 'BUYER', status: 'SUSPENDED', joined: 'Dec 2023', spend: '$1,500', location: 'Moscow, RU' },
