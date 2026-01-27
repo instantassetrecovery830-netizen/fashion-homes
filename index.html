@@ -5,30 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MyFitStore | Luxury Fashion Ecosystem</title>
 
+    <!-- Tailwind CDN (OK for now) -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react/": "https://esm.sh/react@18.3.1/",
-    "react-dom": "https://esm.sh/react-dom@18.3.1",
-    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
-    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "lucide-react": "https://esm.sh/lucide-react@0.263.1",
-    "recharts": "https://esm.sh/recharts@2.12.0",
-    "@neondatabase/serverless": "https://esm.sh/@neondatabase/serverless@0.9.0",
-    "firebase/app": "https://esm.sh/firebase@10.8.0/app",
-    "firebase/auth": "https://esm.sh/firebase@10.8.0/auth",
-  }
-}
-</script>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;600&display=swap"
+      rel="stylesheet"
+    >
   </head>
 
   <body>
     <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
+
+    <!-- ✅ Vite entry point -->
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
