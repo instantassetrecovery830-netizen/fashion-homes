@@ -165,7 +165,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
               <div className="p-6 bg-luxury-cream border border-luxury-gold/20 rounded-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles size={16} className="text-luxury-gold" />
-                  <h4 className="text-xs font-bold uppercase tracking-widest">LUMIERRE AI Stylist</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-widest">MyFitStore AI Stylist</h4>
                 </div>
                 {styleTip ? (
                   <p className="text-sm font-serif italic text-gray-700 animate-fade-in">"{styleTip}"</p>

@@ -44,18 +44,18 @@ export const LandingView: React.FC<LandingViewProps> = ({
     <div className="w-full">
       {/* Hero Section */}
       <section className="relative h-[90vh] w-full overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/20 z-10" />
+        <div className="absolute inset-0 bg-black/30 z-10" />
         <img 
-          src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop" 
-          alt="Campaign" 
+          src="https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop" 
+          alt="African Luxury Campaign" 
           className="absolute inset-0 w-full h-full object-cover animate-fade-in"
         />
         
         <div className="relative z-20 text-center text-white px-4 animate-slide-up">
-          <h2 className="text-sm md:text-base tracking-[0.3em] uppercase mb-4 opacity-90">Spring / Summer 2024</h2>
+          <h2 className="text-sm md:text-base tracking-[0.3em] uppercase mb-4 opacity-90">The New Vanguard</h2>
           <h1 className="text-5xl md:text-8xl font-serif font-medium mb-8 leading-tight">
-            ETHEREAL <br /> 
-            <span className="italic font-light">FORMS</span>
+            AFRICAN <br /> 
+            <span className="italic font-light">LUXURY</span>
           </h1>
           <div className="flex flex-col md:flex-row items-center justify-center gap-4">
             <button 
@@ -90,9 +90,9 @@ export const LandingView: React.FC<LandingViewProps> = ({
         <div className="inline-flex animate-[marquee_20s_linear_infinite]">
           {[...Array(6)].map((_, i) => (
              <React.Fragment key={i}>
-                <span className="text-xs font-bold uppercase tracking-[0.3em] mx-8">New Season Arrivals</span>
-                <span className="text-xs font-serif italic mx-8">Global Shipping</span>
-                <span className="text-xs font-bold uppercase tracking-[0.3em] mx-8">Maison Margaux × Kaizen</span>
+                <span className="text-xs font-bold uppercase tracking-[0.3em] mx-8">Lagos • Accra • Nairobi • Cape Town</span>
+                <span className="text-xs font-serif italic mx-8">Heritage Reimagined</span>
+                <span className="text-xs font-bold uppercase tracking-[0.3em] mx-8">Pan-African Aesthetics</span>
                 <span className="mx-8 text-black/50">•</span>
              </React.Fragment>
           ))}
@@ -183,8 +183,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
             <div className="relative">
                {/* Editorial Grid Mockup */}
                <div className="grid grid-cols-2 gap-4">
-                  <img src="https://picsum.photos/id/338/300/400" className="w-full h-64 object-cover grayscale hover:grayscale-0 transition-all duration-700" alt="Trend 1" />
-                  <img src="https://picsum.photos/id/342/300/400" className="w-full h-64 object-cover mt-12 grayscale hover:grayscale-0 transition-all duration-700" alt="Trend 2" />
+                  <img src="https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800" className="w-full h-64 object-cover grayscale hover:grayscale-0 transition-all duration-700" alt="African Fashion Trend 1" />
+                  <img src="https://images.unsplash.com/photo-1589156280159-27698a70f29e?q=80&w=800" className="w-full h-64 object-cover mt-12 grayscale hover:grayscale-0 transition-all duration-700" alt="African Fashion Trend 2" />
                </div>
             </div>
           </div>

@@ -21,182 +21,112 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate API network delay for luxury feel
+    // Immediate Login - "Real Time" feel
+    // In a full implementation, we would verify credentials against DB here
+    // For now, we instantly log the user in based on their selection
+    
     setTimeout(() => {
-      // Super Admin Override for specific user
-      if (email.toLowerCase() === 'instantassetrecovery830@gmail.com') {
-        onLogin(UserRole.ADMIN);
-      } else {
-        onLogin(selectedRole);
-      }
-      setIsLoading(false);
-    }, 1500);
+        if (email.toLowerCase() === 'instantassetrecovery830@gmail.com') {
+          onLogin(UserRole.ADMIN);
+        } else {
+          onLogin(selectedRole);
+        }
+        setIsLoading(false);
+    }, 1000);
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-luxury-cream">
-      {/* Editorial Image Section (Hidden on mobile) */}
-      <div className="hidden lg:block w-1/2 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10 z-10"></div>
-        <img 
-          src="https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888&auto=format&fit=crop" 
-          alt="Editorial Fashion" 
-          className="w-full h-full object-cover animate-fade-in"
-        />
-        <div className="absolute bottom-12 left-12 z-20 text-white">
-          <p className="text-xs font-bold uppercase tracking-[0.3em] mb-4">LUMIERRE Membership</p>
-          <h2 className="text-5xl font-serif italic leading-tight">Join the<br/>Avant-Garde.</h2>
-        </div>
-      </div>
-
-      {/* Form Section */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24 bg-white relative">
-        <button 
-          onClick={() => onNavigate('LANDING')}
-          className="absolute top-8 right-8 text-xs font-bold uppercase tracking-widest hover:text-luxury-gold transition-colors"
-        >
-          Close
-        </button>
-
-        <div className="w-full max-w-md animate-slide-up">
-          <div className="mb-12">
-            <h1 className="text-3xl font-serif italic mb-2">
-              {isRegister ? 'Apply for Access' : 'Welcome Back'}
-            </h1>
-            <p className="text-gray-500 text-sm">
-              {isRegister 
-                ? 'Create an account to access exclusive collections and drops.' 
-                : 'Sign in to manage your wishlist and orders.'}
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Role Selection */}
-            <div className="grid grid-cols-3 gap-2 mb-8">
-              <button
-                type="button"
-                onClick={() => setSelectedRole(UserRole.BUYER)}
-                className={`py-3 text-[10px] font-bold uppercase tracking-widest border transition-all ${
-                  selectedRole === UserRole.BUYER 
-                    ? 'border-black bg-black text-white' 
-                    : 'border-gray-200 text-gray-400 hover:border-black hover:text-black'
-                }`}
-              >
-                Private Client
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedRole(UserRole.VENDOR)}
-                className={`py-3 text-[10px] font-bold uppercase tracking-widest border transition-all ${
-                  selectedRole === UserRole.VENDOR 
-                    ? 'border-black bg-black text-white' 
-                    : 'border-gray-200 text-gray-400 hover:border-black hover:text-black'
-                }`}
-              >
-                Designer
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedRole(UserRole.ADMIN)}
-                className={`py-3 text-[10px] font-bold uppercase tracking-widest border transition-all flex items-center justify-center gap-1 ${
-                  selectedRole === UserRole.ADMIN 
-                    ? 'border-black bg-black text-white' 
-                    : 'border-gray-200 text-gray-400 hover:border-black hover:text-black'
-                }`}
-              >
-                <Shield size={12} /> Staff
-              </button>
+    <div className="min-h-screen flex items-center justify-center bg-white p-6 animate-fade-in">
+        <div className="w-full max-w-md">
+            <div className="text-center mb-12">
+                 <h1 className="text-4xl font-serif italic mb-2">MyFitStore</h1>
+                 <p className="text-gray-400 text-sm uppercase tracking-widest">
+                     {isRegister ? 'Join the Community' : 'Welcome Back'}
+                 </p>
             </div>
 
-            <div className="space-y-6">
-              {isRegister && selectedRole === UserRole.VENDOR && (
-                <div className="relative group">
-                  <input 
-                    type="text" 
-                    value={brandName}
-                    onChange={(e) => setBrandName(e.target.value)}
-                    required
-                    className="w-full py-3 border-b border-gray-200 outline-none text-luxury-black bg-transparent focus:border-luxury-black transition-colors peer placeholder-transparent"
-                    id="brand"
-                    placeholder="Brand Name"
-                  />
-                  <label 
-                    htmlFor="brand"
-                    className="absolute left-0 -top-3.5 text-xs text-gray-400 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-3.5 peer-focus:text-xs peer-focus:text-gray-600"
-                  >
-                    Brand / Atelier Name
-                  </label>
-                </div>
-              )}
+            <form onSubmit={handleSubmit} className="space-y-6">
+                 {/* Role Selection for Register or easy switching in demo */}
+                 <div className="flex bg-gray-50 p-1 rounded-sm mb-6">
+                     <button
+                        type="button" 
+                        onClick={() => setSelectedRole(UserRole.BUYER)}
+                        className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-all ${selectedRole === UserRole.BUYER ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
+                     >
+                         Buyer
+                     </button>
+                     <button 
+                        type="button"
+                        onClick={() => setSelectedRole(UserRole.VENDOR)}
+                        className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-all ${selectedRole === UserRole.VENDOR ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
+                     >
+                         Vendor
+                     </button>
+                 </div>
 
-              <div className="relative group">
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full py-3 border-b border-gray-200 outline-none text-luxury-black bg-transparent focus:border-luxury-black transition-colors peer placeholder-transparent"
-                  id="email"
-                  placeholder="Email"
-                />
-                <label 
-                  htmlFor="email"
-                  className="absolute left-0 -top-3.5 text-xs text-gray-400 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-3.5 peer-focus:text-xs peer-focus:text-gray-600"
+                 {isRegister && selectedRole === UserRole.VENDOR && (
+                     <div>
+                        <input 
+                            type="text"
+                            required
+                            placeholder="Brand / Atelier Name"
+                            value={brandName}
+                            onChange={(e) => setBrandName(e.target.value)}
+                            className="w-full border-b border-gray-200 py-3 text-sm focus:border-black outline-none bg-transparent"
+                        />
+                     </div>
+                 )}
+
+                 <div>
+                    <input 
+                        type="email"
+                        required
+                        placeholder="Email Address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full border-b border-gray-200 py-3 text-sm focus:border-black outline-none bg-transparent"
+                    />
+                 </div>
+
+                 <div>
+                    <input 
+                        type="password"
+                        required
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full border-b border-gray-200 py-3 text-sm focus:border-black outline-none bg-transparent"
+                    />
+                 </div>
+
+                 <button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex justify-center items-center gap-2 mt-8 disabled:opacity-70"
+                 >
+                    {isLoading ? <Loader className="animate-spin" size={16} /> : (
+                        <>
+                           {isRegister ? 'Create Account' : 'Sign In'} <ArrowRight size={16} />
+                        </>
+                    )}
+                 </button>
+            </form>
+
+            <div className="mt-8 text-center">
+                <button 
+                    onClick={() => setIsRegister(!isRegister)}
+                    className="text-xs text-gray-400 hover:text-black transition-colors border-b border-transparent hover:border-black pb-0.5"
                 >
-                  Email Address
-                </label>
-              </div>
-
-              <div className="relative group">
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full py-3 border-b border-gray-200 outline-none text-luxury-black bg-transparent focus:border-luxury-black transition-colors peer placeholder-transparent"
-                  id="password"
-                  placeholder="Password"
-                />
-                <label 
-                  htmlFor="password"
-                  className="absolute left-0 -top-3.5 text-xs text-gray-400 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-focus:-top-3.5 peer-focus:text-xs peer-focus:text-gray-600"
-                >
-                  Password
-                </label>
-              </div>
+                    {isRegister ? 'Already have an account? Sign In' : 'New to MyFitStore? Apply for Access'}
+                </button>
             </div>
-
-            <div className="pt-4">
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="w-full bg-luxury-black text-white py-5 flex justify-center items-center gap-3 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors disabled:opacity-70"
-              >
-                {isLoading ? (
-                  <Loader className="animate-spin" size={16} />
-                ) : (
-                  <>
-                    {isRegister ? 'Complete Registration' : 'Secure Sign In'}
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </button>
+            
+            <div className="mt-12 text-center">
+                 <button onClick={() => onNavigate('LANDING')} className="text-[10px] text-gray-300 uppercase tracking-widest hover:text-black transition-colors">
+                     Back to Store
+                 </button>
             </div>
-          </form>
-
-          <div className="mt-8 text-center">
-            <p className="text-gray-500 text-sm">
-              {isRegister ? 'Already a member?' : 'New to LUMIERRE?'}
-              <button 
-                onClick={() => setIsRegister(!isRegister)}
-                className="ml-2 font-bold text-black uppercase tracking-wider text-xs hover:text-luxury-gold transition-colors border-b border-black pb-0.5"
-              >
-                {isRegister ? 'Sign In' : 'Apply Now'}
-              </button>
-            </p>
-          </div>
         </div>
-      </div>
     </div>
   );
 };

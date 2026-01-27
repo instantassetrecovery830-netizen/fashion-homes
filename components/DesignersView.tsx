@@ -16,7 +16,7 @@ export const DesignersView: React.FC<DesignersViewProps> = ({ onSelectDesigner, 
       <div className="max-w-7xl mx-auto px-6 mb-20 border-b border-gray-100 pb-12">
         <h1 className="text-4xl md:text-6xl font-serif italic mb-6">The Ateliers</h1>
         <p className="text-gray-500 max-w-2xl font-light text-lg">
-           Explore the visionaries shaping the future of fashion. From Tokyo streetwear to Parisian couture, discover the brands defining the LUMIERRE aesthetic.
+           Explore the visionaries shaping the future of fashion. From Tokyo streetwear to Parisian couture, discover the brands defining the MyFitStore aesthetic.
         </p>
       </div>
 

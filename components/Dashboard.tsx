@@ -9,7 +9,7 @@ import {
   Palette, Layout, Type, FileText, Newspaper, ExternalLink,
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield,
-  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown
+  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus } from '../types';
 import { MOCK_PRODUCTS } from '../constants';
@@ -35,9 +35,9 @@ interface DashboardProps {
   orders?: Order[];
   onUpdateOrderStatus?: (orderId: string, status: Order['status']) => void;
   products?: Product[];
-  onAddProduct?: (product: Product) => void;
-  onUpdateProduct?: (product: Product) => void;
-  onDeleteProduct?: (productId: string) => void;
+  onAddProduct?: (product: Product) => Promise<void>;
+  onUpdateProduct?: (product: Product) => Promise<void>;
+  onDeleteProduct?: (productId: string) => Promise<void>;
   onProductSelect?: (product: Product) => void;
 }
 
@@ -128,11 +128,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [users, setUsers] = useState(MOCK_USERS_LIST);
   const [adminReviews, setAdminReviews] = useState(MOCK_ADMIN_REVIEWS);
   const [transactions, setTransactions] = useState(MOCK_TRANSACTIONS);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Editable Profile State
   const [profileForm, setProfileForm] = useState({
     name: currentVendor?.name || '',
-    email: currentVendor?.email || 'contact@lumierre.com',
+    email: currentVendor?.email || 'contact@myfitstore.com',
     avatar: currentVendor?.avatar || '',
     website: currentVendor?.website || '',
     instagram: currentVendor?.instagram || '',
@@ -159,14 +160,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
     description: '',
     image: '',
     designer: currentVendor?.name || 'Maison Margaux', 
-    stock: 1,
+    stock: 1, 
     sizes: ['S', 'M', 'L']
   });
 
   // Filter products for the current vendor view
   const vendorProducts = isVendor 
     ? products.filter(p => p.designer === (currentVendor?.name || 'Maison Margaux'))
-    : products; // Admin sees all (or logic could differ)
+    : products; // Admin sees all
 
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -176,7 +177,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (currentVendor) {
       setProfileForm({
         name: currentVendor.name,
-        email: currentVendor.email || 'contact@lumierre.com',
+        email: currentVendor.email || 'contact@myfitstore.com',
         avatar: currentVendor.avatar,
         website: currentVendor.website || '',
         instagram: currentVendor.instagram || '',
@@ -212,44 +213,54 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
   };
 
-  const handleUpload = (e: React.FormEvent) => {
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
     if (!isSubscribed) {
         alert("Please subscribe to publish products.");
+        setIsSubmitting(false);
         return;
     }
     
     if (!isVerified) {
         alert("Your vendor profile must be verified by our team before listing products.");
+        setIsSubmitting(false);
         return;
     }
 
-    if (isEditing && onUpdateProduct && newProduct.id) {
-        onUpdateProduct(newProduct as Product);
-        setIsEditing(false);
-    } else {
-        const product: Product = {
-            id: `new-${Date.now()}`,
-            name: newProduct.name || 'Untitled Piece',
-            price: newProduct.price || 0,
-            category: newProduct.category || 'Uncategorized',
-            description: newProduct.description || '',
-            image: newProduct.image || 'https://picsum.photos/600/800',
-            designer: currentVendor?.name || 'Maison Margaux',
-            rating: 0,
-            stock: newProduct.stock || 1,
-            isNewSeason: true,
-            sizes: newProduct.sizes || ['M']
-        };
-        
-        if (onAddProduct) {
-            onAddProduct(product);
+    try {
+        if (isEditing && onUpdateProduct && newProduct.id) {
+            await onUpdateProduct(newProduct as Product);
+            setIsEditing(false);
+        } else {
+            const product: Product = {
+                id: `new-${Date.now()}`,
+                name: newProduct.name || 'Untitled Piece',
+                price: newProduct.price || 0,
+                category: newProduct.category || 'Uncategorized',
+                description: newProduct.description || '',
+                image: newProduct.image || 'https://picsum.photos/600/800',
+                designer: currentVendor?.name || 'Maison Margaux',
+                rating: 0,
+                stock: newProduct.stock || 1,
+                isNewSeason: true,
+                sizes: newProduct.sizes || ['M']
+            };
+            
+            if (onAddProduct) {
+                await onAddProduct(product);
+            }
         }
+        
+        setActiveTab('PRODUCTS');
+        setNewProduct({ name: '', price: 0, category: 'Outerwear', description: '', image: '', designer: currentVendor?.name || 'Maison Margaux', stock: 1, sizes: ['S', 'M', 'L'] });
+    } catch (err) {
+        alert('Failed to save product. Please try again.');
+        console.error(err);
+    } finally {
+        setIsSubmitting(false);
     }
-    
-    setActiveTab('PRODUCTS');
-    setNewProduct({ name: '', price: 0, category: 'Outerwear', description: '', image: '', designer: currentVendor?.name || 'Maison Margaux', stock: 1, sizes: ['S', 'M', 'L'] });
   };
 
   const handleSaveProfile = () => {
@@ -271,7 +282,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       alert("Profile updated successfully.");
     }
   };
-
+  
   const handleSaveStoreDesign = () => {
      if (currentVendor && setVendors) {
       const updatedVendors = vendors.map(v => 
@@ -315,17 +326,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setVendors(updatedVendors);
   };
   
-  const handleSubscriptionPlanUpdate = (vendorId: string, newPlan: any) => {
-    if (!setVendors) return;
-    const updatedVendors = vendors.map(v => {
-      if (v.id === vendorId) {
-        return { ...v, subscriptionPlan: newPlan } as Vendor;
-      }
-      return v;
-    });
-    setVendors(updatedVendors);
-  };
-  
   const handleVerificationStatus = (vendorId: string, status: VerificationStatus) => {
     if (!setVendors) return;
     const updatedVendors = vendors.map(v => {
@@ -346,18 +346,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleVendorSelfSubscribe = () => {
-    if (currentVendor && setVendors) {
-        const updatedVendors = vendors.map(v => {
-            if (v.id === currentVendor.id) {
-                return { ...v, subscriptionStatus: 'ACTIVE' } as Vendor;
-            }
-            return v;
-        });
-        setVendors(updatedVendors);
-    }
-  };
-
   const handlePlanChange = (planName: string) => {
       if (currentVendor && setVendors) {
         const updatedVendors = vendors.map(v => {
@@ -370,7 +358,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         alert(`Plan switched to ${planName} and subscription activated.`);
     }
   };
-
+  
   const getSidebarItems = () => {
     if (isBuyer) {
       return [
@@ -416,7 +404,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const renderSidebar = () => (
     <div className="w-full md:w-64 bg-white border-r border-gray-100 min-h-screen p-6 fixed md:relative z-10 hidden md:block">
       <div className="mb-12">
-        <h2 className="text-xl font-serif font-bold italic">Atelier.</h2>
+        <h2 className="text-xl font-serif font-bold italic">MyFitStore</h2>
         <p className="text-xs text-gray-400 uppercase tracking-widest mt-1">{role} Portal</p>
       </div>
 
@@ -463,817 +451,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
     </div>
   );
-
-  const renderSubscriptionPlan = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-6">Subscription Plan</h3>
-        <div className="flex items-center justify-between mb-8">
-            <p className="text-sm text-gray-500">
-                Current Plan: <span className="font-bold text-black uppercase">{currentVendor?.subscriptionPlan || 'None'}</span>
-            </p>
-            {!isSubscribed && (
-                 <span className="bg-red-100 text-red-600 px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full">
-                    Subscription Expired
-                 </span>
-            )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {SUBSCRIPTION_PLANS.map((plan, idx) => {
-                const isCurrentPlan = currentVendor?.subscriptionPlan === plan.name;
-                // It is the active plan if it matches AND the subscription is active.
-                const isActivePlan = isCurrentPlan && isSubscribed;
-                
-                return (
-                    <div key={idx} className={`border p-6 relative flex flex-col ${isActivePlan ? 'border-black bg-gray-50' : 'border-gray-200'}`}>
-                        {isActivePlan && <div className="absolute top-0 right-0 bg-black text-white px-2 py-1 text-[10px] uppercase font-bold">Active</div>}
-                        <h4 className="text-lg font-serif italic mb-2">{plan.name}</h4>
-                        <p className="text-2xl font-bold mb-4">{plan.price}<span className="text-xs font-normal text-gray-500">{plan.period}</span></p>
-                        <ul className="text-xs text-gray-500 space-y-2 mb-6 flex-1">
-                            {plan.features.map((f, i) => (
-                                <li key={i} className="flex gap-2">
-                                    <Check size={12} className="text-luxury-gold mt-0.5" /> {f}
-                                </li>
-                            ))}
-                        </ul>
-                        <button 
-                            onClick={() => handlePlanChange(plan.name)}
-                            disabled={isActivePlan} 
-                            className={`w-full py-3 text-xs font-bold uppercase tracking-widest ${
-                                isActivePlan 
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
-                                : 'bg-black text-white hover:bg-luxury-gold'
-                            }`}
-                        >
-                            {isActivePlan ? 'Current Plan' : (isCurrentPlan && !isSubscribed ? 'Renew Plan' : 'Switch Plan')}
-                        </button>
-                    </div>
-                );
-            })}
-        </div>
-    </div>
-  );
-
-  const renderFulfillment = () => {
-    // Filter orders to only those containing items from the current vendor
-    const vendorOrders = orders.filter(order => 
-       order.items.some(item => item.designer === currentVendor?.name)
-    ).map(order => ({
-        ...order,
-        // Only show items relevant to this vendor
-        items: order.items.filter(item => item.designer === currentVendor?.name)
-    }));
-
-    return (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-       <h3 className="text-xl font-serif italic mb-2">Order Fulfillment</h3>
-       <p className="text-gray-500 text-sm mb-8">Manage logistics and delivery status for your clientele.</p>
-       
-       <div className="space-y-4">
-          {vendorOrders.map((order) => (
-              <div key={order.id} className="border border-gray-100 p-6 rounded-sm flex flex-col md:flex-row justify-between items-start gap-6">
-                 <div className="flex-1">
-                    <div className="flex items-center gap-4 mb-2">
-                        <span className="font-bold text-lg">{order.id}</span>
-                        <span className="text-xs text-gray-500 uppercase tracking-wide">{order.date}</span>
-                        <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wide rounded ${
-                            order.status === 'Delivered' ? 'bg-green-50 text-green-700' : 
-                            order.status === 'Shipped' ? 'bg-blue-50 text-blue-700' : 'bg-yellow-50 text-yellow-700'
-                        }`}>
-                            {order.status}
-                        </span>
-                    </div>
-                    <p className="text-sm font-bold mb-4">Client: {order.customerName}</p>
-                    <div className="space-y-2">
-                        {order.items.map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-4 bg-gray-50 p-2">
-                                <img src={item.image} className="w-10 h-10 object-cover" alt="product"/>
-                                <div>
-                                    <p className="text-xs font-bold uppercase">{item.name}</p>
-                                    <p className="text-[10px] text-gray-500">Size: {item.size} | Qty: {item.quantity}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                 </div>
-                 
-                 <div className="w-full md:w-48 shrink-0">
-                    <label className="text-xs text-gray-500 uppercase tracking-widest mb-2 block">Update Status</label>
-                    <select 
-                        value={order.status}
-                        onChange={(e) => onUpdateOrderStatus && onUpdateOrderStatus(order.id, e.target.value as any)}
-                        className="w-full p-2 border border-gray-200 text-sm focus:border-black outline-none mb-2"
-                    >
-                        <option value="Processing">Processing</option>
-                        <option value="Shipped">Shipped</option>
-                        <option value="Delivered">Delivered</option>
-                    </select>
-                    <button className="w-full bg-black text-white py-2 text-xs font-bold uppercase tracking-widest hover:bg-gray-800">
-                        Print Label
-                    </button>
-                 </div>
-              </div>
-          ))}
-          {vendorOrders.length === 0 && (
-              <div className="text-center py-12 text-gray-400">
-                  <p>No active orders to fulfill.</p>
-              </div>
-          )}
-       </div>
-    </div>
-    );
-  };
-
-  const renderFollowers = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-2">Community & Followers</h3>
-        <p className="text-gray-500 text-sm mb-8">Manage your brand's audience.</p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {followers.map(follower => (
-                <div key={follower.id} className={`border p-6 flex items-center justify-between group transition-colors ${follower.status === 'BLOCKED' ? 'bg-gray-50 border-gray-100 opacity-50' : 'border-gray-100 hover:border-black'}`}>
-                    <div className="flex items-center gap-4">
-                        <img src={follower.avatar} alt={follower.name} className="w-12 h-12 rounded-full object-cover" />
-                        <div>
-                            <p className="font-bold text-sm">{follower.name}</p>
-                            <p className="text-xs text-gray-400">{follower.handle}</p>
-                            <p className="text-[10px] text-gray-300 mt-1">Joined {follower.since}</p>
-                            {follower.status === 'BLOCKED' && <span className="text-[10px] text-red-500 font-bold uppercase">Blocked</span>}
-                        </div>
-                    </div>
-                    {follower.status !== 'BLOCKED' && (
-                        <div className="flex gap-2">
-                             <button className="text-gray-300 hover:text-black transition-colors p-2" title="Message">
-                                <MessageCircle size={16} />
-                            </button>
-                             <button 
-                                onClick={() => blockFollower(follower.id)}
-                                className="text-gray-300 hover:text-red-500 transition-colors p-2"
-                                title="Block User"
-                            >
-                                <Ban size={16} />
-                            </button>
-                            <button 
-                                onClick={() => removeFollower(follower.id)}
-                                className="text-gray-300 hover:text-red-500 transition-colors p-2"
-                                title="Remove Follower"
-                            >
-                                <UserX size={16} />
-                            </button>
-                        </div>
-                    )}
-                </div>
-            ))}
-             {followers.length === 0 && (
-              <div className="col-span-full text-center py-12 text-gray-400">
-                  <p>No followers yet.</p>
-              </div>
-          )}
-        </div>
-    </div>
-  );
-
-  const renderVerification = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-8">Vendor Verification Queue</h3>
-        <div className="overflow-x-auto">
-            <table className="w-full text-left">
-                <thead className="border-b border-gray-100">
-                    <tr>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Vendor</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Details</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Status</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400 text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                    {vendors.map((vendor) => (
-                        <tr key={vendor.id}>
-                            <td className="py-4">
-                                <div className="flex items-center gap-3">
-                                    <img src={vendor.avatar} className="w-8 h-8 rounded-full object-cover" alt={vendor.name} />
-                                    <div>
-                                        <p className="font-bold text-sm">{vendor.name}</p>
-                                        <p className="text-[10px] text-gray-400">{vendor.email}</p>
-                                    </div>
-                                </div>
-                            </td>
-                             <td className="py-4">
-                                <p className="text-xs text-gray-600 mb-1"><span className="font-bold">Loc:</span> {vendor.location}</p>
-                                <p className="text-[10px] text-gray-400">{vendor.bio.substring(0, 40)}...</p>
-                            </td>
-                            <td className="py-4">
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${
-                                    vendor.verificationStatus === 'VERIFIED' ? 'bg-blue-50 text-blue-700' :
-                                    vendor.verificationStatus === 'REJECTED' ? 'bg-red-50 text-red-700' : 
-                                    'bg-yellow-50 text-yellow-700'
-                                }`}>
-                                    {vendor.verificationStatus}
-                                </span>
-                            </td>
-                            <td className="py-4 text-right">
-                                <div className="flex justify-end gap-2">
-                                     <button 
-                                        onClick={() => handleVerificationStatus(vendor.id, 'VERIFIED')}
-                                        className="p-1 text-green-500 hover:bg-green-50 rounded" title="Approve"
-                                     >
-                                        <CheckCircle size={16} />
-                                     </button>
-                                     <button 
-                                        onClick={() => handleVerificationStatus(vendor.id, 'PENDING')}
-                                        className="p-1 text-yellow-500 hover:bg-yellow-50 rounded" title="Set Pending"
-                                     >
-                                        <Shield size={16} />
-                                     </button>
-                                     <button 
-                                        onClick={() => handleVerificationStatus(vendor.id, 'REJECTED')}
-                                        className="p-1 text-red-500 hover:bg-red-50 rounded" title="Reject"
-                                     >
-                                        <Ban size={16} />
-                                     </button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    </div>
-  );
   
-  const renderUsers = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-8">User & Role Management</h3>
-        <div className="overflow-x-auto">
-            <table className="w-full text-left">
-                <thead className="border-b border-gray-100">
-                    <tr>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">User</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Role</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Location</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Status</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Lifetime Spend</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400 text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                    {users.map((user) => (
-                        <tr key={user.id}>
-                            <td className="py-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center text-xs font-bold">
-                                        {user.name.charAt(0)}
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-sm">{user.name}</p>
-                                        <p className="text-[10px] text-gray-400">{user.email}</p>
-                                    </div>
-                                </div>
-                            </td>
-                            <td className="py-4">
-                                <div className="relative">
-                                    <select 
-                                        value={user.role}
-                                        onChange={(e) => handleRoleUpdate(user.id, e.target.value)}
-                                        className="bg-transparent border-b border-gray-200 text-xs font-bold uppercase py-1 pr-6 focus:border-black outline-none cursor-pointer hover:border-luxury-gold transition-colors appearance-none"
-                                    >
-                                        <option value="BUYER">Buyer</option>
-                                        <option value="VENDOR">Vendor</option>
-                                        <option value="ADMIN">Admin</option>
-                                    </select>
-                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                                        <ChevronDown size={12} />
-                                    </div>
-                                </div>
-                            </td>
-                            <td className="py-4 text-sm text-gray-500">{user.location}</td>
-                             <td className="py-4">
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${
-                                    user.status === 'ACTIVE' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                                }`}>
-                                    {user.status}
-                                </span>
-                            </td>
-                            <td className="py-4 text-sm font-bold">{user.spend}</td>
-                            <td className="py-4 text-right">
-                                <button 
-                                    onClick={() => toggleUserStatus(user.id)}
-                                    className={`text-xs font-bold px-3 py-1 rounded transition-colors ${
-                                        user.status === 'ACTIVE' 
-                                            ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                                            : 'bg-green-100 text-green-600 hover:bg-green-200'
-                                    }`}
-                                >
-                                    {user.status === 'ACTIVE' ? 'Suspend' : 'Reactivate'}
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    </div>
-  );
-
-  const renderSubscriptions = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-8">Manage Vendor Subscriptions</h3>
-        <div className="overflow-x-auto">
-            <table className="w-full text-left">
-                <thead className="border-b border-gray-100">
-                    <tr>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Vendor</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Plan</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Status</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Verified</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400 text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                    {vendors.map((vendor) => (
-                        <tr key={vendor.id}>
-                            <td className="py-4">
-                                <div className="flex items-center gap-3">
-                                    <img src={vendor.avatar} className="w-8 h-8 rounded-full object-cover" alt={vendor.name} />
-                                    <span className="font-bold text-sm">{vendor.name}</span>
-                                </div>
-                            </td>
-                            <td className="py-4">
-                                <select
-                                    value={vendor.subscriptionPlan || 'Atelier'}
-                                    onChange={(e) => handleSubscriptionPlanUpdate(vendor.id, e.target.value)}
-                                    className="bg-gray-50 border border-gray-200 text-xs font-bold uppercase p-2 rounded outline-none focus:border-black cursor-pointer hover:border-black transition-colors"
-                                >
-                                    {SUBSCRIPTION_PLANS.map(p => (
-                                        <option key={p.name} value={p.name}>{p.name}</option>
-                                    ))}
-                                </select>
-                            </td>
-                            <td className="py-4">
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${
-                                    vendor.subscriptionStatus === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                }`}>
-                                    {vendor.subscriptionStatus}
-                                </span>
-                            </td>
-                            <td className="py-4">
-                                {vendor.verificationStatus === 'VERIFIED' ? 
-                                    <span className="text-blue-500 flex items-center gap-1 text-xs"><ShieldCheck size={14} /> Verified</span> : 
-                                    <span className="text-gray-300 text-xs">{vendor.verificationStatus}</span>
-                                }
-                            </td>
-                            <td className="py-4 text-right">
-                                <button 
-                                    onClick={() => handleSubscriptionToggle(vendor.id)}
-                                    className="text-xs font-bold underline hover:text-luxury-gold"
-                                >
-                                    {vendor.subscriptionStatus === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    </div>
-  );
-  
-  const renderReviews = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-8">Content Moderation & Reviews</h3>
-        <div className="overflow-x-auto">
-            <table className="w-full text-left">
-                <thead className="border-b border-gray-100">
-                    <tr>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Content</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Product</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Rating</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Status</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400 text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                    {adminReviews.map((review) => (
-                        <tr key={review.id}>
-                            <td className="py-4 max-w-xs">
-                                <p className="text-sm font-bold mb-1">{review.author}</p>
-                                <p className="text-xs text-gray-600 italic">"{review.content}"</p>
-                                <p className="text-[10px] text-gray-400 mt-1">{review.date}</p>
-                            </td>
-                             <td className="py-4">
-                                <span className="text-xs font-bold uppercase">{review.productName}</span>
-                                <p className="text-[10px] text-gray-400">ID: {review.productId}</p>
-                            </td>
-                            <td className="py-4">
-                                <div className="flex text-luxury-gold">
-                                    {[...Array(5)].map((_, i) => (
-                                         <Heart key={i} size={10} fill={i < review.rating ? 'currentColor' : 'none'} className={i < review.rating ? '' : 'text-gray-200'} />
-                                    ))}
-                                </div>
-                            </td>
-                            <td className="py-4">
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${
-                                    review.status === 'APPROVED' ? 'bg-green-50 text-green-700' :
-                                    review.status === 'FLAGGED' ? 'bg-red-50 text-red-700' : 
-                                    'bg-yellow-50 text-yellow-700'
-                                }`}>
-                                    {review.status}
-                                </span>
-                            </td>
-                            <td className="py-4 text-right">
-                                <div className="flex justify-end gap-2">
-                                     {review.status !== 'APPROVED' && (
-                                         <button 
-                                            onClick={() => handleReviewAction(review.id, 'APPROVE')}
-                                            className="text-green-500 hover:bg-green-50 p-1 rounded" title="Approve"
-                                        >
-                                            <CheckCircle size={14} />
-                                        </button>
-                                     )}
-                                     <button 
-                                        onClick={() => handleReviewAction(review.id, 'FLAG')}
-                                        className="text-yellow-500 hover:bg-yellow-50 p-1 rounded" title="Flag"
-                                    >
-                                        <Flag size={14} />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleReviewAction(review.id, 'DELETE')}
-                                        className="text-red-500 hover:bg-red-50 p-1 rounded" title="Remove"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    </div>
-  );
-
-  const renderTransactions = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-8">Transactions Ledger</h3>
-        <div className="overflow-x-auto">
-            <table className="w-full text-left">
-                <thead className="border-b border-gray-100">
-                    <tr>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Transaction ID</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Parties</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Amount</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Commission (15%)</th>
-                        <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400 text-right">Status</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                    {transactions.map((tx) => (
-                        <tr key={tx.id}>
-                            <td className="py-4">
-                                <p className="text-xs font-mono font-bold">{tx.id}</p>
-                                <p className="text-[10px] text-gray-400">{tx.date}</p>
-                            </td>
-                            <td className="py-4">
-                                <p className="text-xs font-bold">{tx.vendor}</p>
-                                <p className="text-[10px] text-gray-500">Buyer: {tx.customer}</p>
-                            </td>
-                            <td className="py-4 text-sm font-medium">${tx.amount.toFixed(2)}</td>
-                            <td className="py-4 text-sm font-medium text-green-600">+${tx.platformFee.toFixed(2)}</td>
-                            <td className="py-4 text-right">
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${
-                                    tx.status === 'CLEARED' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
-                                }`}>
-                                    {tx.status}
-                                </span>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    </div>
-  );
-  
-  const renderProfile = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-      <h3 className="text-xl font-serif italic mb-8">Profile & Settings</h3>
-      
-      {isVendor && (
-          <div className="mb-8 p-6 bg-gray-50 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                  <h4 className="text-sm font-bold uppercase tracking-widest mb-1">Account Status</h4>
-                  <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
-                       <span className={`flex items-center gap-1 ${isSubscribed ? 'text-green-600' : 'text-red-500'}`}>
-                           <CheckCircle size={14} /> {isSubscribed ? 'Subscription Active' : 'Subscription Inactive'}
-                       </span>
-                       <span className={`flex items-center gap-1 ${isVerified ? 'text-blue-600' : 'text-yellow-600'}`}>
-                           {isVerified ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />} 
-                           {isVerified ? 'Verified Designer' : `Verification: ${currentVendor?.verificationStatus}`}
-                       </span>
-                  </div>
-              </div>
-              <div className="flex gap-4">
-                  {!isSubscribed && (
-                      <button 
-                        onClick={() => setActiveTab('SUBSCRIPTION_PLAN')}
-                        className="bg-luxury-gold text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-black transition-colors"
-                      >
-                          Subscribe Now
-                      </button>
-                  )}
-              </div>
-          </div>
-      )}
-
-      {/* Standard Profile Fields */}
-      <div className="max-w-2xl space-y-6">
-        <div className="flex items-center gap-6 pb-6 border-b border-gray-50">
-          <div className="w-24 h-24 bg-gray-100 rounded-full overflow-hidden shrink-0">
-             <img src={profileForm.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200"} alt="Avatar" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <h4 className="font-bold text-lg">{role === 'VENDOR' ? profileForm.name : 'Jane Doe'}</h4>
-            <p className="text-gray-400 text-sm mb-2">{role}</p>
-            <button 
-              onClick={() => alert("Image upload mock: Please change the URL in the Settings for now.")}
-              className="text-xs font-bold uppercase tracking-widest bg-gray-100 px-4 py-2 hover:bg-black hover:text-white transition-colors"
-            >
-              Change Avatar
-            </button>
-          </div>
-        </div>
-        
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-           <div className="space-y-2">
-             <label className="text-xs text-gray-500 uppercase tracking-widest">Display Name</label>
-             <input 
-                type="text" 
-                value={profileForm.name} 
-                onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                className="w-full p-3 border border-gray-200 bg-gray-50 text-sm focus:border-black outline-none" 
-             />
-           </div>
-           <div className="space-y-2">
-             <label className="text-xs text-gray-500 uppercase tracking-widest">Email Address</label>
-             <input 
-                type="email" 
-                value={profileForm.email}
-                onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                className="w-full p-3 border border-gray-200 bg-gray-50 text-sm focus:border-black outline-none" 
-             />
-           </div>
-        </div>
-        
-        {/* Social Links Section */}
-        <div className="pt-6 border-t border-gray-50">
-           <h4 className="text-sm font-bold uppercase tracking-widest mb-4">Social & Web</h4>
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Website</label>
-                 <div className="flex items-center border border-gray-200 bg-gray-50">
-                    <Globe size={14} className="ml-3 text-gray-400" />
-                    <input 
-                        type="text" 
-                        placeholder="https://"
-                        value={profileForm.website} 
-                        onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
-                        className="w-full p-3 bg-transparent text-sm focus:outline-none" 
-                     />
-                 </div>
-               </div>
-               <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Instagram</label>
-                 <div className="flex items-center border border-gray-200 bg-gray-50">
-                    <Instagram size={14} className="ml-3 text-gray-400" />
-                    <input 
-                        type="text" 
-                        placeholder="@username"
-                        value={profileForm.instagram} 
-                        onChange={(e) => setProfileForm({ ...profileForm, instagram: e.target.value })}
-                        className="w-full p-3 bg-transparent text-sm focus:outline-none" 
-                     />
-                 </div>
-               </div>
-               <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Twitter</label>
-                  <div className="flex items-center border border-gray-200 bg-gray-50">
-                    <Twitter size={14} className="ml-3 text-gray-400" />
-                    <input 
-                        type="text" 
-                        placeholder="@username"
-                        value={profileForm.twitter} 
-                        onChange={(e) => setProfileForm({ ...profileForm, twitter: e.target.value })}
-                        className="w-full p-3 bg-transparent text-sm focus:outline-none" 
-                     />
-                 </div>
-               </div>
-           </div>
-        </div>
-
-        <button 
-            onClick={handleSaveProfile}
-            className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors"
-        >
-            Save Changes
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderSettings = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-6">Platform Settings</h3>
-        
-        <div className="space-y-6">
-            <div className="p-6 bg-gray-50 border border-gray-100">
-                <h4 className="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Activity size={16} /> Feature Flags
-                </h4>
-                <div className="space-y-4">
-                    {Object.entries(featureFlags).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between p-3 bg-white border border-gray-200">
-                             <div>
-                                <p className="text-xs font-bold uppercase tracking-wide">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                                <p className="text-[10px] text-gray-500">Enable or disable this module globally.</p>
-                             </div>
-                             <button 
-                                onClick={() => toggleFeatureFlag(key as keyof FeatureFlags)}
-                                className={`w-12 h-6 rounded-full relative transition-colors ${value ? 'bg-black' : 'bg-gray-300'}`}
-                             >
-                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${value ? 'left-7' : 'left-1'}`} />
-                             </button>
-                        </div>
-                    ))}
-                </div>
-            </div>
-             
-             <div className="p-6 bg-red-50 border border-red-100">
-                <h4 className="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2 text-red-600">
-                    <AlertCircle size={16} /> Danger Zone
-                </h4>
-                <div className="flex items-center justify-between">
-                     <div>
-                        <p className="text-xs font-bold uppercase tracking-wide">System Reset</p>
-                        <p className="text-[10px] text-gray-500">Clear all temporary caches and restart services.</p>
-                     </div>
-                     <button className="bg-white border border-red-200 text-red-500 px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-colors">
-                        Restart
-                     </button>
-                </div>
-            </div>
-        </div>
-    </div>
-  );
-
-  const renderOverview = () => (
-    <div className="space-y-8 animate-fade-in">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { label: 'Total Revenue', value: '$45,231', icon: DollarSign, trend: '+12%' },
-          { label: 'Active Orders', value: '12', icon: Package, trend: '+2' },
-          { label: 'Total Clients', value: '1,203', icon: Users, trend: '+5%' },
-          { label: 'Avg. Order Value', value: '$340', icon: Activity, trend: '-1%' },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white p-6 border border-gray-100 shadow-sm flex flex-col justify-between h-32">
-            <div className="flex justify-between items-start">
-               <div>
-                 <p className="text-xs text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                 <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
-               </div>
-               <div className="p-2 bg-gray-50 rounded-full text-gray-400">
-                 <stat.icon size={18} />
-               </div>
-            </div>
-            <p className={`text-xs font-bold ${stat.trend.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
-              {stat.trend} <span className="text-gray-300 font-normal">vs last month</span>
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Chart */}
-        <div className="bg-white p-6 border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-serif italic mb-6">Revenue Analytics</h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChartComponent data={SALES_DATA} />
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Activity Feed */}
-        <div className="bg-white p-6 border border-gray-100 shadow-sm">
-           <div className="flex justify-between items-center mb-6">
-             <h3 className="text-lg font-serif italic">Recent Activity</h3>
-             <button className="text-xs uppercase text-gray-400 hover:text-black">View All</button>
-           </div>
-           <div className="space-y-6">
-             {[1, 2, 3].map((_, i) => (
-               <div key={i} className="flex gap-4 items-start pb-6 border-b border-gray-50 last:border-0 last:pb-0">
-                 <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
-                    <ShoppingBag size={16} />
-                 </div>
-                 <div>
-                   <p className="text-sm font-bold">New order #ORD-29{i}</p>
-                   <p className="text-xs text-gray-500">2 minutes ago</p>
-                 </div>
-               </div>
-             ))}
-           </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderProducts = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <div className="flex justify-between items-center mb-8">
-            <div>
-              <h3 className="text-xl font-serif italic">My Collection</h3>
-              <p className="text-gray-500 text-sm mt-1">Manage your active listings and inventory.</p>
-            </div>
-            <button 
-              onClick={() => setActiveTab('UPLOAD')}
-              className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2"
-            >
-              <Plus size={14} /> Add Piece
-            </button>
-        </div>
-
-        {vendorProducts.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 bg-gray-50 border-2 border-dashed border-gray-200 rounded-sm">
-            <Shirt size={48} className="mx-auto mb-4 opacity-20" />
-            <p className="text-sm font-bold uppercase tracking-widest mb-2">No items in collection</p>
-            <p className="text-xs mb-6">Start by uploading your first piece.</p>
-            <button 
-              onClick={() => setActiveTab('UPLOAD')}
-              className="text-xs underline hover:text-black"
-            >
-              Upload Now
-            </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="border-b border-gray-100">
-                <tr>
-                  <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400 pl-4">Product</th>
-                  <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Price</th>
-                  <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Stock</th>
-                  <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400">Category</th>
-                  <th className="pb-4 text-xs font-bold uppercase tracking-wider text-gray-400 text-right pr-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {vendorProducts.map((product) => (
-                  <tr key={product.id} className="group hover:bg-gray-50 transition-colors">
-                    <td className="py-4 pl-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-16 bg-gray-100 overflow-hidden">
-                           <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-sm text-black">{product.name}</p>
-                          <p className="text-[10px] text-gray-400">ID: {product.id}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 text-sm">${product.price}</td>
-                    <td className="py-4">
-                       <span className={`text-xs font-bold px-2 py-1 rounded ${product.stock < 5 ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
-                         {product.stock} Units
-                       </span>
-                    </td>
-                    <td className="py-4 text-xs uppercase tracking-wide text-gray-500">{product.category}</td>
-                    <td className="py-4 pr-4 text-right">
-                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button 
-                           onClick={() => handleEditProduct(product)}
-                           className="p-2 hover:bg-white hover:shadow-md rounded-full transition-all"
-                           title="Edit"
-                         >
-                           <Edit2 size={14} />
-                         </button>
-                         <button 
-                           onClick={() => onDeleteProduct && onDeleteProduct(product.id)}
-                           className="p-2 hover:bg-white hover:shadow-md rounded-full text-red-500 transition-all"
-                           title="Delete"
-                         >
-                           <Trash2 size={14} />
-                         </button>
-                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-    </div>
-  );
-
   const renderUpload = () => (
     <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up max-w-3xl mx-auto">
         <h3 className="text-xl font-serif italic mb-2">{isEditing ? 'Edit Masterpiece' : 'Upload New Piece'}</h3>
@@ -1390,8 +568,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex items-center gap-4 pt-4 border-t border-gray-50">
                 <button 
                   type="submit"
-                  className="flex-1 bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex justify-center items-center gap-2"
                 >
+                  {isSubmitting && <Loader className="animate-spin" size={14} />}
                   {isEditing ? 'Update Listing' : 'Publish to Marketplace'}
                 </button>
                 {isEditing && (
@@ -1408,331 +588,576 @@ export const Dashboard: React.FC<DashboardProps> = ({
     </div>
   );
 
-  const renderOrders = () => {
-    // Filter logic based on role
-    // For Vendor, orders that contain at least one item from them (already filtered in Fulfillment but here we can show overview)
-    // For Buyer, their own orders (assuming MOCK_ORDERS are theirs for now as we don't have full auth id match)
-    // For Admin, all orders.
-    
-    // Simplification for demo:
-    let displayOrders = orders;
-    if (isVendor) {
-         displayOrders = orders.filter(order => order.items.some(item => item.designer === currentVendor?.name));
-    } else if (isBuyer) {
-        // Just show all mock orders for demo "My Orders"
-    }
-
-    return (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-8">Order History</h3>
-        
-        {displayOrders.length === 0 ? (
-           <div className="text-center py-12 text-gray-400">
-               <p>No orders found.</p>
-           </div>
-        ) : (
-        <div className="space-y-6">
-            {displayOrders.map((order) => (
-                <div key={order.id} className="border border-gray-100 p-6 rounded-sm">
-                    <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 pb-6 border-b border-gray-50 gap-4">
-                        <div>
-                           <div className="flex items-center gap-3 mb-1">
-                               <span className="font-bold text-lg">{order.id}</span>
-                               <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded ${
-                                   order.status === 'Delivered' ? 'bg-green-100 text-green-700' : 
-                                   order.status === 'Shipped' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
-                               }`}>
-                                   {order.status}
-                               </span>
-                           </div>
-                           <p className="text-xs text-gray-400 uppercase tracking-widest">{order.date}</p>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Total</p>
-                           <p className="text-xl font-serif italic">${order.total}</p>
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                        {order.items.map((item, i) => (
-                           <div key={i} className="flex gap-4 items-center">
-                               <div className="w-12 h-16 bg-gray-100 shrink-0">
-                                   <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                               </div>
-                               <div className="flex-1">
-                                   <p className="text-sm font-bold">{item.name}</p>
-                                   <p className="text-xs text-gray-500">{item.designer} | Size: {item.size}</p>
-                               </div>
-                               <div className="text-sm font-medium">
-                                   ${item.price}
-                               </div>
-                           </div> 
-                        ))}
-                    </div>
-                    
-                    <div className="mt-6 pt-6 border-t border-gray-50 flex justify-end gap-4">
-                        <button className="text-xs font-bold underline hover:text-luxury-gold">View Invoice</button>
-                        <button className="text-xs font-bold underline hover:text-luxury-gold">Track Shipment</button>
-                    </div>
-                </div>
-            ))}
+  const renderProducts = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+      {vendorProducts.map((product) => (
+        <div key={product.id} className="bg-white border border-gray-100 p-4 relative group">
+          <div className="aspect-[3/4] bg-gray-50 mb-4 overflow-hidden">
+             <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+          </div>
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h3 className="font-bold text-sm uppercase tracking-wide">{product.name}</h3>
+              <p className="text-xs text-gray-500">{product.category}</p>
+            </div>
+            <span className="text-sm font-medium">${product.price}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-gray-400 mt-4 pt-4 border-t border-gray-50">
+             <span>Stock: {product.stock}</span>
+             <div className="flex gap-2">
+                <button 
+                  onClick={() => handleEditProduct(product)} 
+                  className="hover:text-black flex items-center gap-1"
+                >
+                  <Edit2 size={12} /> Edit
+                </button>
+                <button 
+                  onClick={() => onDeleteProduct && onDeleteProduct(product.id)} 
+                  className="hover:text-red-500 flex items-center gap-1"
+                >
+                  <Trash2 size={12} /> Delete
+                </button>
+             </div>
+          </div>
         </div>
-        )}
+      ))}
+      <div 
+        onClick={() => { setActiveTab('UPLOAD'); setIsEditing(false); }}
+        className="border-2 border-dashed border-gray-200 flex flex-col items-center justify-center p-8 cursor-pointer hover:border-black hover:bg-gray-50 transition-all min-h-[300px]"
+      >
+        <Plus size={32} className="text-gray-300 mb-2" />
+        <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Add New Item</span>
+      </div>
     </div>
-    );
-  };
+  );
+
+  const renderOrders = () => (
+    <div className="space-y-4 animate-fade-in">
+       {orders.length === 0 ? (
+           <p className="text-gray-400 text-sm italic">No active orders.</p>
+       ) : (
+           orders.map((order) => (
+               <div key={order.id} className="bg-white border border-gray-100 p-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                   <div className="flex items-center gap-4">
+                       <div className="w-12 h-12 bg-gray-50 flex items-center justify-center text-gray-400">
+                           <Package size={20} />
+                       </div>
+                       <div>
+                           <p className="text-xs font-bold uppercase tracking-widest mb-1">{order.id} • {order.date}</p>
+                           <p className="font-serif italic text-lg">{order.customerName}</p>
+                           <p className="text-xs text-gray-500">{order.items.length} Items • Total: ${order.total}</p>
+                       </div>
+                   </div>
+                   <div className="flex items-center gap-4">
+                       <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border ${
+                           order.status === 'Delivered' ? 'border-green-500 text-green-500' :
+                           order.status === 'Shipped' ? 'border-blue-500 text-blue-500' :
+                           'border-orange-500 text-orange-500'
+                       }`}>
+                           {order.status}
+                       </span>
+                       {(isAdmin || isVendor) && (
+                           <select 
+                             value={order.status}
+                             onChange={(e) => onUpdateOrderStatus && onUpdateOrderStatus(order.id, e.target.value as any)}
+                             className="text-xs border-b border-gray-200 py-1 bg-transparent outline-none focus:border-black"
+                           >
+                               <option value="Processing">Processing</option>
+                               <option value="Shipped">Shipped</option>
+                               <option value="Delivered">Delivered</option>
+                           </select>
+                       )}
+                   </div>
+               </div>
+           ))
+       )}
+    </div>
+  );
+
+  const renderSettings = () => (
+      <div className="bg-white border border-gray-100 p-8 max-w-2xl animate-fade-in">
+          <h3 className="text-lg font-serif italic mb-6">Platform Configuration</h3>
+          <div className="space-y-6">
+              {Object.entries(featureFlags).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between pb-4 border-b border-gray-50 last:border-0">
+                      <div>
+                          <p className="text-xs font-bold uppercase tracking-widest mb-1">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                          <p className="text-[10px] text-gray-400">Toggle system-wide feature availability.</p>
+                      </div>
+                      <button 
+                        onClick={() => toggleFeatureFlag(key as keyof FeatureFlags)}
+                        className={`w-12 h-6 rounded-full p-1 transition-colors ${value ? 'bg-black' : 'bg-gray-200'}`}
+                      >
+                          <div className={`w-4 h-4 rounded-full bg-white transition-transform ${value ? 'translate-x-6' : 'translate-x-0'}`} />
+                      </button>
+                  </div>
+              ))}
+          </div>
+      </div>
+  );
+
+  const renderProfile = () => (
+      <div className="bg-white border border-gray-100 p-8 max-w-2xl animate-fade-in">
+          <h3 className="text-lg font-serif italic mb-6">Profile Settings</h3>
+          <div className="space-y-6">
+              <div className="flex items-center gap-6 mb-8">
+                  <div className="w-24 h-24 bg-gray-100 rounded-full overflow-hidden">
+                      <img src={profileForm.avatar || "https://via.placeholder.com/150"} alt="Avatar" className="w-full h-full object-cover" />
+                  </div>
+                  <button className="text-xs font-bold uppercase tracking-widest border border-gray-200 px-4 py-2 hover:bg-black hover:text-white transition-colors">
+                      Change Avatar
+                  </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Display Name</label>
+                      <input 
+                        type="text" 
+                        value={profileForm.name}
+                        onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
+                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                      />
+                  </div>
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email Address</label>
+                      <input 
+                        type="email" 
+                        value={profileForm.email}
+                        onChange={(e) => setProfileForm({...profileForm, email: e.target.value})}
+                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                      />
+                  </div>
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Instagram</label>
+                      <input 
+                        type="text" 
+                        value={profileForm.instagram}
+                        onChange={(e) => setProfileForm({...profileForm, instagram: e.target.value})}
+                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                        placeholder="@username"
+                      />
+                  </div>
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Twitter / X</label>
+                      <input 
+                        type="text" 
+                        value={profileForm.twitter}
+                        onChange={(e) => setProfileForm({...profileForm, twitter: e.target.value})}
+                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                        placeholder="@username"
+                      />
+                  </div>
+              </div>
+              <button 
+                  onClick={handleSaveProfile}
+                  className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors mt-4"
+              >
+                  Save Changes
+              </button>
+          </div>
+      </div>
+  );
 
   const renderStoreDesign = () => (
-      <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-6">Storefront Customization</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <div className="space-y-6">
-                <div className="space-y-2">
-                    <label className="text-xs text-gray-500 uppercase tracking-widest">Brand Name</label>
-                    <input 
-                      type="text" 
-                      value={storeDesign.brandName}
-                      onChange={(e) => setStoreDesign({...storeDesign, brandName: e.target.value})}
-                      className="w-full p-3 border border-gray-200 bg-gray-50 text-sm focus:border-black outline-none" 
-                    />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-xs text-gray-500 uppercase tracking-widest">Bio / Manifesto</label>
-                    <textarea 
-                      rows={5}
-                      value={storeDesign.bio}
-                      onChange={(e) => setStoreDesign({...storeDesign, bio: e.target.value})}
-                      className="w-full p-3 border border-gray-200 bg-gray-50 text-sm focus:border-black outline-none resize-none" 
-                    />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-xs text-gray-500 uppercase tracking-widest">Location</label>
-                    <input 
-                      type="text" 
-                      value={storeDesign.location}
-                      onChange={(e) => setStoreDesign({...storeDesign, location: e.target.value})}
-                      className="w-full p-3 border border-gray-200 bg-gray-50 text-sm focus:border-black outline-none" 
-                    />
-                </div>
-            </div>
-            
-            <div className="space-y-6">
-                <div className="space-y-2">
-                    <label className="text-xs text-gray-500 uppercase tracking-widest">Cover Image</label>
-                    <div className="aspect-[2/1] bg-gray-100 overflow-hidden relative group">
-                        <img src={storeDesign.coverImage} alt="Cover" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button className="bg-white text-black px-4 py-2 text-xs font-bold uppercase tracking-widest">Change Image</button>
-                        </div>
-                    </div>
-                    <input 
-                      type="text" 
-                      value={storeDesign.coverImage}
-                      onChange={(e) => setStoreDesign({...storeDesign, coverImage: e.target.value})}
-                      className="w-full p-3 border border-gray-200 bg-gray-50 text-xs text-gray-400 focus:border-black outline-none mt-2" 
-                      placeholder="Image URL"
-                    />
-                </div>
-            </div>
-        </div>
+      <div className="bg-white border border-gray-100 p-8 max-w-4xl animate-fade-in">
+          <div className="flex justify-between items-center mb-8">
+              <h3 className="text-lg font-serif italic">Storefront Customization</h3>
+              <button onClick={() => setActiveTab('STORE_PREVIEW')} className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:text-luxury-gold">
+                  <Eye size={14} /> Preview
+              </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <div className="space-y-6">
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Brand Name</label>
+                      <input 
+                        value={storeDesign.brandName}
+                        onChange={(e) => setStoreDesign({...storeDesign, brandName: e.target.value})}
+                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                      />
+                  </div>
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Bio / Philosophy</label>
+                      <textarea 
+                        value={storeDesign.bio}
+                        onChange={(e) => setStoreDesign({...storeDesign, bio: e.target.value})}
+                        rows={4}
+                        className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none resize-none"
+                      />
+                  </div>
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Location</label>
+                      <input 
+                        value={storeDesign.location}
+                        onChange={(e) => setStoreDesign({...storeDesign, location: e.target.value})}
+                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                      />
+                  </div>
+              </div>
+              <div className="space-y-6">
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Cover Image URL</label>
+                       <div className="aspect-[21/9] bg-gray-100 mb-2 overflow-hidden">
+                           <img src={storeDesign.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                       </div>
+                      <input 
+                        value={storeDesign.coverImage}
+                        onChange={(e) => setStoreDesign({...storeDesign, coverImage: e.target.value})}
+                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                      />
+                  </div>
+              </div>
+          </div>
+          <div className="border-t border-gray-100 mt-8 pt-8 flex justify-end">
+              <button 
+                  onClick={handleSaveStoreDesign}
+                  className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors"
+              >
+                  Update Storefront
+              </button>
+          </div>
+      </div>
+  );
 
-        {/* Visual Identity Section */}
-        <div className="mt-12 pt-8 border-t border-gray-100">
-            <h4 className="text-lg font-serif italic mb-6">Visual Identity</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                {/* Theme Selection */}
-                <div>
-                    <label className="text-xs text-gray-500 uppercase tracking-widest mb-4 block">Aesthetic Theme</label>
-                    <div className="space-y-4">
-                        {['Editorial', 'Minimalist', 'Avant-Garde'].map((theme) => (
-                            <button
-                                key={theme}
-                                onClick={() => setStoreDesign({...storeDesign, theme})}
-                                className={`w-full text-left p-4 border transition-all flex justify-between items-center ${
-                                    storeDesign.theme === theme 
-                                    ? 'border-black bg-gray-50' 
-                                    : 'border-gray-200 hover:border-gray-400'
-                                }`}
-                            >
-                                <div>
-                                    <p className="text-sm font-bold uppercase tracking-wide">{theme}</p>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {theme === 'Editorial' ? 'Classic serif typography, balanced spacing.' : 
-                                         theme === 'Minimalist' ? 'Clean sans-serif, maximizing white space.' : 
-                                         'Bold monochrome contrasts, heavy structure.'}
-                                    </p>
-                                </div>
-                                {storeDesign.theme === theme && <CheckCircle size={16} className="text-black" />}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+  const renderSaved = () => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
+          {savedItems.length === 0 ? (
+              <p className="col-span-4 text-center text-gray-400 italic py-12">No saved items.</p>
+          ) : (
+              savedItems.map(item => (
+                  <div key={item.id} className="group relative">
+                      <div className="aspect-[3/4] bg-gray-100 mb-4 overflow-hidden">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          <button 
+                              onClick={() => removeFromSaved(item.id)}
+                              className="absolute top-2 right-2 bg-white/80 p-2 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"
+                          >
+                              <X size={14} />
+                          </button>
+                      </div>
+                      <h3 className="font-bold text-xs uppercase tracking-widest">{item.designer}</h3>
+                      <p className="text-sm font-serif italic text-gray-600">{item.name}</p>
+                      <p className="text-sm font-medium mt-1">${item.price}</p>
+                  </div>
+              ))
+          )}
+      </div>
+  );
 
-                {/* Accent Color & Layout */}
-                <div className="space-y-8">
-                    <div>
-                        <label className="text-xs text-gray-500 uppercase tracking-widest mb-4 block">Brand Accent Color</label>
-                        <div className="flex gap-4">
-                            {[
-                                { color: '#000000', name: 'Noir' },
-                                { color: '#D4AF37', name: 'Gold' },
-                                { color: '#800020', name: 'Burgundy' },
-                                { color: '#2E4A3B', name: 'Hunter' },
-                                { color: '#1E3A8A', name: 'Royal' }
-                            ].map((preset) => (
-                                <button
-                                    key={preset.color}
-                                    onClick={() => setStoreDesign({...storeDesign, accentColor: preset.color})}
-                                    className={`w-10 h-10 rounded-full border-2 transition-all relative ${
-                                        storeDesign.accentColor === preset.color ? 'border-black scale-110' : 'border-transparent'
-                                    }`}
-                                    style={{ backgroundColor: preset.color }}
-                                    title={preset.name}
-                                >
-                                    {storeDesign.accentColor === preset.color && (
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <Check size={12} className="text-white mix-blend-difference" />
-                                        </div>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+  const renderFulfillment = () => renderOrders();
 
-                    <div>
-                        <label className="text-xs text-gray-500 uppercase tracking-widest mb-4 block">Product Grid Layout</label>
-                        <div className="flex gap-4">
-                            <button
-                                onClick={() => setStoreDesign({...storeDesign, layout: 'Grid'})}
-                                className={`flex-1 p-4 border flex flex-col items-center justify-center gap-2 transition-all ${
-                                    storeDesign.layout === 'Grid' ? 'border-black bg-gray-50' : 'border-gray-200 hover:border-gray-400'
-                                }`}
-                            >
-                                <Grid size={20} />
-                                <span className="text-[10px] font-bold uppercase">Standard Grid</span>
-                            </button>
-                            <button
-                                onClick={() => setStoreDesign({...storeDesign, layout: 'Masonry'})}
-                                className={`flex-1 p-4 border flex flex-col items-center justify-center gap-2 transition-all ${
-                                    storeDesign.layout === 'Masonry' ? 'border-black bg-gray-50' : 'border-gray-200 hover:border-gray-400'
-                                }`}
-                            >
-                                <Columns size={20} />
-                                <span className="text-[10px] font-bold uppercase">Editorial Masonry</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  const renderSubscriptions = () => (
+      <div className="space-y-4 animate-fade-in">
+          {vendors.map(vendor => (
+              <div key={vendor.id} className="bg-white border border-gray-100 p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                      <img src={vendor.avatar} alt={vendor.name} className="w-12 h-12 rounded-full object-cover" />
+                      <div>
+                          <h4 className="font-bold text-sm uppercase tracking-widest">{vendor.name}</h4>
+                          <p className="text-xs text-gray-500">{vendor.email}</p>
+                      </div>
+                  </div>
+                  <div className="flex items-center gap-8">
+                       <div className="text-right">
+                           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Current Plan</p>
+                           <p className="text-sm font-serif italic">{vendor.subscriptionPlan || 'None'}</p>
+                       </div>
+                       <div className="text-right">
+                           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Status</p>
+                           <span className={`text-xs font-bold ${vendor.subscriptionStatus === 'ACTIVE' ? 'text-green-500' : 'text-red-500'}`}>
+                               {vendor.subscriptionStatus}
+                           </span>
+                       </div>
+                       <button 
+                          onClick={() => handleSubscriptionToggle(vendor.id)}
+                          className="p-2 border border-gray-200 hover:bg-black hover:text-white transition-colors"
+                          title="Toggle Status"
+                       >
+                           <Power size={16} />
+                       </button>
+                  </div>
+              </div>
+          ))}
+      </div>
+  );
 
-        <div className="mt-8 pt-8 border-t border-gray-100">
-             <button 
-                onClick={handleSaveStoreDesign}
-                className="bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors"
-            >
-                Save Design
-            </button>
-        </div>
+  const renderVerification = () => (
+      <div className="space-y-4 animate-fade-in">
+          {vendors.filter(v => v.verificationStatus === 'PENDING').length === 0 && (
+               <p className="text-gray-400 text-center italic py-12">No pending verifications.</p>
+          )}
+          {vendors.map(vendor => (
+              <div key={vendor.id} className="bg-white border border-gray-100 p-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                   <div className="flex items-center gap-4 w-full md:w-auto">
+                      <div className="w-16 h-16 bg-gray-100 shrink-0">
+                          <img src={vendor.avatar} alt={vendor.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div>
+                          <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-sm uppercase tracking-widest">{vendor.name}</h4>
+                              <span className={`text-[10px] px-2 py-0.5 border ${
+                                  vendor.verificationStatus === 'VERIFIED' ? 'border-blue-500 text-blue-500' :
+                                  vendor.verificationStatus === 'REJECTED' ? 'border-red-500 text-red-500' :
+                                  'border-yellow-500 text-yellow-500'
+                              }`}>{vendor.verificationStatus}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 max-w-md mt-1">{vendor.bio}</p>
+                          <a href={vendor.website} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 hover:underline mt-1 block">{vendor.website}</a>
+                      </div>
+                  </div>
+                  <div className="flex gap-2">
+                      <button 
+                          onClick={() => handleVerificationStatus(vendor.id, 'VERIFIED')}
+                          className="bg-green-50 text-green-600 px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-green-100"
+                      >
+                          Verify
+                      </button>
+                      <button 
+                          onClick={() => handleVerificationStatus(vendor.id, 'REJECTED')}
+                          className="bg-red-50 text-red-600 px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-red-100"
+                      >
+                          Reject
+                      </button>
+                  </div>
+              </div>
+          ))}
+      </div>
+  );
+
+  const renderUsers = () => (
+      <div className="overflow-x-auto bg-white border border-gray-100 animate-fade-in">
+          <table className="w-full text-left">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">User</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Role</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Location</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Spend</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Status</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Actions</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {users.map(user => (
+                      <tr key={user.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                          <td className="p-4">
+                              <div className="font-bold text-sm">{user.name}</div>
+                              <div className="text-xs text-gray-400">{user.email}</div>
+                          </td>
+                          <td className="p-4">
+                              <select 
+                                  value={user.role}
+                                  onChange={(e) => handleRoleUpdate(user.id, e.target.value)}
+                                  className="bg-transparent text-xs border border-gray-200 rounded px-2 py-1"
+                              >
+                                  <option value="BUYER">Buyer</option>
+                                  <option value="VENDOR">Vendor</option>
+                                  <option value="ADMIN">Admin</option>
+                              </select>
+                          </td>
+                          <td className="p-4 text-xs text-gray-600">{user.location}</td>
+                          <td className="p-4 text-xs font-mono">{user.spend}</td>
+                          <td className="p-4">
+                              <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                                  user.status === 'ACTIVE' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                              }`}>
+                                  {user.status}
+                              </span>
+                          </td>
+                          <td className="p-4">
+                              <button onClick={() => toggleUserStatus(user.id)} className="text-gray-400 hover:text-black">
+                                  {user.status === 'ACTIVE' ? <Ban size={16} /> : <CheckCircle size={16} />}
+                              </button>
+                          </td>
+                      </tr>
+                  ))}
+              </tbody>
+          </table>
+      </div>
+  );
+
+  const renderReviews = () => (
+      <div className="space-y-4 animate-fade-in">
+          {adminReviews.map(review => (
+              <div key={review.id} className="bg-white border border-gray-100 p-6">
+                  <div className="flex justify-between items-start mb-4">
+                      <div>
+                          <h4 className="font-bold text-sm mb-1">{review.productName}</h4>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span>by {review.author}</span>
+                              <span>•</span>
+                              <span>{review.date}</span>
+                          </div>
+                      </div>
+                       <span className={`text-[10px] font-bold px-2 py-1 border ${
+                           review.status === 'APPROVED' ? 'border-green-500 text-green-500' : 
+                           review.status === 'FLAGGED' ? 'border-red-500 text-red-500' : 
+                           'border-orange-500 text-orange-500'
+                       }`}>
+                           {review.status}
+                       </span>
+                  </div>
+                  <div className="flex items-center gap-1 mb-3">
+                      {[...Array(5)].map((_, i) => (
+                           <Star key={i} size={12} className={i < review.rating ? "fill-luxury-gold text-luxury-gold" : "text-gray-200"} />
+                      ))}
+                  </div>
+                  <p className="text-sm text-gray-600 italic font-serif mb-6">"{review.content}"</p>
+                  <div className="flex gap-3 border-t border-gray-50 pt-4">
+                      <button onClick={() => handleReviewAction(review.id, 'APPROVE')} className="text-xs font-bold uppercase tracking-widest text-green-600 hover:bg-green-50 px-3 py-1">Approve</button>
+                      <button onClick={() => handleReviewAction(review.id, 'FLAG')} className="text-xs font-bold uppercase tracking-widest text-orange-500 hover:bg-orange-50 px-3 py-1">Flag</button>
+                      <button onClick={() => handleReviewAction(review.id, 'DELETE')} className="text-xs font-bold uppercase tracking-widest text-red-600 hover:bg-red-50 px-3 py-1">Delete</button>
+                  </div>
+              </div>
+          ))}
+      </div>
+  );
+
+  const renderTransactions = () => (
+      <div className="bg-white border border-gray-100 animate-fade-in">
+           <table className="w-full text-left">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">ID</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Date</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Entity</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Amount</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Fee</th>
+                      <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Status</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {transactions.map(tx => (
+                      <tr key={tx.id} className="border-b border-gray-50">
+                          <td className="p-4 text-xs font-mono text-gray-500">#{tx.id.split('_')[1]}</td>
+                          <td className="p-4 text-xs">{tx.date}</td>
+                          <td className="p-4">
+                              <div className="text-xs font-bold">{tx.vendor}</div>
+                              <div className="text-[10px] text-gray-400">from {tx.customer}</div>
+                          </td>
+                          <td className="p-4 text-sm font-medium">${tx.amount.toFixed(2)}</td>
+                          <td className="p-4 text-xs text-gray-500">${tx.platformFee.toFixed(2)}</td>
+                          <td className="p-4">
+                               <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                                  tx.status === 'CLEARED' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                              }`}>
+                                  {tx.status}
+                              </span>
+                          </td>
+                      </tr>
+                  ))}
+              </tbody>
+          </table>
+      </div>
+  );
+
+  const renderFollowers = () => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+          {followers.map(follower => (
+              <div key={follower.id} className="bg-white border border-gray-100 p-6 flex flex-col items-center text-center relative group">
+                  <button 
+                      onClick={() => removeFollower(follower.id)}
+                      className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                      <X size={16} />
+                  </button>
+                  <img src={follower.avatar} alt={follower.name} className="w-16 h-16 rounded-full object-cover mb-4" />
+                  <h4 className="font-bold text-sm">{follower.name}</h4>
+                  <p className="text-xs text-gray-500 mb-2">{follower.handle}</p>
+                  <p className="text-[10px] text-gray-400 mb-4">Following since {follower.since}</p>
+                  <div className="flex gap-2 w-full">
+                       <button className="flex-1 border border-gray-200 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors">Message</button>
+                       <button onClick={() => blockFollower(follower.id)} className="p-2 border border-gray-200 text-gray-400 hover:text-red-500 transition-colors" title="Block">
+                           <Ban size={16} />
+                       </button>
+                  </div>
+              </div>
+          ))}
+      </div>
+  );
+
+  const renderSubscriptionPlan = () => (
+      <div className="space-y-8 animate-fade-in">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+              <h2 className="text-3xl font-serif italic mb-4">Choose Your Subscription Plan</h2>
+              <p className="text-gray-500 font-light">Scale your digital presence with tools designed for luxury commerce.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {SUBSCRIPTION_PLANS.map((plan) => (
+                  <div 
+                    key={plan.name} 
+                    className={`border p-8 relative transition-all hover:-translate-y-2 hover:shadow-xl ${
+                        currentVendor?.subscriptionPlan === plan.name 
+                        ? 'border-black bg-gray-50 ring-1 ring-black' 
+                        : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                      {currentVendor?.subscriptionPlan === plan.name && (
+                          <div className="absolute top-0 right-0 bg-black text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
+                              Current Plan
+                          </div>
+                      )}
+                      <h3 className="text-xl font-serif italic mb-2">{plan.name}</h3>
+                      <div className="flex items-baseline gap-1 mb-4">
+                          <span className="text-3xl font-bold">{plan.price}</span>
+                          <span className="text-xs text-gray-500">{plan.period}</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mb-8 h-10">{plan.description}</p>
+                      <ul className="space-y-3 mb-8">
+                          {plan.features.map((f, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm">
+                                  <Check size={14} className="mt-1 text-green-600" />
+                                  <span>{f}</span>
+                              </li>
+                          ))}
+                      </ul>
+                      <button 
+                          onClick={() => handlePlanChange(plan.name)}
+                          disabled={currentVendor?.subscriptionPlan === plan.name}
+                          className="w-full py-3 text-xs font-bold uppercase tracking-widest border border-black hover:bg-black hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          {currentVendor?.subscriptionPlan === plan.name ? 'Active' : 'Select Plan'}
+                      </button>
+                  </div>
+              ))}
+          </div>
       </div>
   );
 
   const renderStorePreview = () => (
-    <div className="bg-white rounded-sm shadow-sm border border-gray-100 animate-slide-up overflow-hidden">
-        {/* Cover Image */}
-      <div className="h-64 w-full relative overflow-hidden bg-gray-200">
-         <img 
-           src={storeDesign.coverImage || currentVendor?.coverImage} 
-           alt="Cover" 
-           className="w-full h-full object-cover"
-         />
-         <div className="absolute inset-0 bg-black/10" />
-         <div className="absolute bottom-0 left-0 w-full p-8 bg-gradient-to-t from-black/60 to-transparent text-white">
-             <h1 className="text-4xl font-serif italic mb-2">{storeDesign.brandName || currentVendor?.name}</h1>
-             <p className="text-sm opacity-90 flex items-center gap-2"><MapPin size={14}/> {storeDesign.location || currentVendor?.location}</p>
-         </div>
-      </div>
-
-      <div className="p-8">
-          <div className="flex gap-8">
-               <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden -mt-20 relative z-10 bg-white">
-                   <img src={profileForm.avatar || currentVendor?.avatar} className="w-full h-full object-cover" alt="Profile" />
-               </div>
-               <div className="flex-1 pt-2">
-                   <p className="text-gray-600 font-light leading-relaxed max-w-2xl mb-8">
-                      {storeDesign.bio || currentVendor?.bio}
-                   </p>
-               </div>
-          </div>
-
-          <div className="border-t border-gray-100 pt-8 mt-4">
-              <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold uppercase tracking-widest">Store Inventory</h3>
-                  <span className="text-xs text-gray-400">{vendorProducts.length} Items</span>
+      <div className="bg-white border border-gray-100 shadow-xl overflow-hidden animate-fade-in">
+          <div className="bg-gray-100 border-b border-gray-200 p-2 flex items-center gap-2">
+              <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
               </div>
-              
-              {vendorProducts.length === 0 ? (
-                  <div className="text-center py-12 text-gray-400">
-                      <p>No active listings visible to customers.</p>
-                  </div>
-              ) : (
-                  <div className={`grid gap-6 ${storeDesign.layout === 'Masonry' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-3 lg:grid-cols-4'}`}>
-                      {vendorProducts.map((product, index) => (
-                          <div key={product.id} className={`group cursor-pointer ${storeDesign.layout === 'Masonry' && index % 2 !== 0 ? 'mt-12' : ''}`}>
-                              <div className="aspect-[3/4] bg-gray-100 mb-3 overflow-hidden relative">
-                                  <img src={product.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={product.name} />
-                                  {product.isNewSeason && <span className="absolute top-2 left-2 bg-white text-[10px] font-bold px-2 py-1 uppercase" style={{ color: storeDesign.accentColor }}>New</span>}
-                              </div>
-                              <h4 className="font-bold text-sm" style={{ fontFamily: storeDesign.theme === 'Minimalist' ? 'sans-serif' : 'serif' }}>{product.name}</h4>
-                              <p className="text-xs text-gray-500" style={{ color: storeDesign.accentColor }}>${product.price}</p>
-                          </div>
-                      ))}
-                  </div>
-              )}
+              <div className="flex-1 bg-white rounded text-[10px] text-center text-gray-400 py-1">
+                  myfitstore.com/designers/{storeDesign.brandName.toLowerCase().replace(/\s+/g, '-')}
+              </div>
+          </div>
+          <div className="h-[600px] overflow-y-auto relative bg-white">
+              <div className="h-48 relative">
+                   <img src={storeDesign.coverImage} className="w-full h-full object-cover" alt="cover" />
+                   <div className="absolute inset-0 bg-black/20" />
+              </div>
+              <div className="px-8 relative -mt-12">
+                   <div className="flex items-end gap-6 mb-6">
+                       <img src={profileForm.avatar} className="w-24 h-24 rounded-full border-4 border-white object-cover" alt="avatar" />
+                       <div className="mb-2">
+                           <h2 className="text-2xl font-serif italic">{storeDesign.brandName}</h2>
+                           <p className="text-xs text-gray-500">{storeDesign.location}</p>
+                       </div>
+                   </div>
+                   <p className="text-sm text-gray-600 font-serif italic max-w-xl mb-12">{storeDesign.bio}</p>
+                   <div className="grid grid-cols-3 gap-4">
+                       {[1,2,3].map(i => (
+                           <div key={i} className="aspect-[3/4] bg-gray-100 animate-pulse" />
+                       ))}
+                   </div>
+              </div>
           </div>
       </div>
-    </div>
-  );
-
-  const renderSaved = () => (
-    <div className="bg-white p-8 rounded-sm shadow-sm border border-gray-100 animate-slide-up">
-        <h3 className="text-xl font-serif italic mb-8">Wishlist</h3>
-        {savedItems.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-                <Heart size={48} className="mx-auto mb-4 opacity-20" />
-                <p className="text-sm font-bold uppercase tracking-widest">Your wishlist is empty</p>
-            </div>
-        ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {savedItems.map(item => (
-                    <div key={item.id} className="group relative">
-                        <div className="aspect-[3/4] bg-gray-100 overflow-hidden mb-4 relative">
-                            <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                            <button 
-                                onClick={() => removeFromSaved(item.id)}
-                                className="absolute top-2 right-2 p-2 bg-white/80 hover:bg-red-50 hover:text-red-500 transition-colors rounded-full"
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                            {/* Quick Add overlay */}
-                            <div className="absolute bottom-0 left-0 right-0 bg-white/90 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                                <button 
-                                    onClick={() => onProductSelect && onProductSelect(item)}
-                                    className="w-full text-xs font-bold uppercase tracking-widest hover:text-luxury-gold"
-                                >
-                                    View Product
-                                </button>
-                            </div>
-                        </div>
-                        <h4 className="text-sm font-bold">{item.name}</h4>
-                        <p className="text-xs text-gray-500 mb-1">{item.designer}</p>
-                        <p className="text-sm font-medium">${item.price}</p>
-                    </div>
-                ))}
-            </div>
-        )}
-    </div>
   );
 
   return (
@@ -1740,9 +1165,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {renderSidebar()}
       <div className="flex-1 p-6 md:p-12 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
-           {/* Mobile Header Logic same as before... */}
+           {/* Mobile Header */}
            <div className="md:hidden mb-8 flex items-center justify-between">
-            <h1 className="text-2xl font-serif italic">Atelier.</h1>
+            <h1 className="text-2xl font-serif italic">MyFitStore</h1>
            </div>
 
           <div className="mb-8">
@@ -1751,7 +1176,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </h1>
           </div>
 
-          {activeTab === 'OVERVIEW' && renderOverview()}
+          {activeTab === 'OVERVIEW' && renderOverview(SALES_DATA)}
           {activeTab === 'PRODUCTS' && renderProducts()}
           {activeTab === 'UPLOAD' && renderUpload()}
           {activeTab === 'ORDERS' && renderOrders()}
@@ -1782,4 +1207,43 @@ const AreaChartComponent = ({ data }: { data: any[] }) => (
     <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', border: 'none', borderRadius: '0px', color: '#fff' }} />
     <Line type="monotone" dataKey="sales" stroke="#0a0a0a" strokeWidth={2} />
   </LineChart>
+);
+
+const renderOverview = (data: any[]) => (
+  <div className="space-y-8 animate-fade-in">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {[
+          { label: 'Total Revenue', value: '$45,231', icon: DollarSign, trend: '+12%' },
+          { label: 'Active Orders', value: '12', icon: Package, trend: '+2' },
+          { label: 'Total Clients', value: '1,203', icon: Users, trend: '+5%' },
+          { label: 'Avg. Order Value', value: '$340', icon: Activity, trend: '-1%' },
+        ].map((stat, i) => (
+          <div key={i} className="bg-white p-6 border border-gray-100 shadow-sm flex flex-col justify-between h-32">
+            <div className="flex justify-between items-start">
+               <div>
+                 <p className="text-xs text-gray-400 uppercase tracking-widest">{stat.label}</p>
+                 <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
+               </div>
+               <div className="p-2 bg-gray-50 rounded-full text-gray-400">
+                 <stat.icon size={18} />
+               </div>
+            </div>
+            <p className={`text-xs font-bold ${stat.trend.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
+              {stat.trend} <span className="text-gray-300 font-normal">vs last month</span>
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-6 border border-gray-100 shadow-sm">
+          <h3 className="text-lg font-serif italic mb-6">Revenue Analytics</h3>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChartComponent data={data} />
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
 );

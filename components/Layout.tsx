@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler } from 'lucide-react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader } from 'lucide-react';
 import { NAV_LINKS } from '../constants';
-import { UserRole, ViewState, CartItem } from '../types';
+import { UserRole, ViewState, CartItem, Order } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +16,7 @@ interface LayoutProps {
   currentView: ViewState;
   isLoggedIn: boolean;
   onLogout: () => void;
+  onPlaceOrder?: (order: Order) => Promise<void>;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -30,12 +31,14 @@ export const Layout: React.FC<LayoutProps> = ({
   onRoleChange,
   currentView,
   isLoggedIn,
-  onLogout
+  onLogout,
+  onPlaceOrder
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [measurementError, setMeasurementError] = useState(false);
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,7 +56,7 @@ export const Layout: React.FC<LayoutProps> = ({
     else onNavigate('BUYER_DASHBOARD');
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     // Validate Pre-Orders
     const hasInvalidPreOrder = cart.some(item => 
       item.isPreOrder && (!item.measurements || item.measurements.length < 5)
@@ -64,17 +67,41 @@ export const Layout: React.FC<LayoutProps> = ({
       return;
     }
     setMeasurementError(false);
+    setIsProcessingCheckout(true);
 
-    setOrderComplete(true);
-    setTimeout(() => {
-      setOrderComplete(false);
-      setIsCartOpen(false);
-      if (isLoggedIn) {
-        handleDashboardClick();
-      } else {
-        onNavigate('AUTH');
-      }
-    }, 2000);
+    if (!isLoggedIn) {
+       // Force auth if not logged in
+       setIsProcessingCheckout(false);
+       onNavigate('AUTH');
+       setIsCartOpen(false);
+       return;
+    }
+
+    const newOrder: Order = {
+        id: `ord_${Date.now()}`,
+        customerName: 'Guest User', // Ideally from Auth
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        total: cartTotal,
+        status: 'Processing',
+        items: [...cart]
+    };
+
+    try {
+        if (onPlaceOrder) {
+            await onPlaceOrder(newOrder);
+        }
+        setOrderComplete(true);
+        setTimeout(() => {
+          setOrderComplete(false);
+          setIsCartOpen(false);
+          handleDashboardClick();
+        }, 2000);
+    } catch (e) {
+        console.error("Checkout failed", e);
+        alert("Checkout failed. Please try again.");
+    } finally {
+        setIsProcessingCheckout(false);
+    }
   };
 
   return (
@@ -97,7 +124,7 @@ export const Layout: React.FC<LayoutProps> = ({
             className="text-2xl md:text-3xl font-serif font-bold tracking-widest cursor-pointer hover:opacity-70 transition-opacity"
             onClick={() => onNavigate('LANDING')}
           >
-            LUMIERRE
+            MyFitStore
           </div>
 
           {/* Desktop Nav */}
@@ -317,10 +344,14 @@ export const Layout: React.FC<LayoutProps> = ({
               </div>
               <button 
                 onClick={handleCheckout}
-                className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group"
+                disabled={isProcessingCheckout}
+                className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group disabled:opacity-70"
               >
-                Checkout
-                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                {isProcessingCheckout ? (
+                    <>Processing <Loader className="animate-spin" size={14} /></>
+                ) : (
+                    <>Checkout <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" /></>
+                )}
               </button>
             </div>
           )}
@@ -334,7 +365,7 @@ export const Layout: React.FC<LayoutProps> = ({
       <footer className="bg-luxury-black text-luxury-cream py-20 px-6 mt-20">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
           <div>
-            <h3 className="text-2xl font-serif font-bold tracking-widest mb-6">LUMIERRE</h3>
+            <h3 className="text-2xl font-serif font-bold tracking-widest mb-6">MyFitStore</h3>
             <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
               Redefining luxury digital commerce through curation, technology, and sustainable innovation.
             </p>
@@ -366,7 +397,7 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-gray-900 flex justify-between items-center text-xs text-gray-600">
-          <div>© 2024 LUMIERRE. ALL RIGHTS RESERVED.</div>
+          <div>© 2024 MyFitStore. ALL RIGHTS RESERVED.</div>
           <div className="flex gap-4">
              <Globe size={14} /> <span>US / USD</span>
           </div>

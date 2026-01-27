@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Layout } from './components/Layout';
 import { LandingView } from './components/LandingView';
@@ -12,12 +12,17 @@ import { AuthView } from './components/AuthView';
 import { PricingView } from './components/PricingView';
 import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order } from './types';
 import { MOCK_VENDORS, MOCK_PRODUCTS, MOCK_ORDERS } from './constants';
+import { 
+  seedDatabase, fetchVendors, fetchProducts, fetchOrders,
+  addProductToDb, updateProductInDb, deleteProductFromDb,
+  updateVendorInDb, createOrderInDb, updateOrderStatusInDb
+} from './services/dataService';
+import { Loader } from 'lucide-react';
 
 const App: React.FC = () => {
   // State
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
   const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
-  // Track if user is "officially" logged in for UI purposes
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -26,9 +31,41 @@ const App: React.FC = () => {
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string | null>(null);
   
   // Data State
-  const [vendors, setVendors] = useState<Vendor[]>(MOCK_VENDORS);
-  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // Initialize DB and Fetch Data
+  const refreshData = async () => {
+    try {
+      const [dbVendors, dbProducts, dbOrders] = await Promise.all([
+        fetchVendors(), 
+        fetchProducts(),
+        fetchOrders()
+      ]);
+      setVendors(dbVendors);
+      setProducts(dbProducts);
+      setOrders(dbOrders);
+    } catch (error) {
+      console.error("Failed to refresh data", error);
+    }
+  };
+
+  useEffect(() => {
+    const initData = async () => {
+      try {
+        await seedDatabase();
+        await refreshData();
+      } catch (error) {
+        console.error("Database initialization failed.", error);
+        // Even if fail, we might show empty states rather than full mocks to enforce 'real' mode
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    initData();
+  }, []);
 
   // Derived State: Active Products (only from active vendors)
   const activeProducts = products.filter(product => {
@@ -46,7 +83,6 @@ const App: React.FC = () => {
 
   // Handlers
   const handleNavigate = (view: ViewState) => {
-    // Reset filters when navigating away from Marketplace/Designers unless specified
     if (view !== 'MARKETPLACE') {
         setSelectedDesignerFilter(null);
     }
@@ -56,13 +92,11 @@ const App: React.FC = () => {
   };
 
   const handleDesignerSelect = (designerName: string) => {
-    // Try to find the full vendor object
     const vendor = vendors.find(v => v.name === designerName);
     if (vendor) {
       setSelectedVendor(vendor);
       handleNavigate('VENDOR_PROFILE');
     } else {
-      // Fallback to simple filtering if no profile exists
       setSelectedDesignerFilter(designerName);
       handleNavigate('MARKETPLACE');
     }
@@ -71,7 +105,6 @@ const App: React.FC = () => {
   const handleLogin = (role: UserRole) => {
     setUserRole(role);
     setIsLoggedIn(true);
-    // Redirect based on role
     if (role === UserRole.ADMIN) {
       handleNavigate('ADMIN_PANEL');
     } else if (role === UserRole.VENDOR) {
@@ -100,7 +133,7 @@ const App: React.FC = () => {
       measurements: measurements || ''
     };
     setCart([...cart, newItem]);
-    setIsCartOpen(true); // Open cart when item added
+    setIsCartOpen(true);
   };
 
   const handleUpdateCartItem = (index: number, updates: Partial<CartItem>) => {
@@ -115,24 +148,54 @@ const App: React.FC = () => {
     setCart(newCart);
   };
 
-  const handleAddProduct = (product: Product) => {
-    setProducts(prev => [product, ...prev]);
+  // --- ASYNC DATA HANDLERS ---
+
+  const handleAddProduct = async (product: Product) => {
+    await addProductToDb(product);
+    await refreshData();
   };
 
-  const handleUpdateProduct = (updatedProduct: Product) => {
-    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  const handleUpdateProduct = async (updatedProduct: Product) => {
+    await updateProductInDb(updatedProduct);
+    await refreshData();
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    setProducts(prev => prev.filter(p => p.id !== productId));
+  const handleDeleteProduct = async (productId: string) => {
+    await deleteProductFromDb(productId);
+    await refreshData();
+  };
+  
+  const handleSetVendors = async (updatedVendors: Vendor[]) => {
+    // This receives the full array, but we need to find diffs or update individually.
+    // For the Dashboard implementation, it usually passes the full list but implies a single update.
+    // We will assume simpler single updates are better, but for compatibility with Dashboard signature:
+    // We will just find the changed vendor and update it.
+    
+    // In a real app, the Dashboard would call updateVendor directly. 
+    // Here we iterate and update (or better, modify Dashboard to call specific update)
+    // For now, let's just assume the Dashboard modifies one vendor and calls this.
+    // To be safe, we will just update all vendors in the passed array (not efficient but functional for demo-removal)
+    // BETTER: Modify Dashboard to not require setVendors for single updates, but for now we iterate.
+    
+    for (const v of updatedVendors) {
+       await updateVendorInDb(v);
+    }
+    await refreshData();
+  };
+
+  const handleUpdateOrderStatus = async (orderId: string, status: Order['status']) => {
+    await updateOrderStatusInDb(orderId, status);
+    await refreshData();
+  };
+  
+  const handlePlaceOrder = async (order: Order) => {
+     await createOrderInDb(order);
+     await refreshData();
+     setCart([]); // Clear cart
   };
 
   const toggleFeatureFlag = (key: keyof FeatureFlags) => {
     setFeatureFlags(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const handleUpdateOrderStatus = (orderId: string, status: Order['status']) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
 
   // View Routing
@@ -144,7 +207,7 @@ const App: React.FC = () => {
     if (featureFlags.maintenanceMode && userRole !== UserRole.ADMIN) {
       return (
         <div className="h-screen flex items-center justify-center flex-col">
-          <h1 className="text-4xl font-serif">LUMIERRE</h1>
+          <h1 className="text-4xl font-serif">MyFitStore</h1>
           <p className="mt-4 uppercase tracking-widest text-sm">Under Maintenance</p>
         </div>
       );
@@ -213,7 +276,7 @@ const App: React.FC = () => {
             toggleFeatureFlag={toggleFeatureFlag}
             onNavigate={handleNavigate}
             vendors={vendors}
-            setVendors={setVendors}
+            setVendors={handleSetVendors}
             orders={orders}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             products={products}
@@ -232,7 +295,7 @@ const App: React.FC = () => {
             onNavigate={handleNavigate}
             initialTab="PROFILE"
             vendors={vendors}
-            setVendors={setVendors}
+            setVendors={handleSetVendors}
             products={products}
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
@@ -246,6 +309,16 @@ const App: React.FC = () => {
         return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} onDesignerClick={handleDesignerSelect} />;
     }
   };
+
+  if (isLoadingData) {
+    return (
+      <div className="min-h-screen bg-luxury-cream flex flex-col items-center justify-center animate-fade-in">
+        <h1 className="text-3xl font-serif font-bold tracking-widest mb-6">MyFitStore</h1>
+        <Loader className="animate-spin text-luxury-gold" size={24} />
+        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-gray-400">Loading Archives...</p>
+      </div>
+    );
+  }
 
   if (currentView === 'AUTH') {
     return renderView();
@@ -264,6 +337,7 @@ const App: React.FC = () => {
       currentView={currentView}
       isLoggedIn={isLoggedIn}
       onLogout={handleLogout}
+      onPlaceOrder={handlePlaceOrder}
     >
       {renderView()}
     </Layout>

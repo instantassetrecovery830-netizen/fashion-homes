@@ -1,5 +1,5 @@
 {
-  "name": "copy-of-lumierre",
+  "name": "myfitstore",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -13,7 +13,8 @@
     "react-dom": "^19.2.3",
     "react": "^19.2.3",
     "lucide-react": "^0.563.0",
-    "recharts": "^3.7.0"
+    "recharts": "^3.7.0",
+    "@neondatabase/serverless": "^0.9.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

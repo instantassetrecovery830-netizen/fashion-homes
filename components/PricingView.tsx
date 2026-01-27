@@ -59,10 +59,10 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate, onLogin })
     <div className="min-h-screen bg-luxury-cream pt-24 pb-24 animate-fade-in">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-6 mb-20 text-center">
-        <span className="text-xs font-bold uppercase tracking-[0.3em] text-luxury-gold mb-4 block">LUMIERRE Membership</span>
+        <span className="text-xs font-bold uppercase tracking-[0.3em] text-luxury-gold mb-4 block">MyFitStore Membership</span>
         <h1 className="text-5xl md:text-7xl font-serif italic mb-6">Unlock Privilege</h1>
         <p className="max-w-2xl mx-auto text-gray-500 font-light text-lg">
-          Select your tier to access the LUMIERRE ecosystem. Elevate your experience with exclusive drops, personalized curation, and white-glove service.
+          Select your tier to access the MyFitStore ecosystem. Elevate your experience with exclusive drops, personalized curation, and white-glove service.
         </p>
       </div>
 

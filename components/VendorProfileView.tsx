@@ -33,7 +33,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({ vendor, on
 
   const handleSocialShare = (platform: string) => {
       const url = encodeURIComponent(window.location.href);
-      const text = encodeURIComponent(`Check out ${vendor.name} on LUMIERRE.`);
+      const text = encodeURIComponent(`Check out ${vendor.name} on MyFitStore.`);
       let shareUrl = '';
 
       switch(platform) {
