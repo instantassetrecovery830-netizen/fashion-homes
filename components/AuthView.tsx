@@ -276,6 +276,19 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
                         </button>
                     )}
                 </div>
+
+                <div className="mt-8 border-t border-gray-100 pt-6">
+                    <button 
+                        onClick={async () => {
+                            await signOut(auth);
+                            setVerificationNeeded(false);
+                            onNavigate('LANDING');
+                        }}
+                        className="text-[10px] text-gray-400 uppercase tracking-widest hover:text-black transition-colors"
+                    >
+                        Sign Out / Back to Store
+                    </button>
+                </div>
             </div>
         </div>
       );

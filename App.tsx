@@ -91,6 +91,12 @@ const App: React.FC = () => {
                 setUserRole(UserRole.BUYER);
             }
         }
+      } else if (user && !user.emailVerified) {
+        // User is authenticated but not verified. 
+        // Redirect to AuthView to show verification screen.
+        setIsLoggedIn(false);
+        setUserRole(UserRole.BUYER);
+        setCurrentView('AUTH');
       } else {
         setIsLoggedIn(false);
         setUserRole(UserRole.BUYER);
