@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
 import { Layout } from './components/Layout';
 import { LandingView } from './components/LandingView';
 import { MarketplaceView } from './components/MarketplaceView';
@@ -11,7 +10,6 @@ import { Dashboard } from './components/Dashboard';
 import { AuthView } from './components/AuthView';
 import { PricingView } from './components/PricingView';
 import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order } from './types';
-import { MOCK_VENDORS, MOCK_PRODUCTS, MOCK_ORDERS } from './constants';
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers,
   addProductToDb, updateProductInDb, deleteProductFromDb,
