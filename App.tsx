@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { LandingView } from './components/LandingView';
@@ -9,11 +10,11 @@ import { ProductDetail } from './components/ProductDetail';
 import { Dashboard } from './components/Dashboard';
 import { AuthView } from './components/AuthView';
 import { PricingView } from './components/PricingView';
-import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order } from './types';
+import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent } from './types';
 import { 
-  seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers,
+  seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent,
   addProductToDb, updateProductInDb, deleteProductFromDb,
-  updateVendorInDb, createOrderInDb, updateOrderStatusInDb
+  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb
 } from './services/dataService';
 import { Loader } from 'lucide-react';
 import { auth, onAuthStateChanged, signOut } from './services/firebase';
@@ -33,22 +34,25 @@ const App: React.FC = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [cmsContent, setCmsContent] = useState<LandingPageContent | undefined>(undefined);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   // Initialize DB and Fetch Data
   const refreshData = async () => {
     try {
-      const [dbVendors, dbProducts, dbOrders, dbUsers] = await Promise.all([
+      const [dbVendors, dbProducts, dbOrders, dbUsers, dbContent] = await Promise.all([
         fetchVendors(), 
         fetchProducts(),
         fetchOrders(),
-        fetchUsers()
+        fetchUsers(),
+        fetchLandingContent()
       ]);
       setVendors(dbVendors);
       setProducts(dbProducts);
       setOrders(dbOrders);
       setAllUsers(dbUsers);
+      setCmsContent(dbContent);
     } catch (error) {
       console.error("Failed to refresh data", error);
     }
@@ -214,6 +218,11 @@ const App: React.FC = () => {
     }
     await refreshData();
   };
+  
+  const handleUpdateUser = async (user: User) => {
+      await updateUserInDb(user);
+      await refreshData();
+  };
 
   const handleUpdateOrderStatus = async (orderId: string, status: Order['status']) => {
     await updateOrderStatusInDb(orderId, status);
@@ -224,6 +233,11 @@ const App: React.FC = () => {
      await createOrderInDb(order);
      await refreshData();
      setCart([]); // Clear cart
+  };
+
+  const handleUpdateCMSContent = async (content: LandingPageContent) => {
+    await updateLandingContentInDb(content);
+    await refreshData();
   };
 
   const toggleFeatureFlag = (key: keyof FeatureFlags) => {
@@ -255,6 +269,7 @@ const App: React.FC = () => {
             vendors={vendors}
             products={activeProducts}
             onDesignerClick={handleDesignerSelect}
+            cmsContent={cmsContent}
           />
         );
       case 'MARKETPLACE':
@@ -318,6 +333,9 @@ const App: React.FC = () => {
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
             onProductSelect={handleProductSelect}
+            onUpdateUser={handleUpdateUser}
+            cmsContent={cmsContent}
+            onUpdateCMSContent={handleUpdateCMSContent}
           />
         );
       case 'PROFILE_SETTINGS':
@@ -336,12 +354,15 @@ const App: React.FC = () => {
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
             onProductSelect={handleProductSelect}
+            onUpdateUser={handleUpdateUser}
+            cmsContent={cmsContent}
+            onUpdateCMSContent={handleUpdateCMSContent}
           />
         );
       case 'PRICING':
         return <PricingView onNavigate={handleNavigate} onLogin={() => handleLogin(UserRole.VENDOR)} />;
       default:
-        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} products={activeProducts} onDesignerClick={handleDesignerSelect} />;
+        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} products={activeProducts} onDesignerClick={handleDesignerSelect} cmsContent={cmsContent} />;
     }
   };
 

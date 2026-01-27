@@ -1,7 +1,20 @@
+
 export enum UserRole {
   BUYER = 'BUYER',
   VENDOR = 'VENDOR',
   ADMIN = 'ADMIN'
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatar: string;
+  joined: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  spend?: string;
+  location?: string;
 }
 
 export interface Product {
@@ -79,4 +92,34 @@ export interface TrendAnalysis {
   title: string;
   description: string;
   colorPalette: string[];
+}
+
+export interface LandingPageContent {
+  hero: {
+    videoUrl: string;
+    posterUrl: string;
+    subtitle: string;
+    titleLine1: string;
+    titleLine2: string;
+    buttonText: string;
+  };
+  marquee: {
+    text: string;
+  };
+  designers: {
+    subtitle: string;
+    title: string;
+  };
+  campaign: {
+    subtitle: string;
+    title: string;
+    image1: string;
+    image2: string;
+    image3: string;
+    image4: string;
+    overlayText1: string;
+  };
+  spotlight: {
+    title: string;
+  }
 }

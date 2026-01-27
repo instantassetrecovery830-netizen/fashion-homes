@@ -1,6 +1,7 @@
+
 import { pool } from './db';
 import { MOCK_VENDORS, MOCK_PRODUCTS } from '../constants';
-import { Product, Vendor, Order } from '../types';
+import { Product, Vendor, Order, User, LandingPageContent } from '../types';
 
 // Helper to map DB row to Vendor type
 const mapVendor = (row: any): Vendor => ({
@@ -44,6 +45,37 @@ const mapOrder = (row: any): Order => ({
   items: row.items
 });
 
+// Default CMS Content
+const DEFAULT_CMS_CONTENT: LandingPageContent = {
+  hero: {
+    videoUrl: "https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4",
+    posterUrl: "https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop",
+    subtitle: "The New Vanguard",
+    titleLine1: "AFRICAN",
+    titleLine2: "LUXURY",
+    buttonText: "Shop Collection"
+  },
+  marquee: {
+    text: "Lagos • Accra • Nairobi • Cape Town • Heritage Reimagined • Pan-African Aesthetics"
+  },
+  designers: {
+    subtitle: "The Ateliers",
+    title: "Shop by Designer"
+  },
+  campaign: {
+    subtitle: "The Campaign",
+    title: "Urban Chronicles",
+    image1: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887&auto=format&fit=crop",
+    image2: "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888&auto=format&fit=crop",
+    image3: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop",
+    image4: "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886&auto=format&fit=crop",
+    overlayText1: "Street Edition"
+  },
+  spotlight: {
+    title: "Editor's Picks"
+  }
+};
+
 export const seedDatabase = async () => {
   try {
     console.log('Checking database state...');
@@ -75,7 +107,8 @@ export const seedDatabase = async () => {
         email TEXT,
         role TEXT,
         avatar TEXT,
-        joined_date TEXT
+        joined_date TEXT,
+        status TEXT
       );
     `);
 
@@ -109,6 +142,14 @@ export const seedDatabase = async () => {
       );
     `);
 
+    // Create CMS Content Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cms_content (
+        id TEXT PRIMARY KEY,
+        data JSONB
+      );
+    `);
+
     // Check if we need to seed initial data (only if empty)
     const vendorCount = await pool.query('SELECT COUNT(*) FROM vendors');
     
@@ -131,6 +172,15 @@ export const seedDatabase = async () => {
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         `, [p.id, p.name, p.designer, p.price, p.category, p.image, p.description, p.rating, p.isNewSeason || false, p.stock, p.sizes, p.isPreOrder || false]);
       }
+    }
+
+    // Seed CMS Content if empty
+    const cmsCount = await pool.query('SELECT COUNT(*) FROM cms_content');
+    if (parseInt(cmsCount.rows[0].count) === 0) {
+      console.log('Seeding CMS Content...');
+      await pool.query(`
+        INSERT INTO cms_content (id, data) VALUES ($1, $2)
+      `, ['landing_page', JSON.stringify(DEFAULT_CMS_CONTENT)]);
     }
     
     console.log('Database synced.');
@@ -172,23 +222,36 @@ export const fetchOrders = async (): Promise<Order[]> => {
   }
 };
 
-export const fetchUsers = async (): Promise<any[]> => {
+export const fetchUsers = async (): Promise<User[]> => {
   try {
     const res = await pool.query('SELECT * FROM users ORDER BY joined_date DESC');
     return res.rows.map(row => ({
       id: row.id,
       name: row.name,
       email: row.email,
-      role: row.role,
+      role: row.role as any,
       avatar: row.avatar,
       joined: new Date(row.joined_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      status: 'ACTIVE', // Defaulting for display
+      status: (row.status || 'ACTIVE') as any, 
       spend: '-',
       location: 'Global'
     }));
   } catch (e) {
     console.error("Failed to fetch users", e);
     return [];
+  }
+};
+
+export const fetchLandingContent = async (): Promise<LandingPageContent> => {
+  try {
+    const res = await pool.query('SELECT data FROM cms_content WHERE id = $1', ['landing_page']);
+    if (res.rows.length > 0) {
+      return res.rows[0].data;
+    }
+    return DEFAULT_CMS_CONTENT;
+  } catch (e) {
+    console.error("Failed to fetch CMS content", e);
+    return DEFAULT_CMS_CONTENT;
   }
 };
 
@@ -232,11 +295,28 @@ export const createVendorInDb = async (vendor: Vendor) => {
 
 // --- WRITE OPERATIONS (USERS/BUYERS) ---
 
-export const createUserInDb = async (user: { id: string, name: string, email: string, role: string, avatar: string }) => {
+export const createUserInDb = async (user: { id: string, name: string, email: string, role: string, avatar: string, status: string }) => {
   await pool.query(`
-    INSERT INTO users (id, name, email, role, avatar, joined_date)
-    VALUES ($1, $2, $3, $4, $5, $6)
-  `, [user.id, user.name, user.email, user.role, user.avatar, new Date().toISOString()]);
+    INSERT INTO users (id, name, email, role, avatar, joined_date, status)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+  `, [user.id, user.name, user.email, user.role, user.avatar, new Date().toISOString(), user.status]);
+};
+
+export const updateUserInDb = async (user: User) => {
+  await pool.query(`
+    UPDATE users
+    SET role=$2, status=$3
+    WHERE id=$1
+  `, [user.id, user.role, user.status]);
+};
+
+// --- WRITE OPERATIONS (CMS) ---
+
+export const updateLandingContentInDb = async (content: LandingPageContent) => {
+  await pool.query(`
+    INSERT INTO cms_content (id, data) VALUES ($1, $2)
+    ON CONFLICT (id) DO UPDATE SET data = $2
+  `, ['landing_page', JSON.stringify(content)]);
 };
 
 // --- WRITE OPERATIONS (ORDERS) ---

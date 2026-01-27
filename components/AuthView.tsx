@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader, Shield, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, RefreshCw } from 'lucide-react';
 import { UserRole, ViewState, Vendor } from '../types';
@@ -115,9 +116,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
             await createUserInDb({
                 id: user.uid,
                 name: 'Google User',
-                email: user.email,
+                email: user.email || '',
                 role: UserRole.BUYER,
-                avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200'
+                avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200',
+                status: 'ACTIVE'
             });
          }
       } catch (dbError) {
@@ -175,7 +177,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
                     name: name || 'New User',
                     email: user.email || '',
                     role: UserRole.BUYER,
-                    avatar: finalAvatar
+                    avatar: finalAvatar,
+                    status: 'ACTIVE'
                 });
             }
 
