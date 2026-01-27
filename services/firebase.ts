@@ -1,3 +1,4 @@
+
 // Mock Firebase Service to resolve missing dependency errors
 
 // Mock User object structure used in the app
@@ -5,6 +6,8 @@ export interface MockUser {
   uid: string;
   email: string | null;
   emailVerified: boolean;
+  displayName?: string | null;
+  photoURL?: string | null;
 }
 
 // Internal state
@@ -92,7 +95,9 @@ export const signInWithPopup = async (authInstance: any, provider: any) => {
   const user: MockUser = {
     uid: `google_${Math.random().toString(36).substr(2, 9)}`,
     email: 'user@gmail.com',
-    emailVerified: true
+    emailVerified: true,
+    displayName: 'Google User',
+    photoURL: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200'
   };
   currentUser = user;
   notify();

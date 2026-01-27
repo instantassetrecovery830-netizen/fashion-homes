@@ -92,21 +92,25 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
     setIsLoading(true);
     setError(null);
     try {
+      // @ts-ignore - signInWithGoogle returns a UserCredential-like object in mock, or real one
       const { user } = await signInWithGoogle(auth);
       
       // Attempt to create user in DB. If ID exists, this catches and we assume user is already registered.
       try {
+         const displayName = user.displayName || 'Google User';
+         const photoURL = user.photoURL || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200';
+
          if (selectedRole === UserRole.VENDOR) {
             await createVendorInDb({
                 id: user.uid,
-                name: 'Google User',
+                name: displayName,
                 bio: 'Joined via Google',
-                avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200',
+                avatar: photoURL,
                 verificationStatus: 'PENDING',
                 subscriptionStatus: 'INACTIVE',
                 location: 'Unknown',
-                coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070',
-                email: user.email,
+                coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=200',
+                email: user.email || '',
                 subscriptionPlan: 'Atelier',
                 website: '',
                 instagram: '',
@@ -115,10 +119,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
          } else {
             await createUserInDb({
                 id: user.uid,
-                name: 'Google User',
+                name: displayName,
                 email: user.email || '',
                 role: UserRole.BUYER,
-                avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200',
+                avatar: photoURL,
                 status: 'ACTIVE'
             });
          }
@@ -458,7 +462,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate }) => {
                         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                     </svg>
-                    <span>Google</span>
+                    <span>Continue with Google</span>
                  </button>
             </form>
 
