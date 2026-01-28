@@ -17,7 +17,8 @@ const mapVendor = (row: any): Vendor => ({
   website: row.website,
   instagram: row.instagram,
   twitter: row.twitter,
-  paymentMethods: row.payment_methods || []
+  paymentMethods: row.payment_methods || [],
+  kycDocuments: row.kyc_documents || {}
 });
 
 // Helper to map DB row to Product type
@@ -51,8 +52,8 @@ const DEFAULT_CMS_CONTENT: LandingPageContent = {
     videoUrl: "https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4",
     posterUrl: "https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop",
     subtitle: "The New Vanguard",
-    titleLine1: "AFRICAN",
-    titleLine2: "LUXURY",
+    titleLine1: "DIGITAL",
+    titleLine2: "AVANT-GARDE",
     buttonText: "Shop Collection"
   },
   marquee: {
@@ -124,11 +125,12 @@ export const seedDatabase = async () => {
       );
     `);
     
-    // Add payment_methods column if not exists (for updates)
+    // Add columns if not exists (for updates)
     try {
         await pool.query('ALTER TABLE vendors ADD COLUMN IF NOT EXISTS payment_methods JSONB');
+        await pool.query('ALTER TABLE vendors ADD COLUMN IF NOT EXISTS kyc_documents JSONB');
     } catch (e) {
-        console.log("Column payment_methods might already exist or error adding it.", e);
+        console.log("Column additions might already exist or error adding them.", e);
     }
 
     // Create Users Table (For Buyers/Admins)
@@ -333,16 +335,16 @@ export const deleteProductFromDb = async (productId: string) => {
 export const updateVendorInDb = async (vendor: Vendor) => {
   await pool.query(`
     UPDATE vendors
-    SET name=$2, bio=$3, avatar=$4, location=$5, cover_image=$6, email=$7, website=$8, instagram=$9, twitter=$10, subscription_plan=$11, subscription_status=$12, verification_status=$13, payment_methods=$14
+    SET name=$2, bio=$3, avatar=$4, location=$5, cover_image=$6, email=$7, website=$8, instagram=$9, twitter=$10, subscription_plan=$11, subscription_status=$12, verification_status=$13, payment_methods=$14, kyc_documents=$15
     WHERE id=$1
-  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.location, vendor.coverImage, vendor.email, vendor.website, vendor.instagram, vendor.twitter, vendor.subscriptionPlan, vendor.subscriptionStatus, vendor.verificationStatus, JSON.stringify(vendor.paymentMethods || [])]);
+  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.location, vendor.coverImage, vendor.email, vendor.website, vendor.instagram, vendor.twitter, vendor.subscriptionPlan, vendor.subscriptionStatus, vendor.verificationStatus, JSON.stringify(vendor.paymentMethods || []), JSON.stringify(vendor.kycDocuments || {})]);
 };
 
 export const createVendorInDb = async (vendor: Vendor) => {
   await pool.query(`
-    INSERT INTO vendors (id, name, bio, avatar, verification_status, subscription_status, location, cover_image, email, subscription_plan, website, instagram, twitter, payment_methods)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.paymentMethods || [])]);
+    INSERT INTO vendors (id, name, bio, avatar, verification_status, subscription_status, location, cover_image, email, subscription_plan, website, instagram, twitter, payment_methods, kyc_documents)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.paymentMethods || []), JSON.stringify(vendor.kycDocuments || {})]);
 };
 
 // --- WRITE OPERATIONS (USERS/BUYERS) ---

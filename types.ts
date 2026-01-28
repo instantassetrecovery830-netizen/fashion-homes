@@ -50,6 +50,13 @@ export interface PaymentMethod {
   };
 }
 
+export interface KycDocuments {
+  idFront?: string;
+  idBack?: string;
+  proofOfAddress?: string;
+  submittedAt?: string;
+}
+
 export interface Vendor {
   id: string;
   name: string;
@@ -65,6 +72,7 @@ export interface Vendor {
   instagram?: string;
   twitter?: string;
   paymentMethods?: PaymentMethod[];
+  kycDocuments?: KycDocuments;
 }
 
 export interface CartItem extends Product {

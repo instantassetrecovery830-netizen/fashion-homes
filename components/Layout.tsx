@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera } from 'lucide-react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft } from 'lucide-react';
 import { NAV_LINKS } from '../constants';
 import { UserRole, ViewState, CartItem, Order } from '../types';
 
@@ -44,6 +44,15 @@ export const Layout: React.FC<LayoutProps> = ({
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   
+  // Checkout State
+  const [checkoutStep, setCheckoutStep] = useState<'CART' | 'PAYMENT'>('CART');
+  const [paymentDetails, setPaymentDetails] = useState({
+    cardName: '',
+    cardNumber: '',
+    expiry: '',
+    cvc: ''
+  });
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -53,6 +62,13 @@ export const Layout: React.FC<LayoutProps> = ({
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Reset checkout step when cart closes
+  useEffect(() => {
+    if (!isCartOpen) {
+        setTimeout(() => setCheckoutStep('CART'), 500);
+    }
+  }, [isCartOpen]);
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
 
@@ -74,13 +90,12 @@ export const Layout: React.FC<LayoutProps> = ({
         await onVisualSearch(file);
       } finally {
         setIsSearching(false);
-        // Reset input so same file can be selected again if needed
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     }
   };
 
-  const handleCheckout = async () => {
+  const handleProceedToPayment = () => {
     // Validate Pre-Orders
     const hasInvalidPreOrder = cart.some(item => 
       item.isPreOrder && (!item.measurements || item.measurements.length < 5)
@@ -91,19 +106,28 @@ export const Layout: React.FC<LayoutProps> = ({
       return;
     }
     setMeasurementError(false);
-    setIsProcessingCheckout(true);
 
     if (!isLoggedIn) {
-       // Force auth if not logged in
-       setIsProcessingCheckout(false);
        onNavigate('AUTH');
        setIsCartOpen(false);
        return;
     }
 
+    setCheckoutStep('PAYMENT');
+  };
+
+  const handleFinalizeOrder = async () => {
+    // Basic validation
+    if (!paymentDetails.cardNumber || !paymentDetails.cvc || !paymentDetails.expiry) {
+        alert("Please enter valid payment details.");
+        return;
+    }
+
+    setIsProcessingCheckout(true);
+
     const newOrder: Order = {
         id: `ord_${Date.now()}`,
-        customerName: 'Guest User', // Ideally from Auth
+        customerName: 'Guest User', // Ideally from Auth context
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         total: cartTotal,
         status: 'Processing',
@@ -119,6 +143,8 @@ export const Layout: React.FC<LayoutProps> = ({
           setOrderComplete(false);
           setIsCartOpen(false);
           handleDashboardClick();
+          // Reset Payment Form
+          setPaymentDetails({ cardName: '', cardNumber: '', expiry: '', cvc: '' });
         }, 2000);
     } catch (e) {
         console.error("Checkout failed", e);
@@ -274,21 +300,6 @@ export const Layout: React.FC<LayoutProps> = ({
                 Sign In / Register
               </button>
             </div>
-            {/* Quick Role Switch for Mobile Dev - kept from previous implementation logic for convenience */}
-            <div className="mt-4 border-t border-gray-100 pt-4">
-               <p className="text-[10px] text-gray-300 uppercase px-2 mb-2">Dev: Quick Switch</p>
-                <div className="flex gap-4">
-                  {Object.values(UserRole).map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => { onRoleChange(r); setMobileMenuOpen(false); }}
-                      className="text-xs text-gray-400 hover:text-black"
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-            </div>
           </div>
         )}
       </nav>
@@ -304,8 +315,16 @@ export const Layout: React.FC<LayoutProps> = ({
         <div 
           className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl transform transition-transform duration-500 ease-out flex flex-col ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}
         >
+          {/* Drawer Header */}
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10">
-             <h2 className="text-xl font-serif italic">Your Selection</h2>
+             <div className="flex items-center gap-3">
+                 {checkoutStep === 'PAYMENT' && !orderComplete && (
+                     <button onClick={() => setCheckoutStep('CART')} className="hover:text-luxury-gold transition-colors">
+                         <ArrowLeft size={20} />
+                     </button>
+                 )}
+                 <h2 className="text-xl font-serif italic">{checkoutStep === 'PAYMENT' ? 'Secure Payment' : 'Your Selection'}</h2>
+             </div>
              <button onClick={() => setIsCartOpen(false)} className="hover:rotate-90 transition-transform duration-300">
                <X size={24} />
              </button>
@@ -329,7 +348,8 @@ export const Layout: React.FC<LayoutProps> = ({
                   Start Shopping
                 </button>
               </div>
-            ) : (
+            ) : checkoutStep === 'CART' ? (
+              // CART VIEW
               cart.map((item, index) => (
                 <div key={`${item.id}-${index}`} className="animate-fade-in">
                   <div className="flex gap-4 mb-4">
@@ -376,26 +396,104 @@ export const Layout: React.FC<LayoutProps> = ({
                   )}
                 </div>
               ))
+            ) : (
+                // PAYMENT VIEW
+                <div className="space-y-6 animate-fade-in">
+                    <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold uppercase text-gray-400">Total Amount</span>
+                            <span className="font-bold text-lg">${cartTotal}</span>
+                        </div>
+                        <div className="flex gap-2 text-xs text-gray-400">
+                           <Lock size={12} /> <span className="uppercase tracking-wider">Secure Encryption</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Cardholder Name</label>
+                            <input 
+                                type="text"
+                                placeholder="Name on Card"
+                                value={paymentDetails.cardName}
+                                onChange={(e) => setPaymentDetails({...paymentDetails, cardName: e.target.value})}
+                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                            />
+                        </div>
+                         <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Card Number</label>
+                            <div className="relative">
+                                <input 
+                                    type="text"
+                                    placeholder="0000 0000 0000 0000"
+                                    value={paymentDetails.cardNumber}
+                                    onChange={(e) => setPaymentDetails({...paymentDetails, cardNumber: e.target.value})}
+                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                />
+                                <CreditCard size={16} className="absolute right-0 top-2 text-gray-400" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-6">
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Expiry Date</label>
+                                <div className="relative">
+                                    <input 
+                                        type="text"
+                                        placeholder="MM/YY"
+                                        value={paymentDetails.expiry}
+                                        onChange={(e) => setPaymentDetails({...paymentDetails, expiry: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                    <Calendar size={16} className="absolute right-0 top-2 text-gray-400" />
+                                </div>
+                            </div>
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">CVC</label>
+                                <div className="relative">
+                                    <input 
+                                        type="text"
+                                        placeholder="123"
+                                        value={paymentDetails.cvc}
+                                        onChange={(e) => setPaymentDetails({...paymentDetails, cvc: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                    <Lock size={16} className="absolute right-0 top-2 text-gray-400" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
           </div>
 
           {cart.length > 0 && !orderComplete && (
             <div className="p-6 bg-gray-50 border-t border-gray-100">
-              <div className="flex justify-between items-center mb-6 text-sm">
-                <span className="uppercase tracking-widest text-gray-500">Subtotal</span>
-                <span className="font-bold text-lg">${cartTotal}</span>
-              </div>
-              <button 
-                onClick={handleCheckout}
-                disabled={isProcessingCheckout}
-                className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group disabled:opacity-70"
-              >
-                {isProcessingCheckout ? (
-                    <>Processing <Loader className="animate-spin" size={14} /></>
-                ) : (
-                    <>Checkout <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" /></>
-                )}
-              </button>
+              {checkoutStep === 'CART' ? (
+                <>
+                  <div className="flex justify-between items-center mb-6 text-sm">
+                    <span className="uppercase tracking-widest text-gray-500">Subtotal</span>
+                    <span className="font-bold text-lg">${cartTotal}</span>
+                  </div>
+                  <button 
+                    onClick={handleProceedToPayment}
+                    className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group"
+                  >
+                    Proceed to Checkout <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={handleFinalizeOrder}
+                  disabled={isProcessingCheckout}
+                  className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group disabled:opacity-70"
+                >
+                   {isProcessingCheckout ? (
+                       <>Processing <Loader className="animate-spin" size={14} /></>
+                   ) : (
+                       <>Pay ${cartTotal} <Lock size={16} /></>
+                   )}
+                </button>
+              )}
             </div>
           )}
         </div>

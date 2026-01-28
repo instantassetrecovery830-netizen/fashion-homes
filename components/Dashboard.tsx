@@ -12,9 +12,10 @@ import {
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield,
   Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu, Wallet, Banknote, Bitcoin, ArrowLeft, Inbox,
-  Phone, Clock
+  Phone, Clock, Calendar, FileCheck
 } from 'lucide-react';
-import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission } from '../types';
+import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission, KycDocuments } from '../types';
+import { updateUserPassword, auth } from '../services/firebase';
 
 // Initial Empty Data for real-time start
 const SALES_DATA = [
@@ -121,6 +122,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const productFileInputRef = useRef<HTMLInputElement>(null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const kycIdFrontRef = useRef<HTMLInputElement>(null);
+  const kycIdBackRef = useRef<HTMLInputElement>(null);
+  const kycProofRef = useRef<HTMLInputElement>(null);
 
   // Editable Profile State
   const [profileForm, setProfileForm] = useState({
@@ -132,6 +136,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
     twitter: currentVendor?.twitter || ''
   });
   
+  // Password Update State
+  const [passwords, setPasswords] = useState({
+      new: '',
+      confirm: ''
+  });
+  const [passwordStatus, setPasswordStatus] = useState({ loading: false, success: false, error: '' });
+
+  // KYC State
+  const [kycFiles, setKycFiles] = useState<KycDocuments>({
+      idFront: currentVendor?.kycDocuments?.idFront || '',
+      idBack: currentVendor?.kycDocuments?.idBack || '',
+      proofOfAddress: currentVendor?.kycDocuments?.proofOfAddress || ''
+  });
+  const [kycStatus, setKycStatus] = useState({ loading: false, success: false, error: '' });
+
+  // Subscription Payment State
+  const [showSubscriptionPayment, setShowSubscriptionPayment] = useState(false);
+  const [selectedPlanForUpgrade, setSelectedPlanForUpgrade] = useState<string | null>(null);
+  const [subPaymentDetails, setSubPaymentDetails] = useState({
+     cardName: '',
+     cardNumber: '',
+     expiry: '',
+     cvc: ''
+  });
+
   // Payment Method State
   const [isAddingPayout, setIsAddingPayout] = useState(false);
   const [payoutForm, setPayoutForm] = useState<Partial<PaymentMethod>>({
@@ -270,6 +299,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         coverImage: currentVendor.coverImage || '',
         bio: currentVendor.bio
       }));
+      setKycFiles({
+          idFront: currentVendor.kycDocuments?.idFront || '',
+          idBack: currentVendor.kycDocuments?.idBack || '',
+          proofOfAddress: currentVendor.kycDocuments?.proofOfAddress || ''
+      });
     }
   }, [currentVendor]);
 
@@ -424,6 +458,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
   
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (passwords.new !== passwords.confirm) {
+          setPasswordStatus({ loading: false, success: false, error: 'Passwords do not match' });
+          return;
+      }
+      
+      setPasswordStatus({ loading: true, success: false, error: '' });
+      try {
+          if (auth.currentUser) {
+              await updateUserPassword(auth.currentUser, passwords.new);
+              setPasswordStatus({ loading: false, success: true, error: '' });
+              setPasswords({ new: '', confirm: '' });
+              setTimeout(() => setPasswordStatus({ loading: false, success: false, error: '' }), 3000);
+          } else {
+              setPasswordStatus({ loading: false, success: false, error: 'User session invalid.' });
+          }
+      } catch (err) {
+          setPasswordStatus({ loading: false, success: false, error: 'Failed to update password.' });
+      }
+  };
+
+  const handleKycSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!kycFiles.idFront || !kycFiles.proofOfAddress) {
+          setKycStatus({ loading: false, success: false, error: 'Please upload ID and Proof of Address.' });
+          return;
+      }
+      
+      setKycStatus({ loading: true, success: false, error: '' });
+      
+      if (currentVendor && setVendors) {
+          const updatedVendors = vendors.map(v => 
+            v.id === currentVendor.id 
+              ? { 
+                  ...v, 
+                  kycDocuments: { ...kycFiles, submittedAt: new Date().toISOString() },
+                  verificationStatus: 'PENDING' as VerificationStatus
+                } 
+              : v
+          );
+          
+          // Simulate API call
+          setTimeout(() => {
+              setVendors(updatedVendors);
+              setKycStatus({ loading: false, success: true, error: '' });
+          }, 1500);
+      }
+  };
+  
   const handleSaveStoreDesign = () => {
      if (currentVendor && setVendors) {
       const updatedVendors = vendors.map(v => 
@@ -543,7 +627,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handlePlanChange = (planName: string) => {
+  const initiatePlanUpgrade = (planName: string) => {
+      setSelectedPlanForUpgrade(planName);
+      if (planName === "Atelier") {
+          // Free plan, upgrade immediately
+          performPlanUpgrade(planName);
+      } else {
+          // Paid plan, show payment modal
+          setShowSubscriptionPayment(true);
+      }
+  };
+
+  const performPlanUpgrade = (planName: string) => {
       if (currentVendor && setVendors) {
         const updatedVendors = vendors.map(v => {
             if (v.id === currentVendor.id) {
@@ -552,8 +647,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
             return v;
         });
         setVendors(updatedVendors);
+        setShowSubscriptionPayment(false);
+        setSubPaymentDetails({cardName: '', cardNumber: '', expiry: '', cvc: ''});
         alert(`Plan switched to ${planName} and subscription activated.`);
     }
+  };
+
+  const handleSubscriptionPaymentSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsSubmitting(true);
+      
+      // Simulate Payment Processing
+      setTimeout(() => {
+          setIsSubmitting(false);
+          if (selectedPlanForUpgrade) {
+              performPlanUpgrade(selectedPlanForUpgrade);
+          }
+      }, 1500);
   };
   
   // ... Sidebar logic (omitted for brevity as it doesn't change much, but kept in full component)
@@ -850,7 +960,92 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     // Regular Vendor / Buyer View
     return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-8 animate-fade-in relative">
+      {/* Subscription Payment Modal */}
+      {showSubscriptionPayment && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
+              <div className="bg-white max-w-md w-full p-8 shadow-2xl relative animate-slide-up">
+                   <button 
+                      onClick={() => setShowSubscriptionPayment(false)}
+                      className="absolute top-4 right-4 text-gray-400 hover:text-black transition-colors"
+                   >
+                       <X size={20} />
+                   </button>
+                   <div className="text-center mb-8">
+                       <Diamond size={32} className="mx-auto text-luxury-gold mb-4" />
+                       <h3 className="text-2xl font-serif italic mb-2">Secure Payment</h3>
+                       <p className="text-sm text-gray-500">Upgrade to {selectedPlanForUpgrade}</p>
+                   </div>
+                   
+                   <form onSubmit={handleSubscriptionPaymentSubmit} className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Cardholder Name</label>
+                            <input 
+                                required
+                                type="text"
+                                placeholder="Name on Card"
+                                value={subPaymentDetails.cardName}
+                                onChange={(e) => setSubPaymentDetails({...subPaymentDetails, cardName: e.target.value})}
+                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Card Number</label>
+                            <div className="relative">
+                                <input 
+                                    required
+                                    type="text"
+                                    placeholder="0000 0000 0000 0000"
+                                    value={subPaymentDetails.cardNumber}
+                                    onChange={(e) => setSubPaymentDetails({...subPaymentDetails, cardNumber: e.target.value})}
+                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                                />
+                                <CreditCard size={16} className="absolute right-0 top-2 text-gray-400" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-6">
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Expiry</label>
+                                <div className="relative">
+                                    <input 
+                                        required
+                                        type="text"
+                                        placeholder="MM/YY"
+                                        value={subPaymentDetails.expiry}
+                                        onChange={(e) => setSubPaymentDetails({...subPaymentDetails, expiry: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                                    />
+                                    <Calendar size={16} className="absolute right-0 top-2 text-gray-400" />
+                                </div>
+                            </div>
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">CVC</label>
+                                <div className="relative">
+                                    <input 
+                                        required
+                                        type="text"
+                                        placeholder="123"
+                                        value={subPaymentDetails.cvc}
+                                        onChange={(e) => setSubPaymentDetails({...subPaymentDetails, cvc: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                                    />
+                                    <Lock size={16} className="absolute right-0 top-2 text-gray-400" />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button 
+                            type="submit" 
+                            disabled={isSubmitting}
+                            className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 mt-4 disabled:opacity-70"
+                        >
+                           {isSubmitting ? <Loader className="animate-spin" size={16} /> : <>Pay & Upgrade <Lock size={16} /></>}
+                        </button>
+                   </form>
+              </div>
+          </div>
+      )}
+
       <div className="flex justify-between items-end">
         <div>
            <h2 className="text-3xl font-serif italic mb-2">Dashboard Overview</h2>
@@ -1028,6 +1223,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="flex-1 p-6 md:p-12 overflow-y-auto h-screen">
         {activeTab === 'OVERVIEW' && renderOverview()}
         {activeTab === 'PRODUCTS' && renderProducts()}
+        
+        {/* SUBSCRIPTION PLAN TAB */}
+        {activeTab === 'SUBSCRIPTION_PLAN' && (
+            <div className="space-y-8 animate-fade-in">
+                 <h2 className="text-2xl font-serif italic mb-6">Membership Tiers</h2>
+                 <p className="text-gray-500 max-w-2xl mb-8">
+                    Elevate your atelier's presence. Upgrade your plan to unlock analytics, lower commission rates, and priority placement in the marketplace.
+                 </p>
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                     {SUBSCRIPTION_PLANS.map((plan, idx) => (
+                         <div key={idx} className={`bg-white border p-8 flex flex-col relative ${currentVendor?.subscriptionPlan === plan.name ? 'border-luxury-gold shadow-md' : 'border-gray-100 shadow-sm'}`}>
+                             {currentVendor?.subscriptionPlan === plan.name && (
+                                 <div className="absolute top-0 right-0 bg-luxury-gold text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
+                                     Current Plan
+                                 </div>
+                             )}
+                             <h3 className="text-xl font-bold uppercase tracking-widest mb-2">{plan.name}</h3>
+                             <div className="flex items-baseline gap-1 mb-4">
+                                <span className="text-3xl font-serif italic">{plan.price}</span>
+                                <span className="text-xs text-gray-400">{plan.period}</span>
+                             </div>
+                             <p className="text-xs text-gray-500 mb-6 min-h-[40px]">{plan.description}</p>
+                             
+                             <ul className="space-y-3 mb-8 flex-1">
+                                 {plan.features.map((feat, i) => (
+                                     <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                                         <Check size={14} className="text-green-500 shrink-0 mt-0.5" />
+                                         <span>{feat}</span>
+                                     </li>
+                                 ))}
+                             </ul>
+                             
+                             <button 
+                                onClick={() => initiatePlanUpgrade(plan.name)}
+                                disabled={currentVendor?.subscriptionPlan === plan.name}
+                                className={`w-full py-3 text-xs font-bold uppercase tracking-widest transition-colors ${
+                                    currentVendor?.subscriptionPlan === plan.name 
+                                        ? 'bg-gray-100 text-gray-400 cursor-default' 
+                                        : 'bg-black text-white hover:bg-luxury-gold'
+                                }`}
+                             >
+                                 {currentVendor?.subscriptionPlan === plan.name ? 'Active' : 'Select Plan'}
+                             </button>
+                         </div>
+                     ))}
+                 </div>
+            </div>
+        )}
+
         {activeTab === 'UPLOAD' && (
              // Upload Form Logic
              <div className="max-w-2xl mx-auto bg-white p-8 border border-gray-100 shadow-sm animate-fade-in">
@@ -1425,31 +1670,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                              </>
                          )}
 
-                         {/* AUTH PAGE EDITING */}
-                         {cmsActiveSection === 'AUTH' && (
-                             <section className="space-y-6">
-                                <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">Auth Page Imagery</h3>
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-2">Login Image</p>
-                                        <div className="relative h-64 bg-gray-100 overflow-hidden group">
-                                            <img src={cmsForm.auth?.loginImage} className="w-full h-full object-cover" />
-                                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'auth', 'loginImage')} />
-                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold uppercase transition-opacity pointer-events-none">Change</div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-2">Register Image</p>
-                                        <div className="relative h-64 bg-gray-100 overflow-hidden group">
-                                            <img src={cmsForm.auth?.registerImage} className="w-full h-full object-cover" />
-                                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'auth', 'registerImage')} />
-                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold uppercase transition-opacity pointer-events-none">Change</div>
-                                        </div>
-                                    </div>
-                                </div>
-                             </section>
-                         )}
-
                          <div className="pt-6 border-t border-gray-100">
                             <button onClick={handleSaveCMS} className="bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2">
                                 {isSubmitting ? <Loader className="animate-spin" size={14}/> : <Save size={16} />} Save Changes
@@ -1463,7 +1683,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {activeTab === 'PROFILE' && (
             <div className="max-w-xl mx-auto space-y-8 animate-fade-in">
                 <h2 className="text-2xl font-serif italic mb-6">Profile Settings</h2>
+                
+                {/* General Information */}
                 <div className="bg-white p-8 border border-gray-100 shadow-sm">
+                    <h3 className="text-sm font-bold uppercase tracking-widest mb-6 text-gray-400 border-b border-gray-50 pb-2">General Information</h3>
                     <div className="flex justify-center mb-8">
                         <div className="relative w-32 h-32 rounded-full overflow-hidden border border-gray-200 group">
                             <img src={profileForm.avatar || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" />
@@ -1501,6 +1724,137 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </button>
                     </div>
                 </div>
+
+                {/* Security Section (Update Password) */}
+                <div className="bg-white p-8 border border-gray-100 shadow-sm">
+                    <h3 className="text-sm font-bold uppercase tracking-widest mb-6 text-gray-400 border-b border-gray-50 pb-2">Security</h3>
+                    <form onSubmit={handleUpdatePassword} className="space-y-4">
+                        <div>
+                             <label className="text-xs font-bold uppercase tracking-widest text-gray-400">New Password</label>
+                             <input 
+                                type="password"
+                                value={passwords.new}
+                                onChange={e => setPasswords({...passwords, new: e.target.value})}
+                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                                placeholder="Min. 8 characters"
+                             />
+                        </div>
+                        <div>
+                             <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Confirm Password</label>
+                             <input 
+                                type="password"
+                                value={passwords.confirm}
+                                onChange={e => setPasswords({...passwords, confirm: e.target.value})}
+                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                                placeholder="Repeat new password"
+                             />
+                        </div>
+                        {passwordStatus.error && (
+                            <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12}/> {passwordStatus.error}</p>
+                        )}
+                        {passwordStatus.success && (
+                            <p className="text-xs text-green-500 flex items-center gap-1"><CheckCircle size={12}/> Password updated successfully</p>
+                        )}
+                        <button 
+                            type="submit" 
+                            disabled={!passwords.new || passwordStatus.loading}
+                            className="w-full border border-gray-200 text-black py-3 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors mt-2 disabled:opacity-50"
+                        >
+                            {passwordStatus.loading ? <Loader className="animate-spin mx-auto" size={14} /> : 'Update Password'}
+                        </button>
+                    </form>
+                </div>
+
+                {/* KYC Section (Vendors Only) */}
+                {isVendor && (
+                    <div className="bg-white p-8 border border-gray-100 shadow-sm">
+                        <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-2">
+                            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400">Identity Verification</h3>
+                            <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
+                                currentVendor?.verificationStatus === 'VERIFIED' ? 'bg-green-100 text-green-700' : 
+                                currentVendor?.verificationStatus === 'REJECTED' ? 'bg-red-100 text-red-700' : 
+                                'bg-yellow-100 text-yellow-700'
+                            }`}>
+                                {currentVendor?.verificationStatus || 'PENDING'}
+                            </span>
+                        </div>
+                        
+                        <form onSubmit={handleKycSubmit} className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">ID Front</label>
+                                    <div className="aspect-video bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center relative cursor-pointer hover:bg-gray-100 transition-colors">
+                                        {kycFiles.idFront ? (
+                                            <img src={kycFiles.idFront} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <FileCheck className="text-gray-300" />
+                                        )}
+                                        <input 
+                                            type="file" 
+                                            ref={kycIdFrontRef}
+                                            accept="image/*"
+                                            onChange={(e) => handleFileUpload(e, (base64) => setKycFiles({...kycFiles, idFront: base64}))}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">ID Back</label>
+                                    <div className="aspect-video bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center relative cursor-pointer hover:bg-gray-100 transition-colors">
+                                        {kycFiles.idBack ? (
+                                            <img src={kycFiles.idBack} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <FileCheck className="text-gray-300" />
+                                        )}
+                                        <input 
+                                            type="file" 
+                                            ref={kycIdBackRef}
+                                            accept="image/*"
+                                            onChange={(e) => handleFileUpload(e, (base64) => setKycFiles({...kycFiles, idBack: base64}))}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Proof of Address (Utility Bill / Bank Statement)</label>
+                                <div className="h-24 bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center relative cursor-pointer hover:bg-gray-100 transition-colors">
+                                    {kycFiles.proofOfAddress ? (
+                                        <img src={kycFiles.proofOfAddress} className="w-full h-full object-cover opacity-50" />
+                                    ) : (
+                                        <div className="text-center">
+                                            <UploadCloud className="text-gray-300 mx-auto mb-1" size={20} />
+                                            <span className="text-[10px] text-gray-400">Upload Document</span>
+                                        </div>
+                                    )}
+                                    <input 
+                                        type="file" 
+                                        ref={kycProofRef}
+                                        accept="image/*"
+                                        onChange={(e) => handleFileUpload(e, (base64) => setKycFiles({...kycFiles, proofOfAddress: base64}))}
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+
+                            {kycStatus.error && (
+                                <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12}/> {kycStatus.error}</p>
+                            )}
+                            {kycStatus.success && (
+                                <p className="text-xs text-green-500 flex items-center gap-1"><CheckCircle size={12}/> Documents submitted successfully</p>
+                            )}
+
+                            <button 
+                                type="submit" 
+                                disabled={kycStatus.loading || currentVendor?.verificationStatus === 'VERIFIED'}
+                                className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50"
+                            >
+                                {kycStatus.loading ? <Loader className="animate-spin mx-auto" size={14} /> : (currentVendor?.verificationStatus === 'VERIFIED' ? 'Verified' : 'Submit for Verification')}
+                            </button>
+                        </form>
+                    </div>
+                )}
             </div>
         )}
 
@@ -1530,7 +1884,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                             <p className="text-xs text-gray-400">{u.email}</p>
                                         </div>
                                     </td>
-                                    <td className="p-4"><span className="text-[10px] font-bold uppercase bg-gray-100 px-2 py-1 rounded-sm">{u.role}</span></td>
+                                    <td className="p-4">
+                                        <select 
+                                            value={u.role}
+                                            onChange={(e) => handleRoleUpdate(u.id, e.target.value)}
+                                            className="text-[10px] font-bold uppercase bg-gray-100 px-2 py-1 rounded-sm border-none focus:ring-0 cursor-pointer outline-none"
+                                        >
+                                            <option value="BUYER">BUYER</option>
+                                            <option value="VENDOR">VENDOR</option>
+                                            <option value="ADMIN">ADMIN</option>
+                                        </select>
+                                    </td>
                                     <td className="p-4 text-gray-500">{u.joined}</td>
                                     <td className="p-4">
                                         <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${u.status === 'ACTIVE' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
@@ -1553,7 +1917,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
         )}
         
-        {['STORE_PREVIEW', 'FULFILLMENT', 'PAYOUTS', 'FOLLOWERS', 'STORE_DESIGN', 'SUBSCRIPTION_PLAN', 'SAVED', 'VERIFICATION', 'SUBSCRIPTIONS', 'REVIEWS', 'TRANSACTIONS', 'SETTINGS'].includes(activeTab) && !['OVERVIEW', 'PRODUCTS', 'UPLOAD', 'ORDERS', 'CMS', 'PROFILE', 'INBOX', 'USERS'].includes(activeTab) && (
+        {['STORE_PREVIEW', 'FULFILLMENT', 'PAYOUTS', 'FOLLOWERS', 'STORE_DESIGN', 'SAVED', 'VERIFICATION', 'SUBSCRIPTIONS', 'REVIEWS', 'TRANSACTIONS', 'SETTINGS'].includes(activeTab) && !['OVERVIEW', 'PRODUCTS', 'UPLOAD', 'ORDERS', 'CMS', 'PROFILE', 'INBOX', 'USERS', 'SUBSCRIPTION_PLAN'].includes(activeTab) && (
             <div className="h-full flex items-center justify-center text-gray-400 animate-fade-in">
                  <div className="text-center">
                     <Settings size={48} className="mx-auto mb-4 opacity-20" />

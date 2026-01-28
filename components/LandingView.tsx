@@ -50,8 +50,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
     videoUrl: "https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4",
     posterUrl: "https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop",
     subtitle: "The New Vanguard",
-    titleLine1: "AFRICAN",
-    titleLine2: "LUXURY",
+    titleLine1: "DIGITAL",
+    titleLine2: "AVANT-GARDE",
     buttonText: "Shop Collection"
   };
   

@@ -13,6 +13,8 @@ export interface MockUser {
 // Internal state
 let currentUser: MockUser | null = null;
 const listeners: ((user: MockUser | null) => void)[] = [];
+// In-memory store to persist users during the session for testing verification flows
+const userStore: Record<string, MockUser> = {};
 
 const notify = () => {
   listeners.forEach(l => l(currentUser));
@@ -36,12 +38,19 @@ export const createUserWithEmailAndPassword = async (authInstance: any, email: s
   // Simulate delay
   await new Promise(resolve => setTimeout(resolve, 500));
   
+  if (userStore[email]) {
+      const error: any = new Error("Email already in use");
+      error.code = 'auth/email-already-in-use';
+      throw error;
+  }
+
   const newUser: MockUser = {
     uid: `user_${Math.random().toString(36).substr(2, 9)}`,
     email,
     emailVerified: false // Default to unverified to test flow
   };
   
+  userStore[email] = newUser;
   currentUser = newUser;
   notify();
   
@@ -51,13 +60,22 @@ export const createUserWithEmailAndPassword = async (authInstance: any, email: s
 export const signInWithEmailAndPassword = async (authInstance: any, email: string, password: string) => {
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Accept any login for demo purposes
+  // Check in-memory store first (for registered users in this session)
+  if (userStore[email]) {
+      currentUser = userStore[email];
+      notify();
+      return { user: currentUser };
+  }
+  
+  // Accept any login for demo purposes (simulating existing verified user)
   const user: MockUser = {
     uid: `user_${Math.random().toString(36).substr(2, 9)}`,
     email,
-    emailVerified: true // Auto-verified for login convenience
+    emailVerified: true // Auto-verified for login convenience if not explicitly created in this session
   };
   
+  // Persist this auto-created user for consistency
+  userStore[email] = user;
   currentUser = user;
   notify();
   
@@ -77,6 +95,12 @@ export const sendEmailVerification = async (user: any) => {
 export const sendPasswordResetEmail = async (authInstance: any, email: string) => {
   console.log(`[Mock] Password reset email sent to ${email}`);
   await new Promise(resolve => setTimeout(resolve, 500));
+  return Promise.resolve();
+};
+
+export const updateUserPassword = async (user: any, newPassword: string) => {
+  console.log(`[Mock] Password updated for ${user.email} to ${newPassword}`);
+  await new Promise(resolve => setTimeout(resolve, 1000));
   return Promise.resolve();
 };
 

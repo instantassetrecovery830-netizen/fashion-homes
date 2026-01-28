@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader, Shield, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, RefreshCw, ArrowLeft } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types';
 import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, onAuthStateChanged, sendPasswordResetEmail } from '../services/firebase';
-import { createVendorInDb, createUserInDb } from '../services/dataService';
+import { createVendorInDb, createUserInDb, fetchUsers } from '../services/dataService';
 
 interface AuthViewProps {
   onLogin: (role: UserRole) => void;
@@ -122,10 +122,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     setIsLoading(true);
     setError(null);
     try {
-      // @ts-ignore - signInWithGoogle returns a UserCredential-like object in mock, or real one
+      // @ts-ignore
       const { user } = await signInWithGoogle(auth);
       
-      // Attempt to create user in DB. If ID exists, this catches and we assume user is already registered.
+      // Attempt to create user in DB if they don't exist
       try {
          const displayName = user.displayName || 'Google User';
          const photoURL = user.photoURL || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200';
@@ -157,14 +157,25 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             });
          }
       } catch (dbError) {
-          console.log("User likely exists in DB, proceeding with login.");
+          // User likely exists
       }
 
       const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
       if (adminEmails.includes(user.email?.toLowerCase() || '')) {
           onLogin(UserRole.ADMIN);
       } else {
-          onLogin(selectedRole);
+          // Check DB role assignment
+          try {
+              const dbUsers = await fetchUsers();
+              const dbUser = dbUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
+              if (dbUser && dbUser.role) {
+                  onLogin(dbUser.role);
+              } else {
+                  onLogin(selectedRole);
+              }
+          } catch {
+              onLogin(selectedRole);
+          }
       }
     } catch (err: any) {
         console.error("Google Auth Error:", err);
@@ -219,9 +230,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             // Send Verification Email
             await sendEmailVerification(user);
             
-            // Note: We keep the user signed in so we can access auth.currentUser for resending verification.
-            // The App component will treat them as logged out because emailVerified is false.
-
             // Show Verification Screen
             setVerificationEmail(user.email || email);
             setVerificationNeeded(true);
@@ -232,7 +240,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
 
             // Check if verified
             if (!user.emailVerified) {
-                // Keep user signed in for resend functionality
+                // Keep user signed in for resend functionality but treat as unverified UI
                 setVerificationEmail(user.email || email);
                 setVerificationNeeded(true);
                 return;
@@ -242,13 +250,21 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             if (adminEmails.includes(user.email?.toLowerCase() || '')) {
                 onLogin(UserRole.ADMIN);
             } else {
-                // App.tsx will handle the DB lookup to switch role to Vendor if needed
-                onLogin(selectedRole); 
+                try {
+                    const dbUsers = await fetchUsers();
+                    const dbUser = dbUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
+                    if (dbUser && dbUser.role) {
+                        onLogin(dbUser.role);
+                    } else {
+                        onLogin(selectedRole); 
+                    }
+                } catch {
+                    onLogin(selectedRole);
+                }
             }
         }
     } catch (err: any) {
         console.error("Auth Error:", err);
-        // Map Firebase errors to user-friendly messages
         if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-email' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
             setError("Password or Email Incorrect");
         } else if (err.code === 'auth/email-already-in-use') {
@@ -273,13 +289,14 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                     We have sent you a verification email to <span className="font-bold text-black">{verificationEmail}</span>. 
                     Verify it and log in.
                 </p>
+                
+                {/* Login Button acts as the completion step, resetting state to allow re-login attempt */}
                 <button 
                     onClick={async () => {
-                        // Sign out so they can log in again to refresh their token status
                         await signOut(auth);
                         setVerificationNeeded(false);
                         setIsRegister(false); // Switch to login mode
-                        setPassword(''); // Clear password for security
+                        setPassword(''); 
                         setConfirmPassword('');
                         setResendStatus('idle');
                     }}
@@ -396,7 +413,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
 
   return (
     <div className="min-h-screen flex animate-fade-in">
-        {/* Image Section - Hidden on mobile, 50% on desktop */}
+        {/* Image Section */}
         <div className="hidden lg:block w-1/2 relative bg-gray-100 overflow-hidden">
              <img 
                src={isRegister ? registerImage : loginImage} 
@@ -596,7 +613,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                         </svg>
-                        <span>Continue with Google</span>
+                        <span>Sign in with Google</span>
                      </button>
                 </form>
 
