@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid 
 } from 'recharts';
 import { 
   Package, Users, DollarSign, Activity, Settings, ToggleRight, 
@@ -10,7 +10,7 @@ import {
   Palette, Layout, Type, FileText, Newspaper, ExternalLink,
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield,
-  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video
+  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent } from '../types';
 import { MOCK_PRODUCTS } from '../constants';
@@ -124,6 +124,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const isVerified = currentVendor?.verificationStatus === 'VERIFIED';
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('OVERVIEW');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [savedItems, setSavedItems] = useState<Product[]>(products.slice(0, 3)); 
   const [followers, setFollowers] = useState(MOCK_FOLLOWERS);
   // Use passed users from DB, fallback to mock if empty (though logic handles empty arrays)
@@ -310,7 +311,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setIsSubmitting(true);
       try {
         await onUpdateCMSContent(cmsForm);
-        alert('Landing page updated successfully!');
+        alert('Site content updated successfully!');
       } catch (e) {
         console.error("CMS Update failed", e);
         alert('Failed to update landing page.');
@@ -535,8 +536,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     return (
       <div className="space-y-8 animate-fade-in max-w-4xl">
-        {/* Hero Section */}
+        {/* Landing Page Content */}
         <div className="bg-white border border-gray-100 p-8 shadow-sm">
+          <h2 className="text-xl font-bold uppercase tracking-widest mb-6">Landing Page</h2>
+          
           <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Hero Section</h3>
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
@@ -593,6 +596,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
           </div>
+        </div>
+        
+        {/* Auth Page Section */}
+        <div className="bg-white border border-gray-100 p-8 shadow-sm">
+           <h2 className="text-xl font-bold uppercase tracking-widest mb-6">Authentication Visuals</h2>
+           <div className="grid grid-cols-2 gap-6">
+               <div className="space-y-2">
+                   <label className="text-xs text-gray-500 uppercase tracking-widest">Login Cover Image</label>
+                   <input 
+                      value={cmsForm.auth?.loginImage || ''}
+                      onChange={e => setCmsForm({...cmsForm, auth: {...(cmsForm.auth || { loginImage: '', registerImage: '' }), loginImage: e.target.value}})}
+                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                   />
+               </div>
+               <div className="space-y-2">
+                   <label className="text-xs text-gray-500 uppercase tracking-widest">Register Cover Image</label>
+                   <input 
+                      value={cmsForm.auth?.registerImage || ''}
+                      onChange={e => setCmsForm({...cmsForm, auth: {...(cmsForm.auth || { loginImage: '', registerImage: '' }), registerImage: e.target.value}})}
+                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                   />
+               </div>
+           </div>
         </div>
 
         {/* Marquee */}
@@ -655,6 +681,136 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, overlayText1: e.target.value}})}
                   className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
                />
+           </div>
+        </div>
+
+        {/* About Page Section */}
+        <div className="bg-white border border-gray-100 p-8 shadow-sm">
+           <h2 className="text-xl font-bold uppercase tracking-widest mb-6">About / Contact Page</h2>
+           
+           {/* About Hero */}
+           <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Hero Section</h3>
+           <div className="space-y-6 mb-8">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                   <label className="text-xs text-gray-500 uppercase tracking-widest">Title</label>
+                   <input 
+                      value={cmsForm.about.hero.title}
+                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, title: e.target.value}}})}
+                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                   />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-xs text-gray-500 uppercase tracking-widest">Subtitle</label>
+                   <input 
+                      value={cmsForm.about.hero.subtitle}
+                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, subtitle: e.target.value}}})}
+                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                   />
+                </div>
+              </div>
+              <div className="space-y-2">
+                  <label className="text-xs text-gray-500 uppercase tracking-widest">Description</label>
+                  <textarea 
+                     value={cmsForm.about.hero.description}
+                     onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, description: e.target.value}}})}
+                     className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-20 resize-none"
+                  />
+              </div>
+              <div className="space-y-2">
+                 <label className="text-xs text-gray-500 uppercase tracking-widest">Hero Image URL</label>
+                 <input 
+                    value={cmsForm.about.hero.imageUrl}
+                    onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, imageUrl: e.target.value}}})}
+                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                 />
+              </div>
+           </div>
+
+           {/* Philosophy */}
+           <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Philosophy Section</h3>
+           <div className="space-y-6 mb-8">
+               <div className="space-y-2">
+                   <label className="text-xs text-gray-500 uppercase tracking-widest">Section Title</label>
+                   <input 
+                      value={cmsForm.about.philosophy.title}
+                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, title: e.target.value}}})}
+                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                   />
+               </div>
+               <div className="grid grid-cols-2 gap-6">
+                   <div className="space-y-2">
+                       <label className="text-xs text-gray-500 uppercase tracking-widest">Paragraph 1</label>
+                       <textarea 
+                          value={cmsForm.about.philosophy.description1}
+                          onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description1: e.target.value}}})}
+                          className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32 resize-none"
+                       />
+                   </div>
+                   <div className="space-y-2">
+                       <label className="text-xs text-gray-500 uppercase tracking-widest">Paragraph 2</label>
+                       <textarea 
+                          value={cmsForm.about.philosophy.description2}
+                          onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description2: e.target.value}}})}
+                          className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32 resize-none"
+                       />
+                   </div>
+               </div>
+               <div className="grid grid-cols-2 gap-6">
+                   <div className="space-y-2">
+                       <label className="text-xs text-gray-500 uppercase tracking-widest">Image 1 URL</label>
+                       <input 
+                          value={cmsForm.about.philosophy.image1}
+                          onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, image1: e.target.value}}})}
+                          className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                       />
+                   </div>
+                   <div className="space-y-2">
+                       <label className="text-xs text-gray-500 uppercase tracking-widest">Image 2 URL</label>
+                       <input 
+                          value={cmsForm.about.philosophy.image2}
+                          onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, image2: e.target.value}}})}
+                          className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                       />
+                   </div>
+               </div>
+           </div>
+
+           {/* Contact Info */}
+           <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Contact Details</h3>
+           <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                   <label className="text-xs text-gray-500 uppercase tracking-widest">Address</label>
+                   <textarea 
+                      value={cmsForm.about.contact.address}
+                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, address: e.target.value}}})}
+                      className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-20 resize-none"
+                   />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-xs text-gray-500 uppercase tracking-widest">Email</label>
+                   <input 
+                      value={cmsForm.about.contact.email}
+                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, email: e.target.value}}})}
+                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                   />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-xs text-gray-500 uppercase tracking-widest">Phone</label>
+                   <input 
+                      value={cmsForm.about.contact.phone}
+                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, phone: e.target.value}}})}
+                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                   />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-xs text-gray-500 uppercase tracking-widest">Business Hours</label>
+                   <input 
+                      value={cmsForm.about.contact.hours}
+                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, hours: e.target.value}}})}
+                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                   />
+                </div>
            </div>
         </div>
 
@@ -1240,24 +1396,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                          <th className="p-4 font-bold uppercase text-xs text-gray-500">Vendor / Customer</th>
                          <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Amount</th>
                          <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Fee</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Status</th>
+                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Status</th>
                      </tr>
                  </thead>
                  <tbody>
                      {transactions.map(tx => (
                          <tr key={tx.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
-                             <td className="p-4 font-mono text-xs">{tx.id}</td>
-                             <td className="p-4 text-xs text-gray-500">{tx.date}</td>
+                             <td className="p-4 font-mono text-xs text-gray-500">{tx.id}</td>
+                             <td className="p-4">{tx.date}</td>
                              <td className="p-4">
-                                 <div className="flex flex-col">
-                                     <span className="font-bold text-xs">{tx.vendor}</span>
-                                     <span className="text-[10px] text-gray-400">{tx.customer}</span>
-                                 </div>
+                                 <span className="block font-bold">{tx.vendor}</span>
+                                 <span className="text-xs text-gray-400">from {tx.customer}</span>
                              </td>
-                             <td className="p-4 text-right font-bold">${tx.amount.toFixed(2)}</td>
-                             <td className="p-4 text-right text-xs text-gray-500">${tx.platformFee.toFixed(2)}</td>
-                             <td className="p-4 text-right">
-                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 ${tx.status === 'CLEARED' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                             <td className="p-4 text-right font-medium">${tx.amount.toFixed(2)}</td>
+                             <td className="p-4 text-right text-gray-400 text-xs">${tx.platformFee.toFixed(2)}</td>
+                             <td className="p-4">
+                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${tx.status === 'CLEARED' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
                                      {tx.status}
                                  </span>
                              </td>
@@ -1269,171 +1423,222 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
   );
 
+  const renderOverview = () => (
+    <div className="space-y-6 animate-fade-in">
+        <h3 className="text-lg font-serif italic mb-4">Overview</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+             <div className="bg-white p-6 border border-gray-100 shadow-sm">
+                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Revenue</p>
+                 <p className="text-2xl font-serif mt-2">${stats.revenue.toLocaleString()}</p>
+             </div>
+             <div className="bg-white p-6 border border-gray-100 shadow-sm">
+                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Active Orders</p>
+                 <p className="text-2xl font-serif mt-2">{stats.activeOrders}</p>
+             </div>
+             <div className="bg-white p-6 border border-gray-100 shadow-sm">
+                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Clients</p>
+                 <p className="text-2xl font-serif mt-2">{stats.clients}</p>
+             </div>
+             <div className="bg-white p-6 border border-gray-100 shadow-sm">
+                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Avg. Order Value</p>
+                 <p className="text-2xl font-serif mt-2">${Math.round(stats.aov)}</p>
+             </div>
+        </div>
+        
+        <div className="bg-white p-6 border border-gray-100 shadow-sm h-80">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Sales Performance</h4>
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={SALES_DATA}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} tickFormatter={(value) => `$${value}`} />
+                    <Tooltip cursor={{fill: '#f9fafb'}} contentStyle={{border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}} />
+                    <Bar dataKey="sales" fill="#000000" radius={[2, 2, 0, 0]} barSize={40} />
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    </div>
+  );
+
   const renderFollowers = () => (
       <div className="space-y-6 animate-fade-in">
           <h3 className="text-lg font-serif italic mb-4">Community</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {followers.map(follower => (
-                  <div key={follower.id} className={`bg-white p-4 border border-gray-100 shadow-sm flex items-center justify-between ${follower.status === 'BLOCKED' ? 'opacity-50' : ''}`}>
+                  <div key={follower.id} className="bg-white p-6 border border-gray-100 shadow-sm flex justify-between items-center">
                       <div className="flex items-center gap-4">
-                          <img src={follower.avatar} className="w-12 h-12 rounded-full object-cover" />
+                          <div className="w-12 h-12 bg-gray-50 rounded-full overflow-hidden">
+                              <img src={follower.avatar} className="w-full h-full object-cover" />
+                          </div>
                           <div>
                               <h4 className="font-bold text-sm">{follower.name}</h4>
-                              <p className="text-xs text-gray-400">{follower.handle} • Joined {follower.since}</p>
+                              <p className="text-xs text-gray-500">{follower.handle} • Since {follower.since}</p>
                           </div>
                       </div>
                       <div className="flex gap-2">
-                          <button onClick={() => blockFollower(follower.id)} className="text-gray-400 hover:text-red-500" title="Block User">
-                              {follower.status === 'BLOCKED' ? <CheckCircle size={16} /> : <Ban size={16} />}
-                          </button>
-                          <button onClick={() => removeFollower(follower.id)} className="text-gray-400 hover:text-red-500" title="Remove Follower">
-                              <UserX size={16} />
-                          </button>
+                           {follower.status === 'BLOCKED' ? (
+                               <span className="text-xs text-red-500 font-bold uppercase">Blocked</span>
+                           ) : (
+                               <>
+                                <button onClick={() => removeFollower(follower.id)} className="p-2 hover:bg-gray-50 text-gray-400 hover:text-red-500 transition-colors" title="Remove"><UserX size={16} /></button>
+                                <button onClick={() => blockFollower(follower.id)} className="p-2 hover:bg-gray-50 text-gray-400 hover:text-red-500 transition-colors" title="Block"><Ban size={16} /></button>
+                               </>
+                           )}
                       </div>
                   </div>
               ))}
           </div>
       </div>
   );
-
+  
   const renderSubscriptionPlan = () => (
       <div className="space-y-8 animate-fade-in">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-              <h3 className="text-2xl font-serif italic mb-4">Choose Your Atelier Tier</h3>
-              <p className="text-gray-500 text-sm">Unlock marketplace features, analytics, and lower commission rates.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {SUBSCRIPTION_PLANS.map(plan => (
-                  <div key={plan.name} className={`bg-white border p-8 flex flex-col ${currentVendor?.subscriptionPlan === plan.name ? 'border-luxury-gold shadow-lg ring-1 ring-luxury-gold' : 'border-gray-100'}`}>
-                      <div className="mb-6">
-                          <h4 className="text-lg font-bold uppercase tracking-widest mb-2">{plan.name}</h4>
-                          <div className="flex items-baseline gap-1">
-                              <span className="text-3xl font-serif italic">{plan.price}</span>
-                              <span className="text-xs text-gray-400">{plan.period}</span>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-4 leading-relaxed">{plan.description}</p>
-                      </div>
-                      <div className="flex-1 space-y-3 mb-8">
-                          {plan.features.map(f => (
-                              <div key={f} className="flex items-center gap-2 text-sm">
-                                  <Check size={14} className="text-luxury-gold" /> {f}
-                              </div>
-                          ))}
-                      </div>
-                      <button 
-                          onClick={() => handlePlanChange(plan.name)}
-                          className={`w-full py-3 text-xs font-bold uppercase tracking-widest transition-colors ${currentVendor?.subscriptionPlan === plan.name ? 'bg-gray-100 text-gray-400 cursor-default' : 'bg-black text-white hover:bg-luxury-gold'}`}
-                          disabled={currentVendor?.subscriptionPlan === plan.name}
-                      >
-                          {currentVendor?.subscriptionPlan === plan.name ? 'Current Plan' : 'Select Plan'}
-                      </button>
-                  </div>
-              ))}
-          </div>
-      </div>
-  );
+           <h3 className="text-lg font-serif italic">Membership & Plans</h3>
+           
+           {/* Current Plan */}
+           <div className="bg-black text-white p-8 relative overflow-hidden">
+               <div className="relative z-10">
+                   <span className="text-xs font-bold uppercase tracking-widest text-luxury-gold mb-2 block">Current Plan</span>
+                   <h2 className="text-4xl font-serif italic mb-4">{currentVendor?.subscriptionPlan || 'Atelier'}</h2>
+                   <p className="text-gray-400 text-sm max-w-md mb-6">
+                       {currentVendor?.subscriptionStatus === 'ACTIVE' 
+                        ? 'Your subscription is active. You have full access to marketplace features.' 
+                        : 'Your subscription is inactive. Please select a plan to activate your store.'}
+                   </p>
+                   <div className="flex gap-4">
+                       <div className="bg-white/10 px-4 py-2 rounded-sm text-xs">
+                           <span className="block text-gray-400 uppercase tracking-widest text-[10px]">Status</span>
+                           <span className={`font-bold ${currentVendor?.subscriptionStatus === 'ACTIVE' ? 'text-green-400' : 'text-red-400'}`}>
+                               {currentVendor?.subscriptionStatus || 'INACTIVE'}
+                           </span>
+                       </div>
+                       <div className="bg-white/10 px-4 py-2 rounded-sm text-xs">
+                           <span className="block text-gray-400 uppercase tracking-widest text-[10px]">Renewal</span>
+                           <span className="font-bold">Auto-Renews Oct 24</span>
+                       </div>
+                   </div>
+               </div>
+               <Diamond className="absolute -right-10 -bottom-10 text-white/5 w-64 h-64" />
+           </div>
 
-  const renderStorePreview = () => (
-      <div className="h-full flex flex-col items-center justify-center space-y-6 animate-fade-in bg-white p-12 border border-gray-100">
-          <Store size={48} className="text-gray-300" />
-          <h3 className="text-xl font-serif italic">Your Boutique is Live</h3>
-          <p className="text-gray-500 max-w-md text-center">
-              Your store is currently visible to the global marketplace. View it as a customer to ensure everything looks perfect.
-          </p>
-          <button 
-              onClick={() => onNavigate('VENDOR_PROFILE')}
-              className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2"
-          >
-              View Live Store <ExternalLink size={14} />
-          </button>
+           {/* Plan Options */}
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+               {SUBSCRIPTION_PLANS.map(plan => (
+                   <div key={plan.name} className={`bg-white border p-6 flex flex-col ${currentVendor?.subscriptionPlan === plan.name ? 'border-black shadow-lg' : 'border-gray-100'}`}>
+                       <div className="mb-6">
+                           <h4 className="text-xl font-serif italic mb-2">{plan.name}</h4>
+                           <div className="flex items-baseline gap-1">
+                               <span className="text-2xl font-bold">{plan.price}</span>
+                               <span className="text-xs text-gray-500">{plan.period}</span>
+                           </div>
+                           <p className="text-xs text-gray-500 mt-2 min-h-[40px]">{plan.description}</p>
+                       </div>
+                       <div className="flex-1 space-y-3 mb-6">
+                           {plan.features.map((f, i) => (
+                               <div key={i} className="flex items-center gap-2 text-xs">
+                                   <Check size={12} className="text-green-500" />
+                                   <span>{f}</span>
+                               </div>
+                           ))}
+                       </div>
+                       <button 
+                         onClick={() => handlePlanChange(plan.name)}
+                         disabled={currentVendor?.subscriptionPlan === plan.name && currentVendor?.subscriptionStatus === 'ACTIVE'}
+                         className={`w-full py-3 text-xs font-bold uppercase tracking-widest transition-colors ${
+                             currentVendor?.subscriptionPlan === plan.name && currentVendor?.subscriptionStatus === 'ACTIVE'
+                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                             : 'bg-black text-white hover:bg-luxury-gold'
+                         }`}
+                       >
+                           {currentVendor?.subscriptionPlan === plan.name && currentVendor?.subscriptionStatus === 'ACTIVE' ? 'Current Plan' : 'Select Plan'}
+                       </button>
+                   </div>
+               ))}
+           </div>
       </div>
   );
 
   return (
-    <div className="min-h-screen bg-luxury-cream flex flex-col md:flex-row">
-      {renderSidebar()}
-      <div className="flex-1 p-6 md:p-12 overflow-y-auto">
-        <div className="max-w-6xl mx-auto">
-           {/* Mobile Header */}
-           <div className="md:hidden mb-8 flex items-center justify-between">
-            <h1 className="text-2xl font-serif italic">MyFitStore</h1>
-           </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row animate-fade-in">
+        {renderSidebar()}
 
-          <div className="mb-8">
-            <h1 className="text-3xl font-serif font-medium mb-2 capitalize">
-              {activeTab === 'MARKETPLACE' ? 'Marketplace' : activeTab === 'SUBSCRIPTION_PLAN' ? 'My Subscription' : activeTab === 'VERIFICATION' ? 'Verification' : activeTab === 'USERS' ? 'User Management' : activeTab === 'REVIEWS' ? 'Review Moderation' : activeTab === 'STORE_PREVIEW' ? 'Live Store Preview' : activeTab === 'CMS' ? 'Content Management' : activeTab.toLowerCase().replace('_', ' ')}
-            </h1>
-          </div>
+        {/* Mobile Navigation Drawer */}
+        {mobileNavOpen && (
+            <div className="fixed inset-0 z-50 bg-white md:hidden animate-fade-in flex flex-col">
+                <div className="p-6 flex justify-between items-center border-b border-gray-100">
+                     <div className="flex items-center gap-2">
+                         <LayoutDashboard size={20} />
+                         <h2 className="text-xl font-serif font-bold italic">Menu</h2>
+                     </div>
+                     <button onClick={() => setMobileNavOpen(false)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-200 transition-colors"><X size={20}/></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6">
+                    <nav className="space-y-3">
+                        {getSidebarItems().map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                                if (item.action) item.action();
+                                else setActiveTab(item.id as DashboardTab);
+                                setMobileNavOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-4 px-4 py-4 text-sm font-bold uppercase tracking-widest transition-all rounded-sm border ${
+                              activeTab === item.id 
+                                ? 'bg-black text-white border-black shadow-lg' 
+                                : 'text-gray-500 border-gray-100 hover:bg-gray-50 hover:text-black hover:border-black'
+                            }`}
+                          >
+                            <item.icon size={18} />
+                            {item.label}
+                          </button>
+                        ))}
+                    </nav>
+                </div>
+            </div>
+        )}
+        
+        <div className="flex-1 p-6 md:p-12 pb-24 md:pb-12 overflow-x-hidden">
+             {/* Mobile Header with Menu Toggle */}
+             <div className="md:hidden mb-6 pb-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-gray-50 z-20 pt-4">
+                 <div className="flex items-center gap-3">
+                     <button onClick={() => setMobileNavOpen(true)} className="p-2 -ml-2 hover:bg-gray-200 rounded-md transition-colors">
+                         <Menu size={24} />
+                     </button>
+                     <h2 className="text-xl font-serif italic">Dashboard</h2>
+                 </div>
+                 {/* Optional: Add simplified actions or user avatar here */}
+             </div>
 
-          {activeTab === 'OVERVIEW' && renderOverview(SALES_DATA, stats)}
-          {activeTab === 'PRODUCTS' && renderProducts()}
-          {activeTab === 'UPLOAD' && renderUpload()}
-          {activeTab === 'ORDERS' && renderOrders()}
-          {activeTab === 'SETTINGS' && isAdmin && renderSettings()}
-          {activeTab === 'CMS' && isAdmin && renderCMS()}
-          {activeTab === 'PROFILE' && renderProfile()}
-          {activeTab === 'STORE_DESIGN' && renderStoreDesign()}
-          {activeTab === 'SAVED' && renderSaved()}
-          {activeTab === 'FULFILLMENT' && isVendor && renderFulfillment()}
-          {activeTab === 'SUBSCRIPTIONS' && isAdmin && renderSubscriptions()}
-          {activeTab === 'VERIFICATION' && isAdmin && renderVerification()}
-          {activeTab === 'USERS' && isAdmin && renderUsers()}
-          {activeTab === 'REVIEWS' && isAdmin && renderReviews()}
-          {activeTab === 'TRANSACTIONS' && isAdmin && renderTransactions()}
-          {activeTab === 'FOLLOWERS' && renderFollowers()}
-          {activeTab === 'SUBSCRIPTION_PLAN' && renderSubscriptionPlan()}
-          {activeTab === 'STORE_PREVIEW' && renderStorePreview()}
+             {/* Tab Content */}
+             {activeTab === 'OVERVIEW' && renderOverview()}
+             {activeTab === 'PRODUCTS' && renderProducts()}
+             {activeTab === 'UPLOAD' && renderUpload()}
+             {activeTab === 'ORDERS' && renderOrders()}
+             {activeTab === 'FULFILLMENT' && renderFulfillment()}
+             {activeTab === 'SETTINGS' && renderSettings()}
+             {activeTab === 'PROFILE' && renderProfile()}
+             {activeTab === 'STORE_DESIGN' && renderStoreDesign()}
+             {activeTab === 'SAVED' && renderSaved()}
+             {activeTab === 'SUBSCRIPTIONS' && renderSubscriptions()}
+             {activeTab === 'VERIFICATION' && renderVerification()}
+             {activeTab === 'USERS' && renderUsers()}
+             {activeTab === 'REVIEWS' && renderReviews()}
+             {activeTab === 'TRANSACTIONS' && renderTransactions()}
+             {activeTab === 'FOLLOWERS' && renderFollowers()}
+             {activeTab === 'SUBSCRIPTION_PLAN' && renderSubscriptionPlan()}
+             {activeTab === 'STORE_PREVIEW' && (
+                 <div className="h-[600px] border border-gray-200 overflow-hidden relative bg-white">
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+                          <div className="text-center">
+                              <Store size={48} className="mx-auto text-gray-300 mb-4" />
+                              <p className="text-gray-400 text-sm">Preview of {storeDesign.brandName}</p>
+                              <button onClick={() => onNavigate('VENDOR_PROFILE')} className="mt-4 text-xs font-bold uppercase underline">View Full Page</button>
+                          </div>
+                      </div>
+                 </div>
+             )}
+             {activeTab === 'CMS' && renderCMS()}
         </div>
-      </div>
     </div>
   );
 };
-
-const AreaChartComponent = ({ data }: { data: any[] }) => (
-  <LineChart data={data}>
-    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-    <XAxis dataKey="name" tick={{fontSize: 12}} stroke="#9ca3af" axisLine={false} tickLine={false} />
-    <YAxis tick={{fontSize: 12}} stroke="#9ca3af" axisLine={false} tickLine={false} tickFormatter={(value) => `$${value}`} />
-    <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', border: 'none', borderRadius: '0px', color: '#fff' }} />
-    <Line type="monotone" dataKey="sales" stroke="#0a0a0a" strokeWidth={2} />
-  </LineChart>
-);
-
-const renderOverview = (data: any[], stats: { revenue: number, activeOrders: number, clients: number, aov: number }) => (
-  <div className="space-y-8 animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { label: 'Total Revenue', value: `$${stats.revenue.toLocaleString()}`, icon: DollarSign, trend: '+12%' },
-          { label: 'Active Orders', value: stats.activeOrders.toString(), icon: Package, trend: '+2' },
-          { label: 'Total Clients', value: stats.clients.toString(), icon: Users, trend: '+5%' },
-          { label: 'Avg. Order Value', value: `$${Math.round(stats.aov).toLocaleString()}`, icon: Activity, trend: '-1%' },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white p-6 border border-gray-100 shadow-sm flex flex-col justify-between h-32">
-            <div className="flex justify-between items-start">
-               <div>
-                 <p className="text-xs text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                 <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
-               </div>
-               <div className="p-2 bg-gray-50 rounded-full text-gray-400">
-                 <stat.icon size={18} />
-               </div>
-            </div>
-            <p className={`text-xs font-bold ${stat.trend.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
-              {stat.trend} <span className="text-gray-300 font-normal">vs last month</span>
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-6 border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-serif italic mb-6">Revenue Analytics</h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChartComponent data={data} />
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-    </div>
-);

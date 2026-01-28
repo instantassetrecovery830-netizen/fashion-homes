@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader } from 'lucide-react';
 import { NAV_LINKS } from '../constants';
@@ -141,20 +142,20 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
 
           {/* Icons */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 md:gap-6">
             <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
             
             {/* User / Auth Menu */}
             <div className="relative group">
-              <User 
-                size={20} 
-                className={`cursor-pointer transition-colors ${isLoggedIn ? 'text-luxury-black' : 'text-gray-400 hover:text-luxury-gold'}`}
-                onClick={() => !isLoggedIn && onNavigate('AUTH')}
-              />
-              
-              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-200">
-                {isLoggedIn ? (
-                  <>
+              {isLoggedIn ? (
+                <>
+                  <User 
+                    size={20} 
+                    className="cursor-pointer transition-colors text-luxury-black hover:text-luxury-gold"
+                    onClick={() => onNavigate('PROFILE_SETTINGS')}
+                  />
+                  
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-200">
                     <div className="p-4 border-b border-gray-50">
                       <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signed in as</p>
                       <p className="font-bold text-sm">{role}</p>
@@ -180,30 +181,16 @@ export const Layout: React.FC<LayoutProps> = ({
                     >
                       <LogOut size={14} /> Sign Out
                     </button>
-                  </>
-                ) : (
-                  <div className="p-2">
-                    <button 
-                      onClick={() => onNavigate('AUTH')}
-                      className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors"
-                    >
-                      Sign In / Join
-                    </button>
-                    <div className="mt-2 border-t border-gray-100 pt-2">
-                      <p className="text-[10px] text-gray-300 uppercase px-2 mb-1">Dev: Quick Switch</p>
-                      {Object.values(UserRole).map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => onRoleChange(r)}
-                          className={`block w-full text-left px-2 py-1 text-xs hover:bg-gray-50 text-gray-400`}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
                   </div>
-                )}
-              </div>
+                </>
+              ) : (
+                <button 
+                  onClick={() => onNavigate('AUTH')}
+                  className="bg-black text-white px-5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors whitespace-nowrap"
+                >
+                  Get Started
+                </button>
+              )}
             </div>
 
             <div 
@@ -222,29 +209,44 @@ export const Layout: React.FC<LayoutProps> = ({
 
         {/* Mobile Menu Overlay */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 py-8 px-6 flex flex-col gap-6 animate-slide-up h-screen">
+          <div className="fixed inset-0 top-0 left-0 w-full h-full bg-white z-40 overflow-y-auto pt-24 pb-10 px-6 flex flex-col gap-6 animate-fade-in">
              {NAV_LINKS.map((link) => (
               <a 
                 key={link.label} 
                 onClick={() => { setMobileMenuOpen(false); onNavigate(link.view); }}
-                className="text-lg font-serif italic hover:text-luxury-gold transition-colors"
+                className="text-2xl font-serif italic hover:text-luxury-gold transition-colors"
               >
                 {link.label}
               </a>
             ))}
              <button 
                 onClick={() => { setMobileMenuOpen(false); onNavigate('PRICING'); }}
-                className="text-lg font-serif italic hover:text-luxury-gold transition-colors text-left"
+                className="text-2xl font-serif italic hover:text-luxury-gold transition-colors text-left"
               >
                 Membership & Pricing
               </button>
             <div className="border-t border-gray-100 pt-6 mt-2">
               <button 
                 onClick={() => { setMobileMenuOpen(false); onNavigate('AUTH'); }}
-                className="text-lg font-serif italic hover:text-luxury-gold transition-colors"
+                className="text-2xl font-serif italic hover:text-luxury-gold transition-colors"
               >
                 Sign In / Register
               </button>
+            </div>
+            {/* Quick Role Switch for Mobile Dev - kept from previous implementation logic for convenience */}
+            <div className="mt-4 border-t border-gray-100 pt-4">
+               <p className="text-[10px] text-gray-300 uppercase px-2 mb-2">Dev: Quick Switch</p>
+                <div className="flex gap-4">
+                  {Object.values(UserRole).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => { onRoleChange(r); setMobileMenuOpen(false); }}
+                      className="text-xs text-gray-400 hover:text-black"
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
             </div>
           </div>
         )}
@@ -382,9 +384,9 @@ export const Layout: React.FC<LayoutProps> = ({
           <div>
             <h4 className="uppercase text-xs font-bold tracking-widest mb-6 text-white">The Company</h4>
             <ul className="space-y-4 text-sm text-gray-400">
-              <li>About Us</li>
+              <li className="cursor-pointer hover:text-luxury-gold transition-colors" onClick={() => onNavigate('ABOUT')}>About Us</li>
               <li>Careers</li>
-              <li className="cursor-pointer hover:text-luxury-gold" onClick={() => onNavigate('PRICING')}>Membership & Pricing</li>
+              <li className="cursor-pointer hover:text-luxury-gold transition-colors" onClick={() => onNavigate('PRICING')}>Membership & Pricing</li>
               <li>Sustainability</li>
             </ul>
           </div>

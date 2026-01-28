@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, Sparkles, Loader, Diamond } from 'lucide-react';
+import { ArrowRight, Sparkles, Loader, Diamond, UserPlus } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService';
 import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types';
 
@@ -93,7 +93,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </video>
         
         <div className="relative z-20 text-center text-white px-4 animate-slide-up">
-          <h2 className="text-sm md:text-base tracking-[0.3em] uppercase mb-4 opacity-90 text-luxury-gold">{hero.subtitle}</h2>
+          <h2 className="text-xs md:text-base tracking-[0.3em] uppercase mb-4 opacity-90 text-luxury-gold">{hero.subtitle}</h2>
           <h1 className="text-5xl md:text-8xl font-serif font-medium mb-8 leading-tight drop-shadow-2xl">
             {hero.titleLine1} <br /> 
             <span className="italic font-light">{hero.titleLine2}</span>
@@ -101,15 +101,24 @@ export const LandingView: React.FC<LandingViewProps> = ({
           <div className="flex flex-col md:flex-row items-center justify-center gap-4">
             <button 
               onClick={() => onNavigate('MARKETPLACE')}
-              className="group relative inline-flex items-center gap-3 px-8 py-4 bg-white text-black text-xs font-bold tracking-widest uppercase hover:bg-luxury-gold hover:text-white transition-all duration-300 min-w-[200px] justify-center"
+              className="group relative inline-flex items-center gap-3 px-8 py-4 bg-white text-black text-xs font-bold tracking-widest uppercase hover:bg-luxury-gold hover:text-white transition-all duration-300 w-full md:w-auto min-w-[200px] justify-center"
             >
               {hero.buttonText}
               <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
             </button>
             
+            {!isLoggedIn && (
+              <button 
+                onClick={() => onNavigate('AUTH')}
+                className="group relative inline-flex items-center gap-2 px-8 py-4 bg-luxury-gold text-white text-xs font-bold tracking-widest uppercase hover:bg-white hover:text-black transition-all duration-300 w-full md:w-auto min-w-[200px] justify-center shadow-lg"
+              >
+                <UserPlus size={14} /> Get Started
+              </button>
+            )}
+            
             <button 
               onClick={() => onNavigate('PRICING')}
-              className="group relative inline-flex items-center gap-2 px-8 py-4 bg-black/30 backdrop-blur-md border border-white/30 text-white text-xs font-bold tracking-widest uppercase hover:bg-white hover:text-black transition-all duration-300 min-w-[200px] justify-center"
+              className="group relative inline-flex items-center gap-2 px-8 py-4 bg-black/30 backdrop-blur-md border border-white/30 text-white text-xs font-bold tracking-widest uppercase hover:bg-white hover:text-black transition-all duration-300 w-full md:w-auto min-w-[200px] justify-center"
             >
               <Diamond size={12} /> Membership Access
             </button>
@@ -117,7 +126,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
             {isLoggedIn && (
                <button 
                 onClick={handleDashboardClick}
-                className="group relative inline-flex items-center gap-3 px-8 py-4 border border-white text-white text-xs font-bold tracking-widest uppercase hover:bg-white hover:text-black transition-all duration-300 backdrop-blur-sm min-w-[200px] justify-center"
+                className="group relative inline-flex items-center gap-3 px-8 py-4 border border-white text-white text-xs font-bold tracking-widest uppercase hover:bg-white hover:text-black transition-all duration-300 backdrop-blur-sm w-full md:w-auto min-w-[200px] justify-center"
               >
                 Dashboard
               </button>
@@ -149,7 +158,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
       </div>
 
       {/* Shop by Designer Section */}
-      <section className="py-24 bg-luxury-cream border-b border-gray-100">
+      <section className="py-16 md:py-24 bg-luxury-cream border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-[0.3em] text-luxury-taupe mb-4 block">{designersSection.subtitle}</span>
@@ -192,7 +201,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
       </section>
 
       {/* AI Curator Section */}
-      <section className="py-24 bg-luxury-black text-luxury-cream overflow-hidden">
+      <section className="py-16 md:py-24 bg-luxury-black text-luxury-cream overflow-hidden">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center gap-3 mb-12">
             <Sparkles className="text-luxury-gold" size={24} />
@@ -235,7 +244,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
       </section>
 
       {/* Campaign / Visual Section */}
-      <section className="py-24 bg-luxury-cream">
+      <section className="py-16 md:py-24 bg-luxury-cream">
         <div className="max-w-7xl mx-auto px-6">
            <div className="mb-12 text-center">
               <span className="text-xs font-bold uppercase tracking-[0.3em] text-luxury-taupe mb-2 block">{campaign.subtitle}</span>
@@ -244,7 +253,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-auto md:h-[600px] auto-rows-fr">
               <div 
                 onClick={() => onNavigate('MARKETPLACE')}
-                className="col-span-1 md:col-span-2 row-span-2 relative group overflow-hidden h-[400px] md:h-full cursor-pointer"
+                className="col-span-2 md:col-span-2 row-span-2 relative group overflow-hidden h-[400px] md:h-full cursor-pointer"
               >
                  <img src={campaign.image1} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 1" />
                  <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
@@ -275,7 +284,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
       </section>
 
       {/* Spotlight Products */}
-      <section className="py-24 max-w-7xl mx-auto px-6 bg-luxury-cream-dark">
+      <section className="py-16 md:py-24 max-w-7xl mx-auto px-6 bg-luxury-cream-dark">
         <div className="flex justify-between items-end mb-12">
            <h2 className="text-3xl font-serif italic text-luxury-black">{spotlightSection.title}</h2>
            <button onClick={() => onNavigate('MARKETPLACE')} className="text-xs uppercase border-b border-black pb-1 hover:text-luxury-gold hover:border-luxury-gold transition-colors text-luxury-black">View All</button>

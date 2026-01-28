@@ -1,4 +1,12 @@
+
 import { Product, Vendor, ViewState, Order } from './types';
+
+export const NAV_LINKS: { label: string; view: ViewState }[] = [
+  { label: 'Shop', view: 'MARKETPLACE' },
+  { label: 'New Arrivals', view: 'NEW_ARRIVALS' },
+  { label: 'Designers', view: 'DESIGNERS' },
+  { label: 'The Maison', view: 'ABOUT' }
+];
 
 export const MOCK_VENDORS: Vendor[] = [
   {
@@ -19,32 +27,30 @@ export const MOCK_VENDORS: Vendor[] = [
   {
     id: 'v2',
     name: 'KAIZEN Studios',
-    bio: 'Streetwear reimagined for the digital age. Tokyo-inspired technical gear.',
+    bio: 'Minimalist streetwear from Tokyo. Focusing on silhouette and utility.',
     avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=200&auto=format&fit=crop',
     verificationStatus: 'VERIFIED',
     subscriptionStatus: 'ACTIVE',
     location: 'Tokyo, Japan',
-    coverImage: 'https://images.unsplash.com/photo-1532453288672-3a27e9be9efd?q=80&w=2070',
+    coverImage: 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?q=80&w=2070',
     email: 'info@kaizen.jp',
     subscriptionPlan: 'Atelier',
-    website: 'https://kaizen.jp',
-    instagram: '@kaizen_studios',
-    twitter: '@kaizen_jp'
+    website: 'https://kaizenstudios.jp',
+    instagram: '@kaizen_studios'
   },
   {
     id: 'v3',
     name: 'Studio Null',
-    bio: 'Minimalist leather goods and accessories stripping away the non-essential.',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop',
+    bio: 'Experimental knitwear and deconstructed forms. Based in Berlin.',
+    avatar: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?q=80&w=200&auto=format&fit=crop',
     verificationStatus: 'PENDING',
     subscriptionStatus: 'INACTIVE',
     location: 'Berlin, Germany',
-    coverImage: 'https://images.unsplash.com/photo-1470309864661-68328b2cd0a5?q=80&w=2070',
-    email: 'hello@studionull.com',
+    coverImage: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2070',
+    email: 'hello@studionull.de',
     subscriptionPlan: 'Atelier',
-    website: 'https://studionull.com',
-    instagram: '@studionull',
-    twitter: '@null_berlin'
+    website: 'https://studionull.de',
+    instagram: '@studio_null'
   }
 ];
 
@@ -53,13 +59,13 @@ export const MOCK_PRODUCTS: Product[] = [
     id: 'p1',
     name: 'Asymmetric Silk Trench',
     designer: 'Maison Margaux',
-    price: 1250,
+    price: 890,
     category: 'Outerwear',
-    image: 'https://picsum.photos/id/325/600/800',
-    description: 'A deconstructed trench coat featuring raw hems and an oversized belt.',
+    image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?q=80&w=1000',
+    description: 'A deconstructed trench coat featuring asymmetric lapels and a belted waist. Crafted from raw silk blends.',
     rating: 4.8,
     isNewSeason: true,
-    stock: 12,
+    stock: 5,
     sizes: ['XS', 'S', 'M', 'L']
   },
   {
@@ -68,91 +74,47 @@ export const MOCK_PRODUCTS: Product[] = [
     designer: 'KAIZEN Studios',
     price: 450,
     category: 'Bottoms',
-    image: 'https://picsum.photos/id/1005/600/800',
-    description: 'Technical fabric cargo pants with modular pockets and adjustable cuffs.',
+    image: 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?q=80&w=1000',
+    description: 'Heavyweight technical cotton cargos with multiple utility pockets and adjustable hem.',
     rating: 4.5,
-    isNewSeason: false,
-    stock: 40,
-    sizes: ['S', 'M', 'L', 'XL']
+    stock: 12,
+    sizes: ['30', '32', '34', '36']
   },
   {
     id: 'p3',
-    name: 'Structure Knit Sweater',
-    designer: 'Maison Margaux',
-    price: 680,
+    name: 'Distressed Mohair Knit',
+    designer: 'Studio Null',
+    price: 620,
     category: 'Knitwear',
-    image: 'https://picsum.photos/id/1027/600/800',
-    description: 'Heavy gauge wool blend with architectural shoulder pads.',
-    rating: 4.9,
-    stock: 5,
-    sizes: ['M', 'L']
+    image: 'https://images.unsplash.com/photo-1621335829175-95f437384d7c?q=80&w=1000',
+    description: 'Hand-knit mohair sweater with intentional distressing and drop-shoulder fit.',
+    rating: 5.0,
+    isNewSeason: true,
+    stock: 3,
+    sizes: ['S/M', 'L/XL']
   },
   {
     id: 'p4',
     name: 'Void Runner Sneakers',
     designer: 'KAIZEN Studios',
-    price: 890,
+    price: 380,
     category: 'Footwear',
-    image: 'https://picsum.photos/id/103/600/800',
-    description: 'Chunky sole sneakers with reflective detailing.',
-    rating: 4.2,
-    isNewSeason: true,
-    stock: 25,
-    sizes: ['39', '40', '41', '42', '43', '44']
+    image: 'https://images.unsplash.com/photo-1603808033192-082d6919d3e1?q=80&w=1000',
+    description: 'Sculptural sneakers featuring a split sole design and neoprene upper.',
+    rating: 4.7,
+    stock: 8,
+    sizes: ['39', '40', '41', '42', '43', '44', '45']
   },
   {
     id: 'p5',
-    name: 'Minimalist Leather Tote',
-    designer: 'Studio Null',
-    price: 1500,
-    category: 'Accessories',
-    image: 'https://picsum.photos/id/250/600/800',
-    description: 'Full grain leather tote with zero hardware.',
-    rating: 5.0,
-    stock: 8,
-    sizes: ['One Size']
-  },
-  {
-    id: 'p6',
-    name: 'Drape Neck Silk Dress',
+    name: 'Structured Leather Tote',
     designer: 'Maison Margaux',
-    price: 2100,
-    category: 'Clothing',
-    image: 'https://picsum.photos/id/338/600/800',
-    description: 'Liquid silk evening wear. Made to order.',
-    rating: 5.0,
-    isNewSeason: true,
-    stock: 3,
-    sizes: ['XS', 'S', 'M'],
-    isPreOrder: true
+    price: 1200,
+    category: 'Accessories',
+    image: 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?q=80&w=1000',
+    description: 'Minimalist leather tote with silver hardware and raw edges.',
+    rating: 4.9,
+    stock: 4,
+    sizes: ['One Size']
   }
-];
-
-export const MOCK_ORDERS: Order[] = [
-  {
-    id: 'ord_1',
-    customerName: 'Alice V.',
-    date: 'Oct 24, 2023',
-    total: 1250,
-    status: 'Processing',
-    items: [
-      { ...MOCK_PRODUCTS[0], quantity: 1, size: 'M', stock: 12 }
-    ]
-  },
-  {
-    id: 'ord_2',
-    customerName: 'James B.',
-    date: 'Oct 22, 2023',
-    total: 2100,
-    status: 'Shipped',
-    items: [
-      { ...MOCK_PRODUCTS[5], quantity: 1, size: 'S', stock: 3, measurements: 'Bust: 88, Waist: 60' }
-    ]
-  }
-];
-
-export const NAV_LINKS: { label: string; view: ViewState }[] = [
-  { label: 'New Arrivals', view: 'NEW_ARRIVALS' },
-  { label: 'Designers', view: 'DESIGNERS' },
-  { label: 'Shop All', view: 'MARKETPLACE' },
 ];

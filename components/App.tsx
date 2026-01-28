@@ -248,7 +248,7 @@ const App: React.FC = () => {
   // View Routing
   const renderView = () => {
     if (currentView === 'AUTH') {
-      return <AuthView onLogin={handleLogin} onNavigate={handleNavigate} />;
+      return <AuthView onLogin={handleLogin} onNavigate={handleNavigate} cmsContent={cmsContent} />;
     }
 
     if (featureFlags.maintenanceMode && userRole !== UserRole.ADMIN) {

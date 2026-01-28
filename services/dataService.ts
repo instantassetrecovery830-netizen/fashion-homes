@@ -73,6 +73,31 @@ const DEFAULT_CMS_CONTENT: LandingPageContent = {
   },
   spotlight: {
     title: "Editor's Picks"
+  },
+  about: {
+    hero: {
+        title: "The Maison",
+        subtitle: "Established 2024",
+        description: "Bridging the gap between African heritage and global luxury through technology, curation, and craftsmanship.",
+        imageUrl: "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=2574&auto=format&fit=crop"
+    },
+    philosophy: {
+        title: "Our Philosophy",
+        description1: "MyFitStore was born from a desire to redefine the digital luxury experience. We believe that true luxury lies in the stories behind the seams. Our platform serves as a curated ecosystem for the world's most avant-garde designers, providing a stage where heritage meets innovation.",
+        description2: "We are more than a marketplace; we are a cultural conduit. By integrating AI-driven styling with human curation, we offer a personalized journey that respects the individuality of both the creator and the collector.",
+        image1: "https://images.unsplash.com/photo-1509319117116-31cf071916de?q=80&w=800",
+        image2: "https://images.unsplash.com/photo-1537832816519-689ad163238b?q=80&w=800"
+    },
+    contact: {
+        address: "24 Rue du Faubourg Saint-Honoré\n75008 Paris, France",
+        email: "concierge@myfitstore.com",
+        phone: "+33 1 42 68 53 00",
+        hours: "Mon - Fri: 09:00 - 18:00 CET"
+    }
+  },
+  auth: {
+    loginImage: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2070",
+    registerImage: "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=2574"
   }
 };
 
@@ -246,7 +271,9 @@ export const fetchLandingContent = async (): Promise<LandingPageContent> => {
   try {
     const res = await pool.query('SELECT data FROM cms_content WHERE id = $1', ['landing_page']);
     if (res.rows.length > 0) {
-      return res.rows[0].data;
+      const data = res.rows[0].data;
+      // Merge with default to ensure keys exists if previously missing
+      return { ...DEFAULT_CMS_CONTENT, ...data };
     }
     return DEFAULT_CMS_CONTENT;
   } catch (e) {

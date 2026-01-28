@@ -86,12 +86,40 @@ export type ViewState =
   | 'BUYER_DASHBOARD'
   | 'AUTH'
   | 'PROFILE_SETTINGS'
-  | 'PRICING';
+  | 'PRICING'
+  | 'ABOUT';
 
 export interface TrendAnalysis {
   title: string;
   description: string;
   colorPalette: string[];
+}
+
+export interface AboutPageContent {
+  hero: {
+    title: string;
+    subtitle: string;
+    description: string;
+    imageUrl: string;
+  };
+  philosophy: {
+    title: string;
+    description1: string;
+    description2: string;
+    image1: string;
+    image2: string;
+  };
+  contact: {
+    address: string;
+    email: string;
+    phone: string;
+    hours: string;
+  };
+}
+
+export interface AuthPageContent {
+  loginImage: string;
+  registerImage: string;
 }
 
 export interface LandingPageContent {
@@ -121,5 +149,7 @@ export interface LandingPageContent {
   };
   spotlight: {
     title: string;
-  }
+  };
+  about: AboutPageContent;
+  auth?: AuthPageContent;
 }
