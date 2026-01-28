@@ -2,27 +2,34 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader, Shield, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, RefreshCw, ArrowLeft, ExternalLink } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types';
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, onAuthStateChanged, sendPasswordResetEmail, mockVerifyEmail } from '../services/firebase';
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, onAuthStateChanged, sendPasswordResetEmail } from '../services/firebase';
 import { createVendorInDb, createUserInDb, fetchUsers } from '../services/dataService';
 
 interface AuthViewProps {
   onLogin: (role: UserRole) => void;
   onNavigate: (view: ViewState) => void;
   cmsContent?: LandingPageContent;
+  initialMode?: 'LOGIN' | 'REGISTER';
+  initialRole?: UserRole;
 }
 
-export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsContent }) => {
-  const [isRegister, setIsRegister] = useState(false);
+export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsContent, initialMode = 'LOGIN', initialRole = UserRole.BUYER }) => {
+  const [isRegister, setIsRegister] = useState(initialMode === 'REGISTER');
   const [isResetingPassword, setIsResetingPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.BUYER);
+  const [selectedRole, setSelectedRole] = useState<UserRole>(initialRole);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Update state when props change (e.g. navigation from Pricing)
+  useEffect(() => {
+    setIsRegister(initialMode === 'REGISTER');
+    setSelectedRole(initialRole);
+  }, [initialMode, initialRole]);
   
   // Verification State
   const [verificationNeeded, setVerificationNeeded] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
   const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
-  const [isSimulatingVerification, setIsSimulatingVerification] = useState(false);
 
   // Password Reset State
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -100,18 +107,30 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     }
   };
 
-  const handleSimulateVerificationLink = async () => {
-      setIsSimulatingVerification(true);
-      await mockVerifyEmail(verificationEmail);
-      setIsSimulatingVerification(false);
-      
-      // Auto transition
-      await signOut(auth);
-      setVerificationNeeded(false);
-      setIsRegister(false);
-      setPassword(''); 
-      setConfirmPassword('');
-      setError("Email Verified! Please sign in.");
+  const handleCheckVerification = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+        if (auth.currentUser) {
+            // Force refresh of the user token to get updated emailVerified status
+            await auth.currentUser.reload();
+            if (auth.currentUser.emailVerified) {
+                await signOut(auth); // Sign out to force clean login state
+                setVerificationNeeded(false);
+                setIsRegister(false);
+                setPassword(''); 
+                setConfirmPassword('');
+                setError("Email Verified! Please sign in.");
+            } else {
+                setError("Email not verified yet. Please check your inbox (and spam folder).");
+            }
+        }
+    } catch (e) {
+        console.error("Verification check failed", e);
+        setError("Unable to verify status. Please try again.");
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
@@ -300,57 +319,47 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                     <Mail size={32} />
                 </div>
                 <h2 className="text-2xl font-serif italic mb-4">Verify Your Email</h2>
-                <p className="text-gray-500 text-sm leading-relaxed mb-8">
-                    We have sent you a verification email to <span className="font-bold text-black">{verificationEmail}</span>. 
-                    Verify it and log in.
+                <p className="text-gray-500 text-sm leading-relaxed mb-6">
+                    We have sent a verification link to <span className="font-bold text-black">{verificationEmail}</span>.
                 </p>
+
+                {error && (
+                    <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-sm mb-6 text-left">
+                        <AlertCircle size={14} className="shrink-0" />
+                        <span>{error}</span>
+                    </div>
+                )}
                 
-                {/* Login Button acts as the completion step, resetting state to allow re-login attempt */}
                 <button 
-                    onClick={async () => {
-                        await signOut(auth);
-                        setVerificationNeeded(false);
-                        setIsRegister(false); // Switch to login mode
-                        setPassword(''); 
-                        setConfirmPassword('');
-                        setResendStatus('idle');
-                    }}
-                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-6"
+                    onClick={handleCheckVerification}
+                    disabled={isLoading}
+                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-4 flex justify-center items-center gap-2"
                 >
-                    Log In
+                    {isLoading ? <Loader size={14} className="animate-spin"/> : <CheckCircle size={14} />} 
+                    I've Verified My Email
                 </button>
                 
                 <div>
                     {resendStatus === 'sent' ? (
-                        <p className="text-green-600 text-xs font-bold animate-fade-in flex items-center justify-center gap-2">
+                        <p className="text-green-600 text-xs font-bold animate-fade-in flex items-center justify-center gap-2 my-4">
                             <CheckCircle size={14} /> Email sent successfully!
                         </p>
                     ) : (
                         <button
                             onClick={handleResendVerification}
                             disabled={resendStatus === 'sending'}
-                            className="text-xs text-gray-400 hover:text-black underline transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mx-auto"
+                            className="text-xs text-gray-400 hover:text-black underline transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mx-auto my-4"
                         >
                             {resendStatus === 'sending' ? (
                                 <><Loader size={12} className="animate-spin" /> Sending...</>
                             ) : (
-                                "Didn't receive it? Resend Email"
+                                "Resend Email"
                             )}
                         </button>
                     )}
                 </div>
 
                 <div className="mt-8 border-t border-gray-100 pt-6">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-4">Demo Environment</p>
-                    <button 
-                        onClick={handleSimulateVerificationLink}
-                        disabled={isSimulatingVerification}
-                        className="w-full border border-dashed border-gray-300 text-gray-500 py-3 text-xs font-bold uppercase tracking-widest hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 mb-4"
-                    >
-                        {isSimulatingVerification ? <Loader size={14} className="animate-spin"/> : <ExternalLink size={14} />} 
-                        Simulate Clicking Link
-                    </button>
-
                     <button 
                         onClick={async () => {
                             await signOut(auth);

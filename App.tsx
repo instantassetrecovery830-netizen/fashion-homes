@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { LandingView } from './components/LandingView';
@@ -22,7 +21,7 @@ import { searchProductsByImage } from './services/geminiService';
 import { Loader } from 'lucide-react';
 import { auth, onAuthStateChanged, signOut } from './services/firebase';
 
-const App: React.FC = () => {
+export const App = () => {
   // State
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
   const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
@@ -32,6 +31,12 @@ const App: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string | null>(null);
+  
+  // Auth Config State for deep linking to Register/Login
+  const [authConfig, setAuthConfig] = useState<{mode: 'LOGIN' | 'REGISTER', role: UserRole}>({ 
+      mode: 'LOGIN', 
+      role: UserRole.BUYER 
+  });
   
   // Data State
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -92,13 +97,22 @@ const App: React.FC = () => {
           if (adminEmails.includes(user.email?.toLowerCase() || '')) {
               setUserRole(UserRole.ADMIN);
           } else {
-              const currentVendors = await fetchVendors();
-              const matchingVendor = currentVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
-              
-              if (matchingVendor) {
-                  setUserRole(UserRole.VENDOR);
+              // Check if user has an assigned role in the Users table
+              const currentUsers = await fetchUsers();
+              const dbUser = currentUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
+
+              if (dbUser && dbUser.role) {
+                  setUserRole(dbUser.role);
               } else {
-                  setUserRole(UserRole.BUYER);
+                  // Fallback to Vendor check
+                  const currentVendors = await fetchVendors();
+                  const matchingVendor = currentVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
+                  
+                  if (matchingVendor) {
+                      setUserRole(UserRole.VENDOR);
+                  } else {
+                      setUserRole(UserRole.BUYER);
+                  }
               }
           }
         } else {
@@ -130,13 +144,23 @@ const App: React.FC = () => {
   });
 
   // Handlers
-  const handleNavigate = (view: ViewState) => {
+  
+  // Base navigation handler
+  const baseNavigate = (view: ViewState) => {
     if (view !== 'MARKETPLACE') {
         setSelectedDesignerFilter(null);
     }
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setIsCartOpen(false);
+  };
+
+  // Wrapper for generic navigation that resets auth state to default
+  const handleNavigate = (view: ViewState) => {
+      if (view === 'AUTH') {
+          setAuthConfig({ mode: 'LOGIN', role: UserRole.BUYER });
+      }
+      baseNavigate(view);
   };
 
   const handleDesignerSelect = (designerName: string) => {
@@ -426,5 +450,3 @@ const App: React.FC = () => {
     </Layout>
   );
 };
-
-export default App;

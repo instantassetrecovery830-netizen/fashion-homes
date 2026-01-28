@@ -1,152 +1,108 @@
 
-// Mock Firebase Service to resolve missing dependency errors
+// Mocking Firebase Authentication for the purpose of this environment where 'firebase' module seems unavailable or typed incorrectly.
+// In a real application, you would install 'firebase' via npm and use the imports.
 
-// Mock User object structure used in the app
+// Simulating the user type
 export interface MockUser {
   uid: string;
   email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
   emailVerified: boolean;
-  displayName?: string | null;
-  photoURL?: string | null;
+  reload: () => Promise<void>;
 }
 
-// Internal state
 let currentUser: MockUser | null = null;
-const listeners: ((user: MockUser | null) => void)[] = [];
-// In-memory store to persist users during the session for testing verification flows
-const userStore: Record<string, MockUser> = {};
+const authStateListeners: ((user: MockUser | null) => void)[] = [];
 
-const notify = () => {
-  listeners.forEach(l => l(currentUser));
+const notifyListeners = () => {
+  authStateListeners.forEach(listener => listener(currentUser));
 };
 
-// Mock Auth Object
 export const auth = {
-  get currentUser() { return currentUser; }
-};
-
-// --- Auth Functions ---
-
-export const initializeApp = (config: any) => {
-  // console.log('Mock Firebase App initialized');
-  return {};
-};
-
-export const getAuth = (app?: any) => auth;
-
-export const createUserWithEmailAndPassword = async (authInstance: any, email: string, password: string) => {
-  // Simulate delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  if (userStore[email]) {
-      const error: any = new Error("Email already in use");
-      error.code = 'auth/email-already-in-use';
-      throw error;
+  get currentUser() {
+    return currentUser;
   }
+};
 
-  const newUser: MockUser = {
-    uid: `user_${Math.random().toString(36).substr(2, 9)}`,
-    email,
-    emailVerified: false // Default to unverified to test flow
+export const onAuthStateChanged = (authInstance: any, callback: (user: any) => void) => {
+  authStateListeners.push(callback);
+  // Initial callback
+  setTimeout(() => callback(currentUser), 10);
+  return () => {
+    const index = authStateListeners.indexOf(callback);
+    if (index > -1) authStateListeners.splice(index, 1);
   };
-  
-  userStore[email] = newUser;
+};
+
+export const createUserWithEmailAndPassword = async (authInstance: any, email: string, pass: string) => {
+  const newUser: MockUser = {
+    uid: 'mock-uid-' + Date.now(),
+    email,
+    displayName: email.split('@')[0],
+    photoURL: 'https://via.placeholder.com/150',
+    emailVerified: false,
+    reload: async () => {
+        // Mock reload behavior
+    }
+  };
   currentUser = newUser;
-  notify();
-  
+  notifyListeners();
   return { user: newUser };
 };
 
-export const signInWithEmailAndPassword = async (authInstance: any, email: string, password: string) => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Check in-memory store first (for registered users in this session)
-  if (userStore[email]) {
-      currentUser = userStore[email];
-      notify();
-      return { user: currentUser };
-  }
-  
-  // Accept any login for demo purposes (simulating existing verified user)
+export const signInWithEmailAndPassword = async (authInstance: any, email: string, pass: string) => {
+  // Simulate successful login
   const user: MockUser = {
-    uid: `user_${Math.random().toString(36).substr(2, 9)}`,
+    uid: 'mock-uid-login',
     email,
-    emailVerified: true // Auto-verified for login convenience if not explicitly created in this session
+    displayName: email.split('@')[0],
+    photoURL: 'https://via.placeholder.com/150',
+    emailVerified: true, // Auto verify for convenience in mock
+    reload: async () => {}
   };
-  
-  // Persist this auto-created user for consistency
-  userStore[email] = user;
   currentUser = user;
-  notify();
-  
+  notifyListeners();
   return { user };
 };
 
 export const signOut = async (authInstance: any) => {
   currentUser = null;
-  notify();
+  notifyListeners();
 };
 
 export const sendEmailVerification = async (user: any) => {
-  console.log(`[Mock] Verification email sent to ${user.email}`);
-  return Promise.resolve();
-};
-
-// NEW: Helper to manually verify email in demo mode
-export const mockVerifyEmail = async (email: string) => {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  if (userStore[email]) {
-    userStore[email].emailVerified = true;
-  }
-  if (currentUser && currentUser.email === email) {
-    currentUser.emailVerified = true;
-  }
-  notify();
-  return Promise.resolve();
+  console.log(`[Mock] Email verification sent to ${user.email}`);
 };
 
 export const sendPasswordResetEmail = async (authInstance: any, email: string) => {
   console.log(`[Mock] Password reset email sent to ${email}`);
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return Promise.resolve();
 };
 
-export const updateUserPassword = async (user: any, newPassword: string) => {
-  console.log(`[Mock] Password updated for ${user.email} to ${newPassword}`);
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  return Promise.resolve();
+export const updatePassword = async (user: any, newPassword: string) => {
+  console.log(`[Mock] Password updated for ${user.email}`);
 };
 
-export const onAuthStateChanged = (authInstance: any, callback: (user: MockUser | null) => void) => {
-  listeners.push(callback);
-  // Immediate callback with current state
-  callback(currentUser);
-  
-  // Return unsubscribe function
-  return () => {
-    const index = listeners.indexOf(callback);
-    if (index > -1) {
-      listeners.splice(index, 1);
-    }
-  };
-};
-
-export class GoogleAuthProvider {}
+// Aliased export for dashboard usage
+export const updateUserPassword = updatePassword;
 
 export const signInWithPopup = async (authInstance: any, provider: any) => {
-  await new Promise(resolve => setTimeout(resolve, 500));
   const user: MockUser = {
-    uid: `google_${Math.random().toString(36).substr(2, 9)}`,
+    uid: 'mock-google-uid-' + Date.now(),
     email: 'user@gmail.com',
-    emailVerified: true,
     displayName: 'Google User',
-    photoURL: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200'
+    photoURL: 'https://via.placeholder.com/150',
+    emailVerified: true,
+    reload: async () => {}
   };
   currentUser = user;
-  notify();
+  notifyListeners();
   return { user };
 };
 
+export const GoogleAuthProvider = class {};
+
+// Wrapper for signInWithGoogle as requested by AuthView
 export const signInWithGoogle = async (authInstance: any) => {
     return signInWithPopup(authInstance, new GoogleAuthProvider());
 };

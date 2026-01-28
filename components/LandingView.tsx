@@ -31,7 +31,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
     const handleScroll = () => {
       setScrollY(window.scrollY);
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -146,8 +146,10 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
       {/* Infinite Marquee with Parallax */}
       <div className="bg-luxury-gold text-white py-4 overflow-hidden whitespace-nowrap border-y border-white/10 relative z-30">
+        {/* Parallax Wrapper */}
         <div style={{ transform: `translateX(${scrollY * -0.15}px)`, willChange: 'transform' }}>
-          <div className="inline-flex animate-[marquee_30s_linear_infinite]">
+          {/* Animation Wrapper: 30s duration, linear timing */}
+          <div className="inline-flex animate-[marquee_30s_linear_infinite] hover:[animation-play-state:paused]">
             {[...Array(6)].map((_, i) => (
                <React.Fragment key={i}>
                   {marqueeItems.map((item, idx) => (

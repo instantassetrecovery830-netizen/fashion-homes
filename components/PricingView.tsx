@@ -1,10 +1,11 @@
+
 import React from 'react';
 import { Check, ArrowRight, Diamond } from 'lucide-react';
 import { ViewState } from '../types';
 
 interface PricingViewProps {
   onNavigate: (view: ViewState) => void;
-  onLogin: () => void;
+  onRegister: () => void;
 }
 
 const PLANS = [
@@ -54,7 +55,7 @@ const PLANS = [
   }
 ];
 
-export const PricingView: React.FC<PricingViewProps> = ({ onNavigate, onLogin }) => {
+export const PricingView: React.FC<PricingViewProps> = ({ onNavigate, onRegister }) => {
   return (
     <div className="min-h-screen bg-luxury-cream pt-24 pb-24 animate-fade-in">
       {/* Header */}
@@ -107,7 +108,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate, onLogin })
               </div>
 
               <button 
-                onClick={onLogin}
+                onClick={onRegister}
                 className={`w-full py-4 text-xs font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-colors ${
                   plan.highlight 
                     ? 'bg-white text-black hover:bg-luxury-gold hover:text-white' 
