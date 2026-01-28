@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { LandingView } from './components/LandingView';
@@ -21,7 +22,7 @@ import { searchProductsByImage } from './services/geminiService';
 import { Loader } from 'lucide-react';
 import { auth, onAuthStateChanged, signOut } from './services/firebase';
 
-export const App = () => {
+const App: React.FC = () => {
   // State
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
   const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
@@ -31,12 +32,6 @@ export const App = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string | null>(null);
-  
-  // Auth Config State for deep linking to Register/Login
-  const [authConfig, setAuthConfig] = useState<{mode: 'LOGIN' | 'REGISTER', role: UserRole}>({ 
-      mode: 'LOGIN', 
-      role: UserRole.BUYER 
-  });
   
   // Data State
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -144,23 +139,13 @@ export const App = () => {
   });
 
   // Handlers
-  
-  // Base navigation handler
-  const baseNavigate = (view: ViewState) => {
+  const handleNavigate = (view: ViewState) => {
     if (view !== 'MARKETPLACE') {
         setSelectedDesignerFilter(null);
     }
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setIsCartOpen(false);
-  };
-
-  // Wrapper for generic navigation that resets auth state to default
-  const handleNavigate = (view: ViewState) => {
-      if (view === 'AUTH') {
-          setAuthConfig({ mode: 'LOGIN', role: UserRole.BUYER });
-      }
-      baseNavigate(view);
   };
 
   const handleDesignerSelect = (designerName: string) => {
@@ -175,12 +160,14 @@ export const App = () => {
   };
 
   const handleLogin = (role: UserRole) => {
+    setUserRole(role); // Set role immediately to ensure dashboard renders with correct permissions
     if (role === UserRole.ADMIN) {
       handleNavigate('ADMIN_PANEL');
     } else if (role === UserRole.VENDOR) {
       handleNavigate('VENDOR_DASHBOARD');
     } else {
-      handleNavigate('MARKETPLACE');
+      // Explicitly route buyers to their dashboard
+      handleNavigate('BUYER_DASHBOARD');
     }
   };
 
@@ -409,7 +396,7 @@ export const App = () => {
           />
         );
       case 'PRICING':
-        return <PricingView onNavigate={handleNavigate} onLogin={() => handleLogin(UserRole.VENDOR)} />;
+        return <PricingView onNavigate={handleNavigate} onRegister={() => handleLogin(UserRole.VENDOR)} />;
       case 'ABOUT':
         return <AboutView onNavigate={handleNavigate} cmsContent={cmsContent} />;
       default:
@@ -450,3 +437,5 @@ export const App = () => {
     </Layout>
   );
 };
+
+export default App;

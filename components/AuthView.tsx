@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Loader, Shield, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, RefreshCw, ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types';
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, onAuthStateChanged, sendPasswordResetEmail } from '../services/firebase';
-import { createVendorInDb, createUserInDb, fetchUsers } from '../services/dataService';
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail } from '../services/firebase';
+import { createVendorInDb, createUserInDb, fetchUsers, fetchVendors } from '../services/dataService';
 
 interface AuthViewProps {
   onLogin: (role: UserRole) => void;
@@ -19,12 +19,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
   const [selectedRole, setSelectedRole] = useState<UserRole>(initialRole);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Update state when props change (e.g. navigation from Pricing)
-  useEffect(() => {
-    setIsRegister(initialMode === 'REGISTER');
-    setSelectedRole(initialRole);
-  }, [initialMode, initialRole]);
   
   // Verification State
   const [verificationNeeded, setVerificationNeeded] = useState(false);
@@ -42,25 +36,29 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [avatar, setAvatar] = useState<string>('');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   
   // Get images from CMS or fallbacks
   const loginImage = cmsContent?.auth?.loginImage || "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2070";
   const registerImage = cmsContent?.auth?.registerImage || "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=2574";
 
-  // Check for existing unverified session on mount (e.g. refresh)
+  // Check for existing unverified session on mount
   useEffect(() => {
+    // If user is logged in but stuck in verification flow
     if (auth.currentUser && !auth.currentUser.emailVerified) {
         setVerificationEmail(auth.currentUser.email || '');
         setVerificationNeeded(true);
     }
   }, []);
 
+  // Update Role state when props change
+  useEffect(() => {
+    setIsRegister(initialMode === 'REGISTER');
+    setSelectedRole(initialRole);
+  }, [initialMode, initialRole]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setAvatarFile(file);
-      // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setAvatar(reader.result as string);
@@ -77,7 +75,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     setPassword('');
     setConfirmPassword('');
     setAvatar('');
-    setAvatarFile(null);
     setVerificationNeeded(false);
     setResendStatus('idle');
     setResetEmailSent(false);
@@ -92,7 +89,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
   const handleResendVerification = async () => {
     const user = auth.currentUser;
     if (!user) {
-        setError("Session expired. Please sign in again to resend email.");
+        setError("Session expired. Please sign in again.");
         return;
     }
 
@@ -100,9 +97,11 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     try {
         await sendEmailVerification(user);
         setResendStatus('sent');
-        setTimeout(() => setResendStatus('idle'), 5000); // Reset message after 5s
+        // Reset to idle after 5 seconds so they can send again if needed
+        setTimeout(() => setResendStatus('idle'), 5000); 
     } catch (e) {
         console.error("Resend failed", e);
+        setError("Failed to resend email. Please try again.");
         setResendStatus('idle');
     }
   };
@@ -112,17 +111,12 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     setError(null);
     try {
         if (auth.currentUser) {
-            // Force refresh of the user token to get updated emailVerified status
             await auth.currentUser.reload();
             if (auth.currentUser.emailVerified) {
-                await signOut(auth); // Sign out to force clean login state
+                await routeUser(auth.currentUser);
                 setVerificationNeeded(false);
-                setIsRegister(false);
-                setPassword(''); 
-                setConfirmPassword('');
-                setError("Email Verified! Please sign in.");
             } else {
-                setError("Email not verified yet. Please check your inbox (and spam folder).");
+                setError("Email not verified yet. Please check your inbox or spam folder.");
             }
         }
     } catch (e) {
@@ -165,58 +159,82 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
          const photoURL = user.photoURL || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200';
 
          if (selectedRole === UserRole.VENDOR) {
-            await createVendorInDb({
-                id: user.uid,
-                name: displayName,
-                bio: 'Joined via Google',
-                avatar: photoURL,
-                verificationStatus: 'PENDING',
-                subscriptionStatus: 'INACTIVE',
-                location: 'Unknown',
-                coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=200',
-                email: user.email || '',
-                subscriptionPlan: 'Atelier',
-                website: '',
-                instagram: '',
-                twitter: ''
-            });
+            // Check if vendor already exists to avoid overwriting details
+            const vendors = await fetchVendors();
+            if (!vendors.find(v => v.email === user.email)) {
+                await createVendorInDb({
+                    id: user.uid,
+                    name: displayName,
+                    bio: 'Joined via Google',
+                    avatar: photoURL,
+                    verificationStatus: 'PENDING',
+                    subscriptionStatus: 'INACTIVE',
+                    location: 'Unknown',
+                    coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=200',
+                    email: user.email || '',
+                    subscriptionPlan: 'Atelier',
+                    website: '',
+                    instagram: '',
+                    twitter: ''
+                });
+            }
          } else {
-            await createUserInDb({
-                id: user.uid,
-                name: displayName,
-                email: user.email || '',
-                role: UserRole.BUYER,
-                avatar: photoURL,
-                status: 'ACTIVE'
-            });
+            const users = await fetchUsers();
+            if (!users.find(u => u.email === user.email)) {
+                await createUserInDb({
+                    id: user.uid,
+                    name: displayName,
+                    email: user.email || '',
+                    role: UserRole.BUYER,
+                    avatar: photoURL,
+                    status: 'ACTIVE'
+                });
+            }
          }
       } catch (dbError) {
-          // User likely exists
+          // User likely exists, proceed
       }
 
-      const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
-      if (adminEmails.includes(user.email?.toLowerCase() || '')) {
-          onLogin(UserRole.ADMIN);
-      } else {
-          // Check DB role assignment
-          try {
-              const dbUsers = await fetchUsers();
-              const dbUser = dbUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
-              if (dbUser && dbUser.role) {
-                  onLogin(dbUser.role);
-              } else {
-                  onLogin(selectedRole);
-              }
-          } catch {
-              onLogin(selectedRole);
-          }
-      }
+      await routeUser(user);
     } catch (err: any) {
         console.error("Google Auth Error:", err);
         setError("Google Sign In Failed");
     } finally {
         setIsLoading(false);
     }
+  };
+
+  // Helper to route user based on DB role
+  const routeUser = async (user: any) => {
+      const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
+      if (adminEmails.includes(user.email?.toLowerCase() || '')) {
+          onLogin(UserRole.ADMIN);
+      } else {
+          try {
+              // Check Buyers (Users table)
+              const dbUsers = await fetchUsers();
+              const dbUser = dbUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
+              
+              if (dbUser && dbUser.role) {
+                  onLogin(dbUser.role);
+                  return;
+              }
+
+              // Check Vendors (Vendors table)
+              const dbVendors = await fetchVendors();
+              const dbVendor = dbVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
+
+              if (dbVendor) {
+                  onLogin(UserRole.VENDOR);
+                  return;
+              }
+
+              // Fallback: If DB entry doesn't exist yet, use the role they selected on the toggle
+              onLogin(selectedRole); 
+          } catch {
+              onLogin(selectedRole);
+          }
+      }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -226,21 +244,26 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     
     try {
         if (isRegister) {
-            // Validation
+            // Registration Flow
             if (password !== confirmPassword) {
                 throw new Error("Passwords do not match");
             }
+            if (!name) {
+                throw new Error("Name is required");
+            }
+            if (selectedRole === UserRole.VENDOR && !brandName) {
+                throw new Error("Business Name is required for vendors");
+            }
 
-            // Register Flow
             const { user } = await createUserWithEmailAndPassword(auth, email, password);
             const finalAvatar = avatar || 'https://via.placeholder.com/150';
 
-            // Save to Database
+            // Save to Database based on Role
             if (selectedRole === UserRole.VENDOR) {
                 const newVendor: Vendor = {
                     id: user.uid,
-                    name: brandName || name || 'New Brand',
-                    bio: 'No bio yet.',
+                    name: brandName,
+                    bio: `Bio for ${name}`,
                     avatar: finalAvatar,
                     verificationStatus: 'PENDING',
                     subscriptionStatus: 'INACTIVE',
@@ -253,7 +276,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             } else {
                 await createUserInDb({
                     id: user.uid,
-                    name: name || 'New User',
+                    name: name,
                     email: user.email || '',
                     role: UserRole.BUYER,
                     avatar: finalAvatar,
@@ -264,7 +287,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             // Send Verification Email
             await sendEmailVerification(user);
             
-            // Show Verification Screen
+            // Show Verification Screen immediately
             setVerificationEmail(user.email || email);
             setVerificationNeeded(true);
 
@@ -272,39 +295,24 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             // Login Flow
             const { user } = await signInWithEmailAndPassword(auth, email, password);
 
-            // Check if verified
+            // Check verification status
             if (!user.emailVerified) {
-                // Keep user signed in for resend functionality but treat as unverified UI
                 setVerificationEmail(user.email || email);
                 setVerificationNeeded(true);
-                return;
+                return; 
             }
             
-            const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
-            if (adminEmails.includes(user.email?.toLowerCase() || '')) {
-                onLogin(UserRole.ADMIN);
-            } else {
-                try {
-                    const dbUsers = await fetchUsers();
-                    const dbUser = dbUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
-                    if (dbUser && dbUser.role) {
-                        onLogin(dbUser.role);
-                    } else {
-                        onLogin(selectedRole); 
-                    }
-                } catch {
-                    onLogin(selectedRole);
-                }
-            }
+            await routeUser(user);
         }
     } catch (err: any) {
         console.error("Auth Error:", err);
-        if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-email' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        // Specific Error Handling as requested
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
             setError("Password or Email Incorrect");
         } else if (err.code === 'auth/email-already-in-use') {
             setError("User already exists. Sign in?");
         } else {
-            setError(err.message || "Authentication failed. Please check your credentials.");
+            setError(err.message || "Authentication failed.");
         }
     } finally {
         setIsLoading(false);
@@ -321,6 +329,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 <h2 className="text-2xl font-serif italic mb-4">Verify Your Email</h2>
                 <p className="text-gray-500 text-sm leading-relaxed mb-6">
                     We have sent a verification link to <span className="font-bold text-black">{verificationEmail}</span>.
+                    Please check your inbox to activate your account.
                 </p>
 
                 {error && (
@@ -333,27 +342,29 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 <button 
                     onClick={handleCheckVerification}
                     disabled={isLoading}
-                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-4 flex justify-center items-center gap-2"
+                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-6 flex justify-center items-center gap-2"
                 >
                     {isLoading ? <Loader size={14} className="animate-spin"/> : <CheckCircle size={14} />} 
                     I've Verified My Email
                 </button>
                 
-                <div>
+                <div className="bg-gray-50 p-4 rounded-sm">
+                    <p className="text-xs text-gray-500 mb-3">Didn't receive the email?</p>
+                    
                     {resendStatus === 'sent' ? (
-                        <p className="text-green-600 text-xs font-bold animate-fade-in flex items-center justify-center gap-2 my-4">
-                            <CheckCircle size={14} /> Email sent successfully!
-                        </p>
+                        <div className="text-green-600 text-xs font-bold animate-fade-in flex items-center justify-center gap-2">
+                            <CheckCircle size={14} /> Link Sent!
+                        </div>
                     ) : (
                         <button
                             onClick={handleResendVerification}
                             disabled={resendStatus === 'sending'}
-                            className="text-xs text-gray-400 hover:text-black underline transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mx-auto my-4"
+                            className="text-xs text-black font-bold uppercase tracking-widest hover:text-luxury-gold underline transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mx-auto"
                         >
                             {resendStatus === 'sending' ? (
                                 <><Loader size={12} className="animate-spin" /> Sending...</>
                             ) : (
-                                "Resend Email"
+                                <><RefreshCw size={12} /> Resend Link</>
                             )}
                         </button>
                     )}
@@ -499,6 +510,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
 
                      {isRegister && (
                         <>
+                             {/* Profile Photo Upload */}
                              <div className="flex justify-center mb-4">
                                 <div className="relative w-24 h-24 rounded-full bg-gray-50 border border-gray-200 overflow-hidden flex items-center justify-center group cursor-pointer">
                                     {avatar ? (
@@ -517,7 +529,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                                     />
                                 </div>
                             </div>
+                            <p className="text-center text-[10px] text-gray-400 mb-4">Upload Profile Photo</p>
 
+                            {/* Name Input */}
                             <div>
                                 <input 
                                     type="text"
@@ -529,6 +543,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                                 />
                             </div>
 
+                            {/* Business Name (Vendor Only) */}
                             {selectedRole === UserRole.VENDOR && (
                                  <div>
                                     <input 
@@ -599,7 +614,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                      )}
 
                      {error && (
-                        <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-sm">
+                        <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-sm animate-fade-in">
                             <AlertCircle size={14} />
                             <span>
                                 {error === "User already exists. Sign in?" ? (
