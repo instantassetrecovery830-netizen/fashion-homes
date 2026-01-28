@@ -1,10 +1,22 @@
 
 // @ts-ignore
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  updatePassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  User,
+  Auth
+} from 'firebase/auth';
 
-// Your web app's Firebase configuration
+// Firebase Configuration for MyFitStore
 const firebaseConfig = {
   apiKey: "AIzaSyBBeM4QB0gkxenQHyGh3vyBz91_-q4qL0o",
   authDomain: "myfitstore-922b4.firebaseapp.com",
@@ -19,7 +31,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Wrapper for Google Sign In to match existing component usage
-export const signInWithGoogle = async (authInstance: any) => {
+export const signInWithGoogle = async (authInstance: Auth) => {
   const provider = new GoogleAuthProvider();
   return signInWithPopup(authInstance, provider);
 };

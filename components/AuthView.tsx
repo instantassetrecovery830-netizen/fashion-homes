@@ -150,9 +150,11 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     setIsLoading(true);
     setError(null);
     try {
-      // @ts-ignore
-      const { user } = await signInWithGoogle(auth);
+      const result = await signInWithGoogle(auth);
+      const user = result.user;
       
+      if (!user.email) throw new Error("Google account email not found.");
+
       // Attempt to create user in DB if they don't exist
       try {
          const displayName = user.displayName || 'Google User';
@@ -161,17 +163,17 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
          if (selectedRole === UserRole.VENDOR) {
             // Check if vendor already exists to avoid overwriting details
             const vendors = await fetchVendors();
-            if (!vendors.find(v => v.email === user.email)) {
+            if (!vendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase())) {
                 await createVendorInDb({
                     id: user.uid,
-                    name: displayName,
+                    name: brandName || displayName, // Fallback to displayName if brandName not set
                     bio: 'Joined via Google',
                     avatar: photoURL,
                     verificationStatus: 'PENDING',
                     subscriptionStatus: 'INACTIVE',
                     location: 'Unknown',
                     coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=200',
-                    email: user.email || '',
+                    email: user.email,
                     subscriptionPlan: 'Atelier',
                     website: '',
                     instagram: '',
@@ -180,11 +182,11 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             }
          } else {
             const users = await fetchUsers();
-            if (!users.find(u => u.email === user.email)) {
+            if (!users.find(u => u.email?.toLowerCase() === user.email?.toLowerCase())) {
                 await createUserInDb({
                     id: user.uid,
                     name: displayName,
-                    email: user.email || '',
+                    email: user.email,
                     role: UserRole.BUYER,
                     avatar: photoURL,
                     status: 'ACTIVE'
@@ -192,13 +194,14 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             }
          }
       } catch (dbError) {
-          // User likely exists, proceed
+          console.warn("DB user creation check skipped/failed:", dbError);
+          // User likely exists or DB error - we proceed to routeUser which handles lookup
       }
 
       await routeUser(user);
     } catch (err: any) {
         console.error("Google Auth Error:", err);
-        setError("Google Sign In Failed");
+        setError("Google Sign In Failed. Please try again.");
     } finally {
         setIsLoading(false);
     }
