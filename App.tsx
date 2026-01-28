@@ -11,12 +11,14 @@ import { Dashboard } from './components/Dashboard';
 import { AuthView } from './components/AuthView';
 import { PricingView } from './components/PricingView';
 import { AboutView } from './components/AboutView';
-import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent } from './types';
+import { AiConcierge } from './components/AiConcierge'; // Import Concierge
+import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission } from './types';
 import { 
-  seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent,
+  seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb
 } from './services/dataService';
+import { searchProductsByImage } from './services/geminiService';
 import { Loader } from 'lucide-react';
 import { auth, onAuthStateChanged, signOut } from './services/firebase';
 
@@ -36,24 +38,30 @@ const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [contactSubmissions, setContactSubmissions] = useState<ContactSubmission[]>([]);
   const [cmsContent, setCmsContent] = useState<LandingPageContent | undefined>(undefined);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // Visual Search State
+  const [visualSearchResults, setVisualSearchResults] = useState<Product[] | null>(null);
 
   // Initialize DB and Fetch Data
   const refreshData = async () => {
     try {
-      const [dbVendors, dbProducts, dbOrders, dbUsers, dbContent] = await Promise.all([
+      const [dbVendors, dbProducts, dbOrders, dbUsers, dbContent, dbContacts] = await Promise.all([
         fetchVendors(), 
         fetchProducts(),
         fetchOrders(),
         fetchUsers(),
-        fetchLandingContent()
+        fetchLandingContent(),
+        fetchContactSubmissions()
       ]);
       setVendors(dbVendors);
       setProducts(dbProducts);
       setOrders(dbOrders);
       setAllUsers(dbUsers);
       setCmsContent(dbContent);
+      setContactSubmissions(dbContacts);
     } catch (error) {
       console.error("Failed to refresh data", error);
     }
@@ -84,9 +92,6 @@ const App: React.FC = () => {
           if (adminEmails.includes(user.email?.toLowerCase() || '')) {
               setUserRole(UserRole.ADMIN);
           } else {
-              // Check if user is a vendor in DB
-              // Note: This relies on vendors being fetched. 
-              // We fetch vendors fresh to ensure we catch new registrations.
               const currentVendors = await fetchVendors();
               const matchingVendor = currentVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
               
@@ -97,10 +102,8 @@ const App: React.FC = () => {
               }
           }
         } else {
-          // User exists but email is not verified
           setIsLoggedIn(false);
           setUserRole(UserRole.BUYER);
-          // Redirect to Auth view so verification screen can be shown
           setCurrentView('AUTH');
         }
       } else {
@@ -115,7 +118,7 @@ const App: React.FC = () => {
   // Derived State: Active Products (only from active vendors)
   const activeProducts = products.filter(product => {
       const vendor = vendors.find(v => v.name === product.designer);
-      return vendor ? vendor.subscriptionStatus === 'ACTIVE' : true; // Default to true if no vendor found
+      return vendor ? vendor.subscriptionStatus === 'ACTIVE' : true; 
   });
 
   // Feature Flags Management
@@ -148,8 +151,6 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (role: UserRole) => {
-    // This is called by AuthView on success. 
-    // AuthListener will handle state, we just navigate.
     if (role === UserRole.ADMIN) {
       handleNavigate('ADMIN_PANEL');
     } else if (role === UserRole.VENDOR) {
@@ -196,6 +197,25 @@ const App: React.FC = () => {
     setCart(newCart);
   };
 
+  // --- VISUAL SEARCH HANDLER ---
+  const handleVisualSearch = async (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      
+      const matchIds = await searchProductsByImage(base64, activeProducts);
+      const matchedProducts = activeProducts.filter(p => matchIds.includes(p.id));
+      
+      setVisualSearchResults(matchedProducts);
+      handleNavigate('MARKETPLACE');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearVisualSearch = () => {
+    setVisualSearchResults(null);
+  };
+
   // --- ASYNC DATA HANDLERS ---
 
   const handleAddProduct = async (product: Product) => {
@@ -233,7 +253,7 @@ const App: React.FC = () => {
   const handlePlaceOrder = async (order: Order) => {
      await createOrderInDb(order);
      await refreshData();
-     setCart([]); // Clear cart
+     setCart([]); 
   };
 
   const handleUpdateCMSContent = async (content: LandingPageContent) => {
@@ -248,7 +268,7 @@ const App: React.FC = () => {
   // View Routing
   const renderView = () => {
     if (currentView === 'AUTH') {
-      return <AuthView onLogin={handleLogin} onNavigate={handleNavigate} />;
+      return <AuthView onLogin={handleLogin} onNavigate={handleNavigate} cmsContent={cmsContent} />;
     }
 
     if (featureFlags.maintenanceMode && userRole !== UserRole.ADMIN) {
@@ -279,8 +299,10 @@ const App: React.FC = () => {
             onNavigate={handleNavigate} 
             onProductSelect={handleProductSelect} 
             initialDesigner={selectedDesignerFilter}
-            products={activeProducts}
+            products={visualSearchResults || activeProducts}
             vendors={vendors}
+            customTitle={visualSearchResults ? "Visual Search Results" : null}
+            onClearFilter={handleClearVisualSearch}
           />
         );
       case 'NEW_ARRIVALS':
@@ -337,6 +359,7 @@ const App: React.FC = () => {
             onUpdateUser={handleUpdateUser}
             cmsContent={cmsContent}
             onUpdateCMSContent={handleUpdateCMSContent}
+            contactSubmissions={contactSubmissions}
           />
         );
       case 'PROFILE_SETTINGS':
@@ -358,6 +381,7 @@ const App: React.FC = () => {
             onUpdateUser={handleUpdateUser}
             cmsContent={cmsContent}
             onUpdateCMSContent={handleUpdateCMSContent}
+            contactSubmissions={contactSubmissions}
           />
         );
       case 'PRICING':
@@ -379,10 +403,6 @@ const App: React.FC = () => {
     );
   }
 
-  if (currentView === 'AUTH') {
-    return renderView();
-  }
-
   return (
     <Layout 
       role={userRole} 
@@ -397,8 +417,12 @@ const App: React.FC = () => {
       isLoggedIn={isLoggedIn}
       onLogout={handleLogout}
       onPlaceOrder={handlePlaceOrder}
+      onVisualSearch={handleVisualSearch}
     >
       {renderView()}
+      
+      {/* AI Concierge - Rendered globally but passed active products context */}
+      <AiConcierge products={activeProducts} />
     </Layout>
   );
 };

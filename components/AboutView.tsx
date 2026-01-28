@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { Mail, MapPin, Phone, ArrowRight, Globe, Clock, Check, Loader } from 'lucide-react';
-import { ViewState, LandingPageContent } from '../types';
+import { ViewState, LandingPageContent, ContactSubmission } from '../types';
+import { submitContactFormInDb } from '../services/dataService';
 
 interface AboutViewProps {
   onNavigate: (view: ViewState) => void;
@@ -41,16 +42,31 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigate, cmsContent }) 
      }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSent(true);
-      setFormState({ name: '', email: '', subject: '', message: '' });
-      setTimeout(() => setIsSent(false), 5000);
-    }, 1500);
+    
+    const submission: ContactSubmission = {
+      id: `msg_${Date.now()}`,
+      name: formState.name,
+      email: formState.email,
+      subject: formState.subject || 'General Inquiry',
+      message: formState.message,
+      date: new Date().toISOString(),
+      status: 'NEW'
+    };
+
+    try {
+        await submitContactFormInDb(submission);
+        setIsSubmitting(false);
+        setIsSent(true);
+        setFormState({ name: '', email: '', subject: '', message: '' });
+        setTimeout(() => setIsSent(false), 5000);
+    } catch (e) {
+        console.error("Failed to send message", e);
+        setIsSubmitting(false);
+        alert("Failed to send message. Please try again.");
+    }
   };
 
   return (

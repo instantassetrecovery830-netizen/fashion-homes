@@ -35,6 +35,21 @@ export interface Product {
 export type SubscriptionStatus = 'ACTIVE' | 'INACTIVE';
 export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
+export interface PaymentMethod {
+  id: string;
+  type: 'BANK' | 'CRYPTO' | 'PAYPAL';
+  isDefault?: boolean;
+  details: {
+    bankName?: string;
+    accountName?: string;
+    accountNumber?: string;
+    routingNumber?: string;
+    walletAddress?: string;
+    network?: string; // e.g. BTC, ETH, SOL
+    email?: string;
+  };
+}
+
 export interface Vendor {
   id: string;
   name: string;
@@ -49,6 +64,7 @@ export interface Vendor {
   website?: string;
   instagram?: string;
   twitter?: string;
+  paymentMethods?: PaymentMethod[];
 }
 
 export interface CartItem extends Product {
@@ -65,6 +81,16 @@ export interface Order {
   total: number;
   status: 'Processing' | 'Shipped' | 'Delivered';
   items: CartItem[];
+}
+
+export interface ContactSubmission {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  date: string;
+  status: 'NEW' | 'READ' | 'ARCHIVED';
 }
 
 export interface FeatureFlags {
@@ -93,6 +119,13 @@ export interface TrendAnalysis {
   title: string;
   description: string;
   colorPalette: string[];
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'ai';
+  text: string;
+  timestamp: Date;
 }
 
 export interface AboutPageContent {

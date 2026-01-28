@@ -1,7 +1,6 @@
 
 import { pool } from './db';
-import { MOCK_VENDORS, MOCK_PRODUCTS } from '../constants';
-import { Product, Vendor, Order, User, LandingPageContent } from '../types';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission } from '../types';
 
 // Helper to map DB row to Vendor type
 const mapVendor = (row: any): Vendor => ({
@@ -17,7 +16,8 @@ const mapVendor = (row: any): Vendor => ({
   subscriptionPlan: row.subscription_plan as any,
   website: row.website,
   instagram: row.instagram,
-  twitter: row.twitter
+  twitter: row.twitter,
+  paymentMethods: row.payment_methods || []
 });
 
 // Helper to map DB row to Product type
@@ -103,7 +103,7 @@ const DEFAULT_CMS_CONTENT: LandingPageContent = {
 
 export const seedDatabase = async () => {
   try {
-    console.log('Checking database state...');
+    console.log('Initializing database for production...');
     
     // Create Vendors Table
     await pool.query(`
@@ -123,6 +123,13 @@ export const seedDatabase = async () => {
         twitter TEXT
       );
     `);
+    
+    // Add payment_methods column if not exists (for updates)
+    try {
+        await pool.query('ALTER TABLE vendors ADD COLUMN IF NOT EXISTS payment_methods JSONB');
+    } catch (e) {
+        console.log("Column payment_methods might already exist or error adding it.", e);
+    }
 
     // Create Users Table (For Buyers/Admins)
     await pool.query(`
@@ -175,42 +182,42 @@ export const seedDatabase = async () => {
       );
     `);
 
-    // Check if we need to seed initial data (only if empty)
-    const vendorCount = await pool.query('SELECT COUNT(*) FROM vendors');
-    
-    if (parseInt(vendorCount.rows[0].count) === 0) {
-      console.log('Seeding Vendors...');
-      for (const v of MOCK_VENDORS) {
-        await pool.query(`
-          INSERT INTO vendors (id, name, bio, avatar, verification_status, subscription_status, location, cover_image, email, subscription_plan, website, instagram, twitter)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        `, [v.id, v.name, v.bio, v.avatar, v.verificationStatus, v.subscriptionStatus, v.location, v.coverImage, v.email, v.subscriptionPlan, v.website, v.instagram, v.twitter]);
-      }
-    }
+    // Create Contact Submissions Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contact_submissions (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        email TEXT,
+        subject TEXT,
+        message TEXT,
+        date TEXT,
+        status TEXT
+      );
+    `);
 
-    const productCount = await pool.query('SELECT COUNT(*) FROM products');
-    if (parseInt(productCount.rows[0].count) === 0) {
-      console.log('Seeding Products...');
-      for (const p of MOCK_PRODUCTS) {
-        await pool.query(`
-          INSERT INTO products (id, name, designer, price, category, image, description, rating, is_new_season, stock, sizes, is_pre_order)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        `, [p.id, p.name, p.designer, p.price, p.category, p.image, p.description, p.rating, p.isNewSeason || false, p.stock, p.sizes, p.isPreOrder || false]);
-      }
-    }
+    // CLEAR DEMO DATA - ENSURE FRESH START
+    // This removes any data from previous demo sessions.
+    await pool.query('DELETE FROM products');
+    await pool.query('DELETE FROM vendors');
+    await pool.query('DELETE FROM orders');
+    // Note: We are not deleting 'users' indiscriminately to avoid locking out the admin immediately if they just registered, 
+    // but in a true "start fresh" scenario, we might. 
+    // For now, let's clear the business logic tables.
+    // If you want to clear users too, uncomment the next line:
+    // await pool.query('DELETE FROM users');
 
     // Seed CMS Content if empty
     const cmsCount = await pool.query('SELECT COUNT(*) FROM cms_content');
     if (parseInt(cmsCount.rows[0].count) === 0) {
-      console.log('Seeding CMS Content...');
+      console.log('Seeding Default CMS Content...');
       await pool.query(`
         INSERT INTO cms_content (id, data) VALUES ($1, $2)
       `, ['landing_page', JSON.stringify(DEFAULT_CMS_CONTENT)]);
     }
     
-    console.log('Database synced.');
+    console.log('Database initialized and cleaned for production.');
   } catch (err) {
-    console.error('Error seeding database:', err);
+    console.error('Error initializing database:', err);
     throw err; 
   }
 };
@@ -282,6 +289,24 @@ export const fetchLandingContent = async (): Promise<LandingPageContent> => {
   }
 };
 
+export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> => {
+  try {
+    const res = await pool.query('SELECT * FROM contact_submissions ORDER BY date DESC');
+    return res.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      subject: row.subject,
+      message: row.message,
+      date: row.date,
+      status: row.status as any
+    }));
+  } catch (e) {
+    console.error("Failed to fetch contact submissions", e);
+    return [];
+  }
+};
+
 // --- WRITE OPERATIONS (PRODUCTS) ---
 
 export const addProductToDb = async (product: Product) => {
@@ -308,16 +333,16 @@ export const deleteProductFromDb = async (productId: string) => {
 export const updateVendorInDb = async (vendor: Vendor) => {
   await pool.query(`
     UPDATE vendors
-    SET name=$2, bio=$3, avatar=$4, location=$5, cover_image=$6, email=$7, website=$8, instagram=$9, twitter=$10, subscription_plan=$11, subscription_status=$12, verification_status=$13
+    SET name=$2, bio=$3, avatar=$4, location=$5, cover_image=$6, email=$7, website=$8, instagram=$9, twitter=$10, subscription_plan=$11, subscription_status=$12, verification_status=$13, payment_methods=$14
     WHERE id=$1
-  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.location, vendor.coverImage, vendor.email, vendor.website, vendor.instagram, vendor.twitter, vendor.subscriptionPlan, vendor.subscriptionStatus, vendor.verificationStatus]);
+  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.location, vendor.coverImage, vendor.email, vendor.website, vendor.instagram, vendor.twitter, vendor.subscriptionPlan, vendor.subscriptionStatus, vendor.verificationStatus, JSON.stringify(vendor.paymentMethods || [])]);
 };
 
 export const createVendorInDb = async (vendor: Vendor) => {
   await pool.query(`
-    INSERT INTO vendors (id, name, bio, avatar, verification_status, subscription_status, location, cover_image, email, subscription_plan, website, instagram, twitter)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.website, vendor.instagram, vendor.twitter]);
+    INSERT INTO vendors (id, name, bio, avatar, verification_status, subscription_status, location, cover_image, email, subscription_plan, website, instagram, twitter, payment_methods)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.paymentMethods || [])]);
 };
 
 // --- WRITE OPERATIONS (USERS/BUYERS) ---
@@ -357,4 +382,17 @@ export const createOrderInDb = async (order: Order) => {
 
 export const updateOrderStatusInDb = async (orderId: string, status: string) => {
   await pool.query(`UPDATE orders SET status=$2 WHERE id=$1`, [orderId, status]);
+};
+
+// --- WRITE OPERATIONS (CONTACT) ---
+
+export const submitContactFormInDb = async (submission: ContactSubmission) => {
+  await pool.query(`
+    INSERT INTO contact_submissions (id, name, email, subject, message, date, status)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+  `, [submission.id, submission.name, submission.email, submission.subject, submission.message, submission.date, submission.status]);
+};
+
+export const updateContactStatusInDb = async (id: string, status: 'NEW' | 'READ' | 'ARCHIVED') => {
+  await pool.query(`UPDATE contact_submissions SET status=$2 WHERE id=$1`, [id, status]);
 };

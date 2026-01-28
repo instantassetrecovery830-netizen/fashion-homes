@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { Filter, ChevronDown, Heart } from 'lucide-react';
+import { Filter, ChevronDown, Heart, Camera, X } from 'lucide-react';
 import { Product, ViewState, Vendor } from '../types';
 
 interface MarketplaceViewProps {
@@ -8,6 +9,8 @@ interface MarketplaceViewProps {
   initialDesigner?: string | null;
   products: Product[];
   vendors: Vendor[];
+  customTitle?: string | null;
+  onClearFilter?: () => void;
 }
 
 const FILTERS = ['All', 'Outerwear', 'Bottoms', 'Knitwear', 'Footwear', 'Accessories'];
@@ -16,7 +19,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   onProductSelect, 
   initialDesigner, 
   products,
-  vendors
+  vendors,
+  customTitle,
+  onClearFilter
 }) => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeDesigner, setActiveDesigner] = useState('All Designers');
@@ -50,9 +55,22 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           
           {/* Top Row: Title + Designer Select */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-            <h1 className="text-4xl font-serif italic">Ready-to-Wear</h1>
+            <div className="flex items-center gap-4">
+                <h1 className="text-4xl font-serif italic">
+                    {customTitle || "Ready-to-Wear"}
+                </h1>
+                {customTitle && onClearFilter && (
+                    <button 
+                        onClick={onClearFilter}
+                        className="bg-gray-100 hover:bg-gray-200 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors"
+                    >
+                        <X size={12} /> Clear Search
+                    </button>
+                )}
+            </div>
             
             {/* Designer Dropdown */}
+            {!customTitle && (
             <div className="relative min-w-[240px]">
               <label className="text-[10px] uppercase tracking-widest text-gray-400 mb-2 block font-bold">Filter by Designer</label>
               <div className="relative group">
@@ -68,6 +86,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-black transition-colors" />
               </div>
             </div>
+            )}
           </div>
           
           {/* Bottom Row: Category Pills */}
@@ -99,12 +118,21 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
       <div className="max-w-7xl mx-auto px-6">
         {filteredProducts.length === 0 ? (
            <div className="py-24 text-center animate-fade-in">
-             <p className="text-xl font-serif italic text-gray-400 mb-4">No pieces found matching your criteria.</p>
+             <div className="flex justify-center mb-4">
+                {customTitle ? <Camera size={32} className="text-gray-300" /> : <Filter size={32} className="text-gray-300" />}
+             </div>
+             <p className="text-xl font-serif italic text-gray-400 mb-4">
+                 {customTitle ? "No visual matches found in our current collection." : "No pieces found matching your criteria."}
+             </p>
              <button 
-               onClick={() => {setActiveCategory('All'); setActiveDesigner('All Designers');}} 
+               onClick={() => {
+                   if (onClearFilter) onClearFilter();
+                   setActiveCategory('All'); 
+                   setActiveDesigner('All Designers');
+               }} 
                className="text-xs font-bold uppercase border-b border-black pb-1 hover:text-luxury-gold hover:border-luxury-gold transition-colors"
              >
-               Clear Filters
+               View Full Collection
              </button>
            </div>
         ) : (

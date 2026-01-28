@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera } from 'lucide-react';
 import { NAV_LINKS } from '../constants';
 import { UserRole, ViewState, CartItem, Order } from '../types';
 
@@ -18,6 +18,7 @@ interface LayoutProps {
   isLoggedIn: boolean;
   onLogout: () => void;
   onPlaceOrder?: (order: Order) => Promise<void>;
+  onVisualSearch?: (file: File) => Promise<void>;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -33,13 +34,17 @@ export const Layout: React.FC<LayoutProps> = ({
   currentView,
   isLoggedIn,
   onLogout,
-  onPlaceOrder
+  onPlaceOrder,
+  onVisualSearch
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [measurementError, setMeasurementError] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -55,6 +60,24 @@ export const Layout: React.FC<LayoutProps> = ({
     if (role === UserRole.ADMIN) onNavigate('ADMIN_PANEL');
     else if (role === UserRole.VENDOR) onNavigate('VENDOR_DASHBOARD');
     else onNavigate('BUYER_DASHBOARD');
+  };
+
+  const handleCameraClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onVisualSearch) {
+      setIsSearching(true);
+      try {
+        await onVisualSearch(file);
+      } finally {
+        setIsSearching(false);
+        // Reset input so same file can be selected again if needed
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleCheckout = async () => {
@@ -143,6 +166,24 @@ export const Layout: React.FC<LayoutProps> = ({
 
           {/* Icons */}
           <div className="flex items-center gap-4 md:gap-6">
+            {/* Visual Search */}
+            <div className="relative group">
+                <button 
+                    onClick={handleCameraClick}
+                    className="hover:text-luxury-gold transition-colors relative"
+                    title="Visual Search (Gemini)"
+                >
+                    {isSearching ? <Loader size={20} className="animate-spin text-luxury-gold" /> : <Camera size={20} />}
+                </button>
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    accept="image/*" 
+                    className="hidden" 
+                />
+            </div>
+
             <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
             
             {/* User / Auth Menu */}

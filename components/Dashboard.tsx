@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  PieChart, Pie, Cell, Area, AreaChart, Legend 
 } from 'recharts';
 import { 
   Package, Users, DollarSign, Activity, Settings, ToggleRight, 
@@ -10,20 +11,22 @@ import {
   Palette, Layout, Type, FileText, Newspaper, ExternalLink,
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield,
-  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu
+  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu, Wallet, Banknote, Bitcoin, ArrowLeft, Inbox
 } from 'lucide-react';
-import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent } from '../types';
-import { MOCK_PRODUCTS } from '../constants';
+import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission } from '../types';
 
+// Initial Empty Data for real-time start
 const SALES_DATA = [
-  { name: 'Mon', sales: 4000 },
-  { name: 'Tue', sales: 3000 },
-  { name: 'Wed', sales: 2000 },
-  { name: 'Thu', sales: 2780 },
-  { name: 'Fri', sales: 1890 },
-  { name: 'Sat', sales: 2390 },
-  { name: 'Sun', sales: 3490 },
+  { name: 'Mon', sales: 0 },
+  { name: 'Tue', sales: 0 },
+  { name: 'Wed', sales: 0 },
+  { name: 'Thu', sales: 0 },
+  { name: 'Fri', sales: 0 },
+  { name: 'Sat', sales: 0 },
+  { name: 'Sun', sales: 0 },
 ];
+
+const COLORS = ['#0a0a0a', '#C5A059', '#8B8580', '#E5E5E5', '#4A0404'];
 
 interface DashboardProps {
   role: UserRole;
@@ -44,31 +47,12 @@ interface DashboardProps {
   onUpdateUser?: (user: User) => Promise<void>;
   cmsContent?: LandingPageContent;
   onUpdateCMSContent?: (content: LandingPageContent) => Promise<void>;
+  contactSubmissions?: ContactSubmission[];
 }
 
-type DashboardTab = 'OVERVIEW' | 'PRODUCTS' | 'UPLOAD' | 'ORDERS' | 'SETTINGS' | 'MARKETPLACE' | 'PROFILE' | 'STORE_DESIGN' | 'SAVED' | 'FULFILLMENT' | 'SUBSCRIPTIONS' | 'FOLLOWERS' | 'SUBSCRIPTION_PLAN' | 'VERIFICATION' | 'USERS' | 'REVIEWS' | 'TRANSACTIONS' | 'STORE_PREVIEW' | 'CMS';
+type DashboardTab = 'OVERVIEW' | 'PRODUCTS' | 'UPLOAD' | 'ORDERS' | 'SETTINGS' | 'MARKETPLACE' | 'PROFILE' | 'STORE_DESIGN' | 'SAVED' | 'FULFILLMENT' | 'SUBSCRIPTIONS' | 'FOLLOWERS' | 'SUBSCRIPTION_PLAN' | 'VERIFICATION' | 'USERS' | 'REVIEWS' | 'TRANSACTIONS' | 'STORE_PREVIEW' | 'CMS' | 'PAYOUTS' | 'INBOX';
 
 const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '39', '40', '41', '42', 'One Size'];
-
-const MOCK_FOLLOWERS = [
-  { id: 'f1', name: 'Sophie L.', handle: '@sophie_style', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=150&auto=format&fit=crop', since: 'Oct 2023', status: 'ACTIVE' },
-  { id: 'f2', name: 'Arthur B.', handle: '@art_b', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop', since: 'Nov 2023', status: 'ACTIVE' },
-  { id: 'f3', name: 'Chloé M.', handle: '@chloe_paris', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop', since: 'Dec 2023', status: 'ACTIVE' },
-  { id: 'f4', name: 'James D.', handle: '@jd_design', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop', since: 'Jan 2024', status: 'ACTIVE' },
-];
-
-const MOCK_ADMIN_REVIEWS = [
-  { id: 'r1', productId: 'p1', productName: 'Asymmetric Silk Trench', author: 'Elena K.', rating: 5, content: 'The fabric quality is unmatched. Fits perfectly.', status: 'APPROVED', date: '2023-10-24' },
-  { id: 'r2', productId: 'p2', productName: 'Obsidian Cargo Pant', author: 'Marc D.', rating: 2, content: 'Stitching came loose after two wears. Disappointed given the price point.', status: 'FLAGGED', date: '2023-10-22' },
-  { id: 'r3', productId: 'p4', productName: 'Void Runner Sneakers', author: 'Sophie L.', rating: 5, content: 'Absolute fire. Comfortable and stylish.', status: 'APPROVED', date: '2023-10-20' },
-  { id: 'r4', productId: 'p1', productName: 'Asymmetric Silk Trench', author: 'Bot_User_99', rating: 1, content: 'SCAM SITE DO NOT BUY CLICK LINK HERE', status: 'PENDING', date: '2023-10-25' },
-];
-
-const MOCK_TRANSACTIONS = [
-  { id: 'tx_8823', date: '2023-10-24', customer: 'Alice V.', vendor: 'Maison Margaux', amount: 1250.00, platformFee: 187.50, status: 'CLEARED' },
-  { id: 'tx_8824', date: '2023-10-22', customer: 'James B.', vendor: 'KAIZEN Studios', amount: 890.00, platformFee: 133.50, status: 'CLEARED' },
-  { id: 'tx_8825', date: '2023-10-25', customer: 'Elena K.', vendor: 'Studio Null', amount: 1500.00, platformFee: 225.00, status: 'PENDING' },
-];
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -104,7 +88,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setVendors,
   orders = [],
   onUpdateOrderStatus,
-  products = MOCK_PRODUCTS,
+  products = [],
   users = [],
   onAddProduct,
   onUpdateProduct,
@@ -112,36 +96,51 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onProductSelect,
   onUpdateUser,
   cmsContent,
-  onUpdateCMSContent
+  onUpdateCMSContent,
+  contactSubmissions = []
 }) => {
   const isAdmin = role === UserRole.ADMIN;
   const isVendor = role === UserRole.VENDOR;
   const isBuyer = role === UserRole.BUYER;
   
-  // Assume current vendor is Maison Margaux for demo purposes if logged in as Vendor
-  const currentVendor = isVendor ? vendors.find(v => v.name === 'Maison Margaux') : null;
+  const currentVendor = isVendor && vendors.length > 0 ? vendors[0] : null;
+  
   const isSubscribed = currentVendor?.subscriptionStatus === 'ACTIVE';
   const isVerified = currentVendor?.verificationStatus === 'VERIFIED';
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('OVERVIEW');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [savedItems, setSavedItems] = useState<Product[]>(products.slice(0, 3)); 
-  const [followers, setFollowers] = useState(MOCK_FOLLOWERS);
-  // Use passed users from DB, fallback to mock if empty (though logic handles empty arrays)
-  const [adminReviews, setAdminReviews] = useState(MOCK_ADMIN_REVIEWS);
-  const [transactions, setTransactions] = useState(MOCK_TRANSACTIONS);
+  const [savedItems, setSavedItems] = useState<Product[]>([]); 
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [adminReviews, setAdminReviews] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // File Input Refs for Uploads
+  const productFileInputRef = useRef<HTMLInputElement>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
 
   // Editable Profile State
   const [profileForm, setProfileForm] = useState({
     name: currentVendor?.name || '',
-    email: currentVendor?.email || 'contact@myfitstore.com',
+    email: currentVendor?.email || '',
     avatar: currentVendor?.avatar || '',
     website: currentVendor?.website || '',
     instagram: currentVendor?.instagram || '',
     twitter: currentVendor?.twitter || ''
   });
   
+  // Payment Method State
+  const [isAddingPayout, setIsAddingPayout] = useState(false);
+  const [payoutForm, setPayoutForm] = useState<Partial<PaymentMethod>>({
+      type: 'BANK',
+      details: {}
+  });
+  
+  // Admin Vendor Inspection State
+  const [selectedVendorForDetails, setSelectedVendorForDetails] = useState<Vendor | null>(null);
+
   // CMS Form State
   const [cmsForm, setCmsForm] = useState<LandingPageContent | null>(null);
 
@@ -153,10 +152,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Store Design State
   const [storeDesign, setStoreDesign] = useState({
-    brandName: currentVendor?.name || 'Maison Margaux',
-    location: currentVendor?.location || 'Paris, France',
-    coverImage: currentVendor?.coverImage || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070',
-    bio: currentVendor?.bio || "Founded in 2023...",
+    brandName: currentVendor?.name || '',
+    location: currentVendor?.location || '',
+    coverImage: currentVendor?.coverImage || '',
+    bio: currentVendor?.bio || "",
     theme: 'Editorial',
     layout: 'Grid',
     accentColor: '#000000'
@@ -170,17 +169,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
     category: 'Outerwear',
     description: '',
     image: '',
-    designer: currentVendor?.name || 'Maison Margaux', 
+    designer: currentVendor?.name || '', 
     stock: 1, 
     sizes: ['S', 'M', 'L']
   });
 
   // Filter products for the current vendor view
   const vendorProducts = isVendor 
-    ? products.filter(p => p.designer === (currentVendor?.name || 'Maison Margaux'))
+    ? products.filter(p => p.designer === (currentVendor?.name || ''))
     : products; // Admin sees all
 
-  // Calculate stats dynamically
+  // Calculate stats dynamically for Vendors/Buyers (Original Logic)
   const stats = useMemo(() => {
     let revenue = 0;
     let activeOrders = 0;
@@ -212,6 +211,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [orders, isVendor, currentVendor]);
 
+  // Admin Specific Stats Calculation
+  const adminStats = useMemo(() => {
+    if (!isAdmin) return null;
+
+    const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
+    const avgOrderValue = totalRevenue / (orders.length || 1);
+    const pendingVerifications = vendors.filter(v => v.verificationStatus === 'PENDING').length;
+
+    // Category Distribution
+    const categoryCounts: Record<string, number> = {};
+    products.forEach(p => {
+        categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1;
+    });
+    const categoryData = Object.entries(categoryCounts).map(([name, value]) => ({ name, value }));
+
+    // Top Vendors
+    const vendorPerformance: Record<string, number> = {};
+    orders.forEach(o => {
+        o.items.forEach(item => {
+            vendorPerformance[item.designer] = (vendorPerformance[item.designer] || 0) + (item.price * item.quantity);
+        });
+    });
+    const topVendors = Object.entries(vendorPerformance)
+        .map(([name, revenue]) => ({ name, revenue }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+    return {
+        totalRevenue,
+        avgOrderValue,
+        pendingVerifications,
+        categoryData,
+        topVendors
+    };
+  }, [isAdmin, orders, vendors, products]);
+
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
   }, [initialTab]);
@@ -220,7 +255,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (currentVendor) {
       setProfileForm({
         name: currentVendor.name,
-        email: currentVendor.email || 'contact@myfitstore.com',
+        email: currentVendor.email || '',
         avatar: currentVendor.avatar,
         website: currentVendor.website || '',
         instagram: currentVendor.instagram || '',
@@ -229,12 +264,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setStoreDesign(prev => ({
         ...prev,
         brandName: currentVendor.name,
-        location: currentVendor.location || 'Paris, France',
-        coverImage: currentVendor.coverImage || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070',
+        location: currentVendor.location || '',
+        coverImage: currentVendor.coverImage || '',
         bio: currentVendor.bio
       }));
     }
   }, [currentVendor]);
+
+  // Generic File Upload Handler
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, onSuccess: (base64: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            onSuccess(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    }
+  };
 
   const handleEditProduct = (product: Product) => {
     setNewProduct(product);
@@ -250,7 +297,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       category: 'Outerwear', 
       description: '', 
       image: '', 
-      designer: currentVendor?.name || 'Maison Margaux', 
+      designer: currentVendor?.name || '', 
       stock: 1, 
       sizes: ['S', 'M', 'L'] 
     });
@@ -260,6 +307,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
     e.preventDefault();
     setIsSubmitting(true);
     
+    if (!currentVendor) {
+        alert("Vendor profile not found.");
+        setIsSubmitting(false);
+        return;
+    }
+
     if (!isSubscribed) {
         alert("Please subscribe to publish products.");
         setIsSubmitting(false);
@@ -284,7 +337,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 category: newProduct.category || 'Uncategorized',
                 description: newProduct.description || '',
                 image: newProduct.image || 'https://picsum.photos/600/800',
-                designer: currentVendor?.name || 'Maison Margaux',
+                designer: currentVendor.name,
                 rating: 0,
                 stock: newProduct.stock || 1,
                 isNewSeason: true,
@@ -297,7 +350,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         }
         
         setActiveTab('PRODUCTS');
-        setNewProduct({ name: '', price: 0, category: 'Outerwear', description: '', image: '', designer: currentVendor?.name || 'Maison Margaux', stock: 1, sizes: ['S', 'M', 'L'] });
+        setNewProduct({ name: '', price: 0, category: 'Outerwear', description: '', image: '', designer: currentVendor?.name || '', stock: 1, sizes: ['S', 'M', 'L'] });
     } catch (err) {
         alert('Failed to save product. Please try again.');
         console.error(err);
@@ -318,6 +371,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
       } finally {
         setIsSubmitting(false);
       }
+    }
+  };
+
+  const handleCmsImageUpload = (e: React.ChangeEvent<HTMLInputElement>, section: 'auth', field: 'loginImage' | 'registerImage') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setCmsForm(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                auth: {
+                    ...(prev.auth || { loginImage: '', registerImage: '' }),
+                    [field]: result
+                }
+            }
+        });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -351,6 +425,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setVendors(updatedVendors);
       alert("Storefront updated successfully.");
     }
+  };
+
+  // Payment Methods Handling
+  const handleAddPaymentMethod = () => {
+      if (!currentVendor || !setVendors) return;
+      
+      const newMethod: PaymentMethod = {
+          id: `pm_${Date.now()}`,
+          type: payoutForm.type as any,
+          details: payoutForm.details as any
+      };
+
+      const updatedMethods = [...(currentVendor.paymentMethods || []), newMethod];
+      
+      const updatedVendors = vendors.map(v => 
+        v.id === currentVendor.id 
+          ? { ...v, paymentMethods: updatedMethods } 
+          : v
+      );
+      
+      setVendors(updatedVendors);
+      setIsAddingPayout(false);
+      setPayoutForm({ type: 'BANK', details: {} });
+  };
+
+  const handleDeletePaymentMethod = (id: string) => {
+      if (!currentVendor || !setVendors) return;
+      
+      const updatedMethods = (currentVendor.paymentMethods || []).filter(pm => pm.id !== id);
+      
+      const updatedVendors = vendors.map(v => 
+        v.id === currentVendor.id 
+          ? { ...v, paymentMethods: updatedMethods } 
+          : v
+      );
+      setVendors(updatedVendors);
   };
 
   const removeFromSaved = (id: string) => {
@@ -437,6 +547,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
   
+  // ... Sidebar logic (omitted for brevity as it doesn't change much, but kept in full component)
   const getSidebarItems = () => {
     if (isBuyer) {
       return [
@@ -448,7 +559,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       ];
     }
     
-    // Base items for Vendor/Admin
     const items: { id: string; label: string; icon: any; action?: () => void }[] = [
       { id: 'OVERVIEW', label: 'Overview', icon: LayoutDashboard },
       { id: 'PRODUCTS', label: 'My Collection', icon: Shirt },
@@ -459,6 +569,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       items.push({ id: 'STORE_PREVIEW', label: 'View Live Store', icon: Store });
       items.push({ id: 'FULFILLMENT', label: 'Client Orders', icon: Truck });
       items.push({ id: 'ORDERS', label: 'My Purchases', icon: ShoppingBag });
+      items.push({ id: 'PAYOUTS', label: 'Payouts & Wallet', icon: Wallet });
       items.push({ id: 'FOLLOWERS', label: 'Followers', icon: Users });
       items.push({ id: 'STORE_DESIGN', label: 'Design Store', icon: Palette });
       items.push({ id: 'SUBSCRIPTION_PLAN', label: 'My Subscription', icon: Diamond });
@@ -469,6 +580,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     
     if (isAdmin) {
       items.push({ id: 'CMS', label: 'Content Management', icon: Layout });
+      items.push({ id: 'INBOX', label: 'Inbox', icon: Inbox });
       items.push({ id: 'ORDERS', label: 'All Orders', icon: Package });
       items.push({ id: 'VERIFICATION', label: 'Vendor Verification', icon: ShieldCheck });
       items.push({ id: 'SUBSCRIPTIONS', label: 'Subscriptions', icon: Users });
@@ -531,1114 +643,724 @@ export const Dashboard: React.FC<DashboardProps> = ({
     </div>
   );
 
-  const renderCMS = () => {
-    if (!cmsForm) return <Loader className="animate-spin mx-auto mt-20" />;
-
-    return (
-      <div className="space-y-8 animate-fade-in max-w-4xl">
-        {/* Landing Page Content */}
-        <div className="bg-white border border-gray-100 p-8 shadow-sm">
-          <h2 className="text-xl font-bold uppercase tracking-widest mb-6">Landing Page</h2>
-          
-          <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Hero Section</h3>
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Title Line 1</label>
-                 <input 
-                    value={cmsForm.hero.titleLine1}
-                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, titleLine1: e.target.value}})}
-                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                 />
-              </div>
-              <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Title Line 2</label>
-                 <input 
-                    value={cmsForm.hero.titleLine2}
-                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, titleLine2: e.target.value}})}
-                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                 />
-              </div>
-            </div>
-            <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Subtitle</label>
-                 <input 
-                    value={cmsForm.hero.subtitle}
-                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, subtitle: e.target.value}})}
-                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                 />
-            </div>
-             <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">CTA Button Text</label>
-                 <input 
-                    value={cmsForm.hero.buttonText}
-                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, buttonText: e.target.value}})}
-                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                 />
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-               <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Video URL (MP4)</label>
-                 <input 
-                    value={cmsForm.hero.videoUrl}
-                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, videoUrl: e.target.value}})}
-                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                 />
-                 <div className="text-[10px] text-gray-400">Background video for the landing page.</div>
-              </div>
-              <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Poster Image URL</label>
-                 <input 
-                    value={cmsForm.hero.posterUrl}
-                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, posterUrl: e.target.value}})}
-                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                 />
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Auth Page Section */}
-        <div className="bg-white border border-gray-100 p-8 shadow-sm">
-           <h2 className="text-xl font-bold uppercase tracking-widest mb-6">Authentication Visuals</h2>
-           <div className="grid grid-cols-2 gap-6">
-               <div className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Login Cover Image</label>
-                   <input 
-                      value={cmsForm.auth?.loginImage || ''}
-                      onChange={e => setCmsForm({...cmsForm, auth: {...(cmsForm.auth || { loginImage: '', registerImage: '' }), loginImage: e.target.value}})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                   />
-               </div>
-               <div className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Register Cover Image</label>
-                   <input 
-                      value={cmsForm.auth?.registerImage || ''}
-                      onChange={e => setCmsForm({...cmsForm, auth: {...(cmsForm.auth || { loginImage: '', registerImage: '' }), registerImage: e.target.value}})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                   />
-               </div>
-           </div>
-        </div>
-
-        {/* Marquee */}
-        <div className="bg-white border border-gray-100 p-8 shadow-sm">
-           <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Marquee Banner</h3>
-           <div className="space-y-2">
-               <label className="text-xs text-gray-500 uppercase tracking-widest">Scroll Text (Separate by '•')</label>
-               <input 
-                  value={cmsForm.marquee.text}
-                  onChange={e => setCmsForm({...cmsForm, marquee: {...cmsForm.marquee, text: e.target.value}})}
-                  className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-               />
-           </div>
-        </div>
-
-        {/* Campaign Section */}
-        <div className="bg-white border border-gray-100 p-8 shadow-sm">
-           <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Campaign Visuals</h3>
-           <div className="grid grid-cols-2 gap-6 mb-6">
-             <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Title</label>
-                 <input 
-                    value={cmsForm.campaign.title}
-                    onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, title: e.target.value}})}
-                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                 />
-             </div>
-             <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Subtitle</label>
-                 <input 
-                    value={cmsForm.campaign.subtitle}
-                    onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, subtitle: e.target.value}})}
-                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                 />
-             </div>
-           </div>
-           
-           <div className="grid grid-cols-2 gap-6">
-              {[1, 2, 3, 4].map((num) => (
-                <div key={num} className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Image {num} URL</label>
-                   <div className="flex gap-2">
-                     <div className="w-12 h-12 bg-gray-100 shrink-0 overflow-hidden">
-                       <img src={(cmsForm.campaign as any)[`image${num}`]} alt="" className="w-full h-full object-cover" />
-                     </div>
-                     <input 
-                        value={(cmsForm.campaign as any)[`image${num}`]}
-                        onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, [`image${num}`]: e.target.value}})}
-                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                     />
-                   </div>
-                </div>
-              ))}
-           </div>
-           
-           <div className="space-y-2 mt-6">
-               <label className="text-xs text-gray-500 uppercase tracking-widest">Overlay Text (Image 1)</label>
-               <input 
-                  value={cmsForm.campaign.overlayText1}
-                  onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, overlayText1: e.target.value}})}
-                  className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-               />
-           </div>
-        </div>
-
-        {/* About Page Section */}
-        <div className="bg-white border border-gray-100 p-8 shadow-sm">
-           <h2 className="text-xl font-bold uppercase tracking-widest mb-6">About / Contact Page</h2>
-           
-           {/* About Hero */}
-           <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Hero Section</h3>
-           <div className="space-y-6 mb-8">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Title</label>
-                   <input 
-                      value={cmsForm.about.hero.title}
-                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, title: e.target.value}}})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                   />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Subtitle</label>
-                   <input 
-                      value={cmsForm.about.hero.subtitle}
-                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, subtitle: e.target.value}}})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                   />
-                </div>
-              </div>
-              <div className="space-y-2">
-                  <label className="text-xs text-gray-500 uppercase tracking-widest">Description</label>
-                  <textarea 
-                     value={cmsForm.about.hero.description}
-                     onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, description: e.target.value}}})}
-                     className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-20 resize-none"
-                  />
-              </div>
-              <div className="space-y-2">
-                 <label className="text-xs text-gray-500 uppercase tracking-widest">Hero Image URL</label>
-                 <input 
-                    value={cmsForm.about.hero.imageUrl}
-                    onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, imageUrl: e.target.value}}})}
-                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                 />
-              </div>
-           </div>
-
-           {/* Philosophy */}
-           <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Philosophy Section</h3>
-           <div className="space-y-6 mb-8">
-               <div className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Section Title</label>
-                   <input 
-                      value={cmsForm.about.philosophy.title}
-                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, title: e.target.value}}})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                   />
-               </div>
-               <div className="grid grid-cols-2 gap-6">
-                   <div className="space-y-2">
-                       <label className="text-xs text-gray-500 uppercase tracking-widest">Paragraph 1</label>
-                       <textarea 
-                          value={cmsForm.about.philosophy.description1}
-                          onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description1: e.target.value}}})}
-                          className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32 resize-none"
-                       />
-                   </div>
-                   <div className="space-y-2">
-                       <label className="text-xs text-gray-500 uppercase tracking-widest">Paragraph 2</label>
-                       <textarea 
-                          value={cmsForm.about.philosophy.description2}
-                          onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description2: e.target.value}}})}
-                          className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32 resize-none"
-                       />
-                   </div>
-               </div>
-               <div className="grid grid-cols-2 gap-6">
-                   <div className="space-y-2">
-                       <label className="text-xs text-gray-500 uppercase tracking-widest">Image 1 URL</label>
-                       <input 
-                          value={cmsForm.about.philosophy.image1}
-                          onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, image1: e.target.value}}})}
-                          className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                       />
-                   </div>
-                   <div className="space-y-2">
-                       <label className="text-xs text-gray-500 uppercase tracking-widest">Image 2 URL</label>
-                       <input 
-                          value={cmsForm.about.philosophy.image2}
-                          onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, image2: e.target.value}}})}
-                          className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                       />
-                   </div>
-               </div>
-           </div>
-
-           {/* Contact Info */}
-           <h3 className="text-lg font-serif italic mb-6 border-b border-gray-50 pb-2">Contact Details</h3>
-           <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Address</label>
-                   <textarea 
-                      value={cmsForm.about.contact.address}
-                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, address: e.target.value}}})}
-                      className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-20 resize-none"
-                   />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Email</label>
-                   <input 
-                      value={cmsForm.about.contact.email}
-                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, email: e.target.value}}})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                   />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Phone</label>
-                   <input 
-                      value={cmsForm.about.contact.phone}
-                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, phone: e.target.value}}})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                   />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-xs text-gray-500 uppercase tracking-widest">Business Hours</label>
-                   <input 
-                      value={cmsForm.about.contact.hours}
-                      onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, hours: e.target.value}}})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                   />
-                </div>
-           </div>
-        </div>
-
-        {/* Save Actions */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 flex justify-end gap-4 z-20 md:pl-64">
-           <button 
-             onClick={handleSaveCMS}
-             disabled={isSubmitting}
-             className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2 disabled:opacity-50"
-           >
-             {isSubmitting ? <Loader className="animate-spin" size={16} /> : <Save size={16} />}
-             Publish Changes
-           </button>
-        </div>
-        <div className="h-16" /> {/* Spacer for fixed footer */}
-      </div>
-    );
-  };
-
-  const renderProducts = () => (
-    <div className="space-y-6 animate-fade-in">
-       <div className="flex justify-between items-center">
-         <h3 className="text-lg font-serif italic">Collection Inventory</h3>
-         <button onClick={() => setActiveTab('UPLOAD')} className="bg-black text-white px-6 py-2 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2">
-            <Plus size={14} /> Add Piece
-         </button>
-       </div>
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {vendorProducts.map(product => (
-             <div key={product.id} className="bg-white p-4 border border-gray-100 shadow-sm flex gap-4 group">
-                <div className="w-24 h-32 bg-gray-50 shrink-0 overflow-hidden">
-                   <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                </div>
-                <div className="flex-1 flex flex-col justify-between">
-                   <div>
-                      <h4 className="font-bold text-sm uppercase tracking-wide truncate">{product.name}</h4>
-                      <p className="text-xs text-gray-500 mb-2">${product.price}</p>
-                      <div className="flex flex-wrap gap-1">
-                         {product.sizes?.map(s => <span key={s} className="text-[10px] bg-gray-100 px-1">{s}</span>)}
-                      </div>
-                   </div>
-                   <div className="flex gap-2 mt-4">
-                      <button onClick={() => handleEditProduct(product)} className="text-xs font-bold uppercase hover:text-luxury-gold flex items-center gap-1"><Edit2 size={12}/> Edit</button>
-                      <button onClick={() => onDeleteProduct && onDeleteProduct(product.id)} className="text-xs font-bold uppercase text-red-500 hover:text-red-700 flex items-center gap-1"><Trash2 size={12}/> Remove</button>
-                   </div>
-                </div>
-             </div>
-          ))}
-       </div>
-    </div>
-  );
-
-  const renderUpload = () => (
-    <div className="max-w-2xl bg-white p-8 border border-gray-100 shadow-sm animate-fade-in mx-auto">
-        <h3 className="text-xl font-serif italic mb-6">{isEditing ? 'Edit Piece' : 'New Creation'}</h3>
-        <form onSubmit={handleUpload} className="space-y-6">
-            <div>
-               <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Product Name</label>
-               <input 
-                 value={newProduct.name}
-                 onChange={e => setNewProduct({...newProduct, name: e.target.value})}
-                 className="w-full border-b border-gray-200 py-2 focus:border-black outline-none font-serif text-lg"
-                 placeholder="e.g. Asymmetric Silk Trench"
-                 required
-               />
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-               <div>
-                 <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Price ($)</label>
-                 <input 
-                   type="number"
-                   value={newProduct.price}
-                   onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})}
-                   className="w-full border-b border-gray-200 py-2 focus:border-black outline-none"
-                   required
-                 />
-               </div>
-               <div>
-                 <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Category</label>
-                 <select 
-                   value={newProduct.category}
-                   onChange={e => setNewProduct({...newProduct, category: e.target.value})}
-                   className="w-full border-b border-gray-200 py-2 focus:border-black outline-none bg-transparent"
-                 >
-                   {['Outerwear', 'Bottoms', 'Knitwear', 'Footwear', 'Accessories', 'Clothing'].map(c => <option key={c} value={c}>{c}</option>)}
-                 </select>
-               </div>
-            </div>
-            <div>
-               <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Description</label>
-               <textarea 
-                 value={newProduct.description}
-                 onChange={e => setNewProduct({...newProduct, description: e.target.value})}
-                 className="w-full border border-gray-200 p-4 focus:border-black outline-none h-32 resize-none"
-                 required
-               />
-            </div>
-            <div>
-               <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Image URL</label>
-               <input 
-                 value={newProduct.image}
-                 onChange={e => setNewProduct({...newProduct, image: e.target.value})}
-                 className="w-full border-b border-gray-200 py-2 focus:border-black outline-none"
-                 placeholder="https://..."
-                 required
-               />
-               {newProduct.image && (
-                  <img src={newProduct.image} alt="Preview" className="mt-4 w-24 h-32 object-cover bg-gray-50" />
-               )}
-            </div>
-             <div>
-               <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Sizes</label>
-               <div className="flex flex-wrap gap-2">
-                 {STANDARD_SIZES.map(size => (
-                   <button
-                     key={size}
-                     type="button"
-                     onClick={() => {
-                        const currentSizes = newProduct.sizes || [];
-                        const newSizes = currentSizes.includes(size) 
-                          ? currentSizes.filter(s => s !== size)
-                          : [...currentSizes, size];
-                        setNewProduct({...newProduct, sizes: newSizes});
-                     }}
-                     className={`px-3 py-1 border text-xs transition-colors ${
-                       newProduct.sizes?.includes(size) ? 'bg-black text-white border-black' : 'border-gray-200 text-gray-400 hover:border-black'
-                     }`}
-                   >
-                     {size}
-                   </button>
-                 ))}
-               </div>
-            </div>
-             <div className="flex items-center gap-2 pt-2">
-               <input 
-                 type="checkbox" 
-                 id="preOrder"
-                 checked={newProduct.isPreOrder} 
-                 onChange={e => setNewProduct({...newProduct, isPreOrder: e.target.checked})}
-                 className="w-4 h-4 text-black border-gray-300 focus:ring-black"
-               />
-               <label htmlFor="preOrder" className="text-xs font-bold uppercase tracking-widest cursor-pointer select-none">Mark as Made-to-Order / Pre-Order</label>
-            </div>
-            
-            <div className="flex gap-4 pt-6">
-                <button type="submit" disabled={isSubmitting} className="flex-1 bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex justify-center gap-2">
-                    {isSubmitting ? <Loader className="animate-spin" size={16} /> : (isEditing ? 'Save Changes' : 'Upload Piece')}
-                </button>
-                {isEditing && (
-                    <button type="button" onClick={handleCancelEdit} className="px-8 border border-gray-200 text-xs font-bold uppercase tracking-widest hover:border-black transition-colors">
-                        Cancel
-                    </button>
-                )}
-            </div>
-        </form>
-    </div>
-  );
-
-  const renderOrders = () => (
-    <div className="space-y-6 animate-fade-in">
-        <h3 className="text-lg font-serif italic mb-4">Order History</h3>
-        {orders.map(order => (
-            <div key={order.id} className="bg-white p-6 border border-gray-100 shadow-sm">
-                <div className="flex justify-between items-start mb-4 border-b border-gray-50 pb-4">
-                    <div>
-                        <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Order #{order.id}</span>
-                        <p className="font-serif text-lg">{order.date}</p>
-                    </div>
-                    <div className="text-right">
-                         <span className={`text-[10px] font-bold uppercase px-2 py-1 ${order.status === 'Delivered' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                             {order.status}
-                         </span>
-                         <p className="font-bold mt-1">${order.total}</p>
-                    </div>
-                </div>
-                <div className="space-y-4">
-                    {order.items.map((item, i) => (
-                        <div key={i} className="flex items-center gap-4">
-                            <div className="w-12 h-16 bg-gray-50 overflow-hidden">
-                                <img src={item.image} className="w-full h-full object-cover" />
-                            </div>
-                            <div className="flex-1">
-                                <h4 className="text-sm font-bold">{item.name}</h4>
-                                <p className="text-xs text-gray-500">Size: {item.size} | Qty: {item.quantity}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        ))}
-    </div>
-  );
-
-  const renderFulfillment = () => {
-    // Filter items that belong to this vendor within orders
-    const vendorOrders = orders.filter(o => o.items.some(i => i.designer === currentVendor?.name));
-
-    return (
-        <div className="space-y-6 animate-fade-in">
-             <h3 className="text-lg font-serif italic mb-4">Orders to Fulfill</h3>
-             {vendorOrders.length === 0 ? <p className="text-gray-400">No active orders.</p> : vendorOrders.map(order => (
-                 <div key={order.id} className="bg-white p-6 border border-gray-100 shadow-sm relative">
-                    <div className="flex justify-between items-start mb-6">
-                        <div>
-                            <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Order #{order.id}</span>
-                            <h4 className="font-serif text-xl">{order.customerName}</h4>
-                            <p className="text-xs text-gray-400">{order.date}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                            <select 
-                                value={order.status}
-                                onChange={(e) => onUpdateOrderStatus && onUpdateOrderStatus(order.id, e.target.value as any)}
-                                className="text-xs font-bold uppercase border border-gray-200 p-2 outline-none focus:border-black cursor-pointer"
-                            >
-                                <option value="Processing">Processing</option>
-                                <option value="Shipped">Shipped</option>
-                                <option value="Delivered">Delivered</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-4 border-t border-gray-50 pt-4">
-                        {order.items.filter(i => i.designer === currentVendor?.name).map((item, idx) => (
-                            <div key={idx} className="flex gap-4 items-start">
-                                <img src={item.image} className="w-16 h-20 object-cover bg-gray-50" />
-                                <div>
-                                    <h5 className="font-bold text-sm">{item.name}</h5>
-                                    <p className="text-xs text-gray-500">Size: {item.size}</p>
-                                    {item.measurements && (
-                                        <div className="mt-2 bg-yellow-50 p-2 text-[10px] text-yellow-800 border border-yellow-100 max-w-sm">
-                                            <span className="font-bold block mb-1">Custom Measurements:</span>
-                                            {item.measurements}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                 </div>
-             ))}
-        </div>
-    )
-  };
-
-  const renderSettings = () => (
-      <div className="max-w-2xl bg-white p-8 border border-gray-100 shadow-sm animate-fade-in">
-          <h3 className="text-lg font-serif italic mb-6">Platform Configuration</h3>
-          <div className="space-y-6">
-              {Object.entries(featureFlags).map(([key, value]) => (
-                  <div key={key} className="flex justify-between items-center py-4 border-b border-gray-50 last:border-0">
-                      <div>
-                          <p className="font-bold text-sm uppercase tracking-wide">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                          <p className="text-xs text-gray-400 mt-1">Toggle system availability</p>
-                      </div>
-                      <button 
-                          onClick={() => toggleFeatureFlag(key as keyof FeatureFlags)}
-                          className={`w-12 h-6 rounded-full transition-colors relative ${value ? 'bg-luxury-gold' : 'bg-gray-200'}`}
-                      >
-                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${value ? 'left-7' : 'left-1'}`} />
-                      </button>
-                  </div>
-              ))}
-          </div>
-      </div>
-  );
-
-  const renderProfile = () => (
-      <div className="max-w-2xl bg-white p-8 border border-gray-100 shadow-sm animate-fade-in mx-auto">
-          <h3 className="text-lg font-serif italic mb-6">Profile Details</h3>
-          <div className="space-y-6">
-              <div className="flex items-center gap-6">
-                  <div className="w-20 h-20 rounded-full bg-gray-50 overflow-hidden">
-                      <img src={profileForm.avatar} className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1 block">Avatar URL</label>
-                      <input 
-                          value={profileForm.avatar}
-                          onChange={(e) => setProfileForm({...profileForm, avatar: e.target.value})}
-                          className="w-full border-b border-gray-200 py-1 text-sm focus:border-black outline-none"
-                      />
-                  </div>
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                  <div>
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Name</label>
-                      <input 
-                          value={profileForm.name}
-                          onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
-                          className="w-full border-b border-gray-200 py-2 focus:border-black outline-none"
-                      />
-                  </div>
-                  <div>
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Email</label>
-                      <input 
-                          value={profileForm.email}
-                          onChange={(e) => setProfileForm({...profileForm, email: e.target.value})}
-                          className="w-full border-b border-gray-200 py-2 focus:border-black outline-none"
-                      />
-                  </div>
-              </div>
-              
-              <div className="space-y-4 pt-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Social Connections</p>
-                  <div className="flex items-center gap-2">
-                      <Globe size={16} className="text-gray-400" />
-                      <input 
-                          placeholder="Website URL"
-                          value={profileForm.website}
-                          onChange={(e) => setProfileForm({...profileForm, website: e.target.value})}
-                          className="flex-1 border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                      />
-                  </div>
-                  <div className="flex items-center gap-2">
-                      <Instagram size={16} className="text-gray-400" />
-                      <input 
-                          placeholder="Instagram Handle"
-                          value={profileForm.instagram}
-                          onChange={(e) => setProfileForm({...profileForm, instagram: e.target.value})}
-                          className="flex-1 border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                      />
-                  </div>
-                  <div className="flex items-center gap-2">
-                      <Twitter size={16} className="text-gray-400" />
-                      <input 
-                          placeholder="Twitter Handle"
-                          value={profileForm.twitter}
-                          onChange={(e) => setProfileForm({...profileForm, twitter: e.target.value})}
-                          className="flex-1 border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                      />
-                  </div>
-              </div>
-
-              <button onClick={handleSaveProfile} className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors mt-4">
-                  Save Changes
-              </button>
-          </div>
-      </div>
-  );
-
-  const renderStoreDesign = () => (
-       <div className="max-w-2xl bg-white p-8 border border-gray-100 shadow-sm animate-fade-in mx-auto">
-          <h3 className="text-lg font-serif italic mb-6">Storefront Aesthetics</h3>
-          <div className="space-y-6">
-              <div>
-                  <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Cover Image URL</label>
-                  <input 
-                      value={storeDesign.coverImage}
-                      onChange={(e) => setStoreDesign({...storeDesign, coverImage: e.target.value})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                  />
-                  <div className="mt-4 h-32 w-full bg-gray-50 overflow-hidden relative">
-                      <img src={storeDesign.coverImage} className="w-full h-full object-cover opacity-80" />
-                      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold uppercase bg-black/10 text-white">Preview</span>
-                  </div>
-              </div>
-              <div>
-                  <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Brand Bio</label>
-                  <textarea 
-                      value={storeDesign.bio}
-                      onChange={(e) => setStoreDesign({...storeDesign, bio: e.target.value})}
-                      className="w-full border border-gray-200 p-4 focus:border-black outline-none h-32 resize-none"
-                  />
-              </div>
-              <div>
-                  <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 block">Location</label>
-                  <input 
-                      value={storeDesign.location}
-                      onChange={(e) => setStoreDesign({...storeDesign, location: e.target.value})}
-                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
-                  />
-              </div>
-              <button onClick={handleSaveStoreDesign} className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors mt-4">
-                  Update Storefront
-              </button>
-          </div>
-       </div>
-  );
-
-  const renderSaved = () => (
+  const renderInbox = () => (
       <div className="space-y-6 animate-fade-in">
-          <h3 className="text-lg font-serif italic mb-4">Wishlist</h3>
-          {savedItems.length === 0 ? (
-              <p className="text-gray-400">Your wishlist is empty.</p>
+          <h3 className="text-lg font-serif italic mb-4">Messages & Inquiries</h3>
+          {contactSubmissions && contactSubmissions.length > 0 ? (
+              <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
+                  <table className="w-full text-left text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-100">
+                          <tr>
+                              <th className="p-4 font-bold uppercase text-xs text-gray-500">Sender</th>
+                              <th className="p-4 font-bold uppercase text-xs text-gray-500">Subject</th>
+                              <th className="p-4 font-bold uppercase text-xs text-gray-500">Date</th>
+                              <th className="p-4 font-bold uppercase text-xs text-gray-500">Status</th>
+                              <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Action</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                          {contactSubmissions.map((msg) => (
+                              <tr key={msg.id} className="hover:bg-gray-50/50">
+                                  <td className="p-4">
+                                      <p className="font-bold text-sm">{msg.name}</p>
+                                      <p className="text-xs text-gray-400">{msg.email}</p>
+                                  </td>
+                                  <td className="p-4">
+                                      <p className="font-medium text-sm">{msg.subject}</p>
+                                      <p className="text-xs text-gray-500 line-clamp-1">{msg.message}</p>
+                                  </td>
+                                  <td className="p-4 text-xs text-gray-500">
+                                      {new Date(msg.date).toLocaleDateString()}
+                                  </td>
+                                  <td className="p-4">
+                                      <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${msg.status === 'NEW' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+                                          {msg.status}
+                                      </span>
+                                  </td>
+                                  <td className="p-4 text-right">
+                                      <button className="text-xs font-bold underline hover:text-luxury-gold">View</button>
+                                  </td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
           ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {savedItems.map(product => (
-                      <div key={product.id} className="group cursor-pointer relative" onClick={() => onProductSelect && onProductSelect(product)}>
-                          <div className="aspect-[3/4] bg-gray-100 overflow-hidden mb-4 relative">
-                              <img src={product.image} className="w-full h-full object-cover" />
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); removeFromSaved(product.id); }}
-                                className="absolute top-2 right-2 bg-white/80 p-2 hover:text-red-500 transition-colors"
-                              >
-                                  <Trash2 size={16} />
-                              </button>
-                          </div>
-                          <h4 className="font-bold text-xs uppercase tracking-wide">{product.designer}</h4>
-                          <p className="text-sm text-gray-600">{product.name}</p>
-                          <p className="text-sm font-medium mt-1">${product.price}</p>
-                      </div>
-                  ))}
+              <div className="p-12 text-center text-gray-400 border border-dashed border-gray-200 bg-white">
+                  <Mail size={32} className="mx-auto mb-4 opacity-50" />
+                  <p>No messages in inbox.</p>
               </div>
           )}
       </div>
   );
 
-  const renderSubscriptions = () => (
-      <div className="space-y-6 animate-fade-in">
-          <h3 className="text-lg font-serif italic mb-4">Vendor Subscriptions</h3>
-          <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
-             <table className="w-full text-left text-sm">
-                 <thead className="bg-gray-50 border-b border-gray-100">
-                     <tr>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Vendor</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Plan</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Status</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Action</th>
-                     </tr>
-                 </thead>
-                 <tbody>
-                     {vendors.map(v => (
-                         <tr key={v.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
-                             <td className="p-4 flex items-center gap-3">
-                                 <div className="w-8 h-8 bg-gray-200 rounded-full overflow-hidden">
-                                     <img src={v.avatar} className="w-full h-full object-cover" />
-                                 </div>
-                                 <span className="font-bold">{v.name}</span>
-                             </td>
-                             <td className="p-4"><span className="text-xs bg-gray-100 px-2 py-1 uppercase">{v.subscriptionPlan}</span></td>
-                             <td className="p-4">
-                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${v.subscriptionStatus === 'ACTIVE' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                                     {v.subscriptionStatus}
-                                 </span>
-                             </td>
-                             <td className="p-4 text-right">
-                                 <button 
-                                   onClick={() => handleSubscriptionToggle(v.id)}
-                                   className="text-xs font-bold underline hover:text-luxury-gold"
-                                 >
-                                     {v.subscriptionStatus === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                                 </button>
-                             </td>
-                         </tr>
-                     ))}
-                 </tbody>
-             </table>
-          </div>
-      </div>
-  );
-
-  const renderVerification = () => (
-    <div className="space-y-6 animate-fade-in">
-        <h3 className="text-lg font-serif italic mb-4">Pending Verifications</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {vendors.filter(v => v.verificationStatus === 'PENDING').length === 0 && <p className="text-gray-400">No pending verifications.</p>}
-            {vendors.filter(v => v.verificationStatus === 'PENDING').map(v => (
-                <div key={v.id} className="bg-white p-6 border border-gray-100 shadow-sm flex items-start justify-between">
-                    <div className="flex gap-4">
-                        <div className="w-16 h-16 bg-gray-100 shrink-0">
-                            <img src={v.avatar} className="w-full h-full object-cover" />
+  const renderOverview = () => {
+    // Admin Dashboard View
+    if (isAdmin && adminStats) {
+        return (
+            <div className="space-y-8 animate-fade-in">
+                {/* Header & KPI Cards */}
+                <div>
+                    <h2 className="text-3xl font-serif italic mb-6">System Analytics</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        {/* Revenue Card */}
+                        <div className="bg-luxury-black text-white p-6 shadow-sm">
+                            <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Total Volume</p>
+                            <p className="text-3xl font-bold font-serif italic">${adminStats.totalRevenue.toLocaleString()}</p>
+                            <div className="mt-4 text-[10px] flex items-center gap-1 text-green-400">
+                                <ArrowUpRight size={10} /> +12.5% vs last week
+                            </div>
                         </div>
-                        <div>
-                            <h4 className="font-bold uppercase tracking-wide">{v.name}</h4>
-                            <p className="text-xs text-gray-500 mb-2">{v.location}</p>
-                            <a href={v.website} target="_blank" className="text-xs underline text-blue-500 flex items-center gap-1"><ExternalLink size={10} /> Website</a>
+                        {/* Users Card */}
+                        <div className="bg-white border border-gray-100 p-6 shadow-sm">
+                            <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Total Users</p>
+                            <p className="text-3xl font-bold">{users.length.toLocaleString()}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{vendors.length} Vendors / {users.length - vendors.length} Buyers</p>
                         </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                        <button onClick={() => handleVerificationStatus(v.id, 'VERIFIED')} className="bg-black text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-green-600 transition-colors">Approve</button>
-                        <button onClick={() => handleVerificationStatus(v.id, 'REJECTED')} className="border border-gray-200 px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:border-red-500 hover:text-red-500 transition-colors">Reject</button>
+                        {/* Orders Card */}
+                        <div className="bg-white border border-gray-100 p-6 shadow-sm">
+                            <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Total Orders</p>
+                            <p className="text-3xl font-bold">{orders.length.toLocaleString()}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">Avg. Order: ${adminStats.avgOrderValue.toFixed(0)}</p>
+                        </div>
+                        {/* Action Card */}
+                        <div className="bg-luxury-gold text-white p-6 shadow-sm">
+                            <p className="text-xs uppercase tracking-widest text-white/80 mb-1">Pending Actions</p>
+                            <p className="text-3xl font-bold">{adminStats.pendingVerifications}</p>
+                            <button onClick={() => setActiveTab('VERIFICATION')} className="mt-4 text-[10px] font-bold uppercase underline hover:text-black transition-colors">
+                                Review Applications
+                            </button>
+                        </div>
                     </div>
                 </div>
-            ))}
+
+                {/* Charts Row 1 */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Revenue Area Chart */}
+                    <div className="lg:col-span-2 bg-white p-8 border border-gray-100 shadow-sm">
+                        <h3 className="text-lg font-bold mb-6">Revenue Trajectory</h3>
+                        <div className="h-72 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={SALES_DATA}>
+                                    <defs>
+                                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#000000" stopOpacity={0.1}/>
+                                            <stop offset="95%" stopColor="#000000" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
+                                    <Tooltip contentStyle={{border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', fontSize: '12px'}} />
+                                    <Area type="monotone" dataKey="sales" stroke="#000000" fillOpacity={1} fill="url(#colorSales)" strokeWidth={2} />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Categories Pie Chart */}
+                    <div className="bg-white p-8 border border-gray-100 shadow-sm">
+                        <h3 className="text-lg font-bold mb-6">Category Split</h3>
+                        <div className="h-72 w-full relative">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={adminStats.categoryData}
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {adminStats.categoryData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                </PieChart>
+                            </ResponsiveContainer>
+                            {/* Center Text */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
+                                <span className="text-xs font-bold text-gray-400 uppercase">Mix</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bottom Row: Top Vendors & Recent Activity */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="bg-white p-8 border border-gray-100 shadow-sm">
+                        <h3 className="text-lg font-bold mb-6">Top Performing Ateliers</h3>
+                        <div className="space-y-4">
+                            {adminStats.topVendors.map((v, i) => (
+                                <div key={i} className="flex justify-between items-center border-b border-gray-50 pb-4 last:border-0">
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-2xl font-serif italic text-gray-300">0{i+1}</span>
+                                        <p className="font-bold text-sm">{v.name}</p>
+                                    </div>
+                                    <p className="font-mono text-sm">${v.revenue.toLocaleString()}</p>
+                                </div>
+                            ))}
+                            {adminStats.topVendors.length === 0 && <p className="text-gray-400 italic">No sales data yet.</p>}
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-8 border border-gray-100 shadow-sm">
+                        <h3 className="text-lg font-bold mb-6">Recent System Events</h3>
+                        <div className="space-y-6">
+                            {orders.slice(0, 5).map(o => (
+                                <div key={o.id} className="flex items-start gap-3">
+                                    <div className="mt-1 p-1.5 bg-green-100 text-green-600 rounded-full">
+                                        <DollarSign size={10} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-gray-900">New Order Recieved</p>
+                                        <p className="text-[10px] text-gray-500">Order {o.id} • {o.customerName} • ${o.total}</p>
+                                    </div>
+                                    <span className="ml-auto text-[10px] text-gray-400">{o.date}</span>
+                                </div>
+                            ))}
+                            {/* Inject some fake events if empty for visual fullness */}
+                            <div className="flex items-start gap-3">
+                                <div className="mt-1 p-1.5 bg-blue-100 text-blue-600 rounded-full">
+                                    <Users size={10} />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-gray-900">New User Registration</p>
+                                    <p className="text-[10px] text-gray-500">A new buyer joined the platform.</p>
+                                </div>
+                                <span className="ml-auto text-[10px] text-gray-400">2h ago</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    } 
+
+    // Regular Vendor / Buyer View
+    return (
+    <div className="space-y-8 animate-fade-in">
+      <div className="flex justify-between items-end">
+        <div>
+           <h2 className="text-3xl font-serif italic mb-2">Dashboard Overview</h2>
+           <p className="text-gray-500 text-sm">Welcome back, {role === UserRole.VENDOR ? currentVendor?.name : 'Admin'}</p>
         </div>
+        <div className="text-right">
+           <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Total Revenue</p>
+           <p className="text-3xl font-bold">${stats.revenue.toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+         <div className="bg-white p-6 border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-start mb-4">
+               <div className="p-2 bg-gray-50 rounded-md"><DollarSign size={20} /></div>
+               <span className="text-xs text-gray-400 font-bold">--</span>
+            </div>
+            <p className="text-2xl font-bold mb-1">${stats.revenue.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Total Sales</p>
+         </div>
+         <div className="bg-white p-6 border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-start mb-4">
+               <div className="p-2 bg-gray-50 rounded-md"><Package size={20} /></div>
+               <span className="text-xs text-gray-400 font-bold">--</span>
+            </div>
+            <p className="text-2xl font-bold mb-1">{stats.activeOrders}</p>
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Active Orders</p>
+         </div>
+         <div className="bg-white p-6 border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-start mb-4">
+               <div className="p-2 bg-gray-50 rounded-md"><Users size={20} /></div>
+               <span className="text-xs text-gray-400 font-bold">--</span>
+            </div>
+            <p className="text-2xl font-bold mb-1">{stats.clients}</p>
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Total Clients</p>
+         </div>
+         <div className="bg-white p-6 border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-start mb-4">
+               <div className="p-2 bg-gray-50 rounded-md"><Activity size={20} /></div>
+               <span className="text-xs text-gray-400 font-bold">--</span>
+            </div>
+            <p className="text-2xl font-bold mb-1">${stats.aov.toFixed(0)}</p>
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Avg. Order Value</p>
+         </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+         <div className="lg:col-span-2 bg-white p-6 border border-gray-100 shadow-sm">
+            <h3 className="text-lg font-bold mb-6">Revenue Analytics</h3>
+            <div className="h-64 w-full">
+               <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={SALES_DATA}>
+                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
+                     <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
+                     <Tooltip cursor={{fill: '#f9fafb'}} contentStyle={{border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
+                     <Bar dataKey="sales" fill="#000000" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+               </ResponsiveContainer>
+            </div>
+         </div>
+         
+         <div className="bg-white p-6 border border-gray-100 shadow-sm">
+            <h3 className="text-lg font-bold mb-6">Recent Activity</h3>
+            <div className="space-y-6">
+                <p className="text-sm text-gray-400 italic text-center py-12">No recent activity recorded.</p>
+            </div>
+         </div>
+      </div>
     </div>
   );
+  };
 
-  const renderUsers = () => (
-      <div className="space-y-6 animate-fade-in">
-          <h3 className="text-lg font-serif italic mb-4">User Management</h3>
-          <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
-             <table className="w-full text-left text-sm">
-                 <thead className="bg-gray-50 border-b border-gray-100">
-                     <tr>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">User</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Role</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Status</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Joined</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Action</th>
-                     </tr>
-                 </thead>
-                 <tbody>
-                     {/* Combine Users and Vendors for list */}
-                     {[
-                        ...users.map(u => ({ ...u, isVendor: false })),
-                        ...vendors.map(v => ({ id: v.id, name: v.name, email: v.email || 'N/A', role: 'VENDOR', avatar: v.avatar, status: v.subscriptionStatus === 'ACTIVE' ? 'ACTIVE' : 'SUSPENDED', joined: 'N/A', isVendor: true }))
-                     ].map((u, i) => (
-                         <tr key={`${u.id}-${i}`} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
-                             <td className="p-4 flex items-center gap-3">
-                                 <div className="w-8 h-8 bg-gray-200 rounded-full overflow-hidden">
-                                     <img src={u.avatar} className="w-full h-full object-cover" />
-                                 </div>
-                                 <div>
-                                     <span className="font-bold block text-xs">{u.name}</span>
-                                     <span className="text-[10px] text-gray-400">{u.email}</span>
-                                 </div>
-                             </td>
-                             <td className="p-4">
-                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-600' : u.role === 'VENDOR' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
-                                     {u.role}
-                                 </span>
-                             </td>
-                             <td className="p-4">
-                                 <span className={`text-[10px] font-bold uppercase ${u.status === 'ACTIVE' ? 'text-green-600' : 'text-red-600'}`}>
-                                     {u.status}
-                                 </span>
-                             </td>
-                             <td className="p-4 text-xs text-gray-500">{u.joined}</td>
-                             <td className="p-4 text-right flex justify-end gap-2">
-                                 {!u.isVendor && u.role !== 'ADMIN' && (
-                                     <button onClick={() => toggleUserStatus(u as any)} className="text-xs hover:text-red-500" title={u.status === 'ACTIVE' ? "Suspend User" : "Activate User"}>
-                                         {u.status === 'ACTIVE' ? <Ban size={14} /> : <CheckCircle size={14} />}
-                                     </button>
-                                 )}
-                                 {!u.isVendor && (
-                                     <button 
-                                        onClick={() => handleRoleUpdate(u.id, u.role === 'BUYER' ? 'ADMIN' : 'BUYER')}
-                                        className="text-xs hover:text-blue-500" title="Toggle Admin"
-                                     >
-                                         <Shield size={14} />
-                                     </button>
-                                 )}
-                             </td>
-                         </tr>
-                     ))}
-                 </tbody>
-             </table>
-          </div>
-      </div>
-  );
-
-  const renderReviews = () => (
-      <div className="space-y-6 animate-fade-in">
-          <h3 className="text-lg font-serif italic mb-4">Content Moderation</h3>
-          <div className="grid grid-cols-1 gap-4">
-              {adminReviews.map(review => (
-                  <div key={review.id} className="bg-white p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row gap-6">
-                      <div className="flex-1">
-                          <div className="flex justify-between mb-2">
-                              <span className="text-xs font-bold uppercase text-gray-500">{review.productName}</span>
-                              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 ${review.status === 'FLAGGED' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{review.status}</span>
-                          </div>
-                          <div className="flex items-center gap-2 mb-2">
-                              <div className="flex text-luxury-gold">
-                                  {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} />)}
-                              </div>
-                              <span className="text-xs font-bold">by {review.author}</span>
-                              <span className="text-xs text-gray-400">{review.date}</span>
-                          </div>
-                          <p className="text-sm text-gray-600 italic">"{review.content}"</p>
-                      </div>
-                      <div className="flex items-center gap-2 border-l border-gray-50 pl-6">
-                          <button onClick={() => handleReviewAction(review.id, 'APPROVE')} className="p-2 hover:bg-green-50 text-green-600 rounded-full" title="Approve"><CheckCircle size={18} /></button>
-                          <button onClick={() => handleReviewAction(review.id, 'FLAG')} className="p-2 hover:bg-yellow-50 text-yellow-600 rounded-full" title="Flag"><Flag size={18} /></button>
-                          <button onClick={() => handleReviewAction(review.id, 'DELETE')} className="p-2 hover:bg-red-50 text-red-600 rounded-full" title="Delete"><Trash2 size={18} /></button>
-                      </div>
-                  </div>
-              ))}
-          </div>
-      </div>
-  );
-
-  const renderTransactions = () => (
-      <div className="space-y-6 animate-fade-in">
-          <h3 className="text-lg font-serif italic mb-4">Financial Overview</h3>
-          <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
-             <table className="w-full text-left text-sm">
-                 <thead className="bg-gray-50 border-b border-gray-100">
-                     <tr>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Transaction ID</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Date</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Vendor / Customer</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Amount</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Fee</th>
-                         <th className="p-4 font-bold uppercase text-xs text-gray-500">Status</th>
-                     </tr>
-                 </thead>
-                 <tbody>
-                     {transactions.map(tx => (
-                         <tr key={tx.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
-                             <td className="p-4 font-mono text-xs text-gray-500">{tx.id}</td>
-                             <td className="p-4">{tx.date}</td>
-                             <td className="p-4">
-                                 <span className="block font-bold">{tx.vendor}</span>
-                                 <span className="text-xs text-gray-400">from {tx.customer}</span>
-                             </td>
-                             <td className="p-4 text-right font-medium">${tx.amount.toFixed(2)}</td>
-                             <td className="p-4 text-right text-gray-400 text-xs">${tx.platformFee.toFixed(2)}</td>
-                             <td className="p-4">
-                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${tx.status === 'CLEARED' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-                                     {tx.status}
-                                 </span>
-                             </td>
-                         </tr>
-                     ))}
-                 </tbody>
-             </table>
-          </div>
-      </div>
-  );
-
-  const renderOverview = () => (
+  const renderProducts = () => (
     <div className="space-y-6 animate-fade-in">
-        <h3 className="text-lg font-serif italic mb-4">Overview</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-             <div className="bg-white p-6 border border-gray-100 shadow-sm">
-                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Revenue</p>
-                 <p className="text-2xl font-serif mt-2">${stats.revenue.toLocaleString()}</p>
+       <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-serif italic">My Collection</h2>
+          <button 
+            onClick={() => setActiveTab('UPLOAD')}
+            className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2"
+          >
+             <Plus size={16} /> Add New Piece
+          </button>
+       </div>
+
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {vendorProducts.map((product) => (
+             <div key={product.id} className="group bg-white border border-gray-100 hover:shadow-lg transition-all duration-300">
+                <div className="aspect-[3/4] overflow-hidden relative bg-gray-100">
+                   <img src={product.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                   <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => handleEditProduct(product)}
+                        className="p-2 bg-white text-black hover:bg-black hover:text-white transition-colors"
+                      >
+                         <Edit2 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => onDeleteProduct && onDeleteProduct(product.id)}
+                        className="p-2 bg-white text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+                      >
+                         <Trash2 size={16} />
+                      </button>
+                   </div>
+                </div>
+                <div className="p-4">
+                   <h3 className="font-bold text-sm mb-1 truncate">{product.name}</h3>
+                   <p className="text-xs text-gray-500 mb-3">{product.category}</p>
+                   <div className="flex justify-between items-center">
+                      <span className="font-mono text-sm">${product.price}</span>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-1 ${product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                         {product.stock > 0 ? 'In Stock' : 'Sold Out'}
+                      </span>
+                   </div>
+                </div>
              </div>
-             <div className="bg-white p-6 border border-gray-100 shadow-sm">
-                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Active Orders</p>
-                 <p className="text-2xl font-serif mt-2">{stats.activeOrders}</p>
+          ))}
+          {vendorProducts.length === 0 && (
+             <div className="col-span-full py-12 text-center text-gray-400 border border-dashed border-gray-200">
+                <p>No products found in your collection.</p>
              </div>
-             <div className="bg-white p-6 border border-gray-100 shadow-sm">
-                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Clients</p>
-                 <p className="text-2xl font-serif mt-2">{stats.clients}</p>
-             </div>
-             <div className="bg-white p-6 border border-gray-100 shadow-sm">
-                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Avg. Order Value</p>
-                 <p className="text-2xl font-serif mt-2">${Math.round(stats.aov)}</p>
-             </div>
-        </div>
-        
-        <div className="bg-white p-6 border border-gray-100 shadow-sm h-80">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Sales Performance</h4>
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={SALES_DATA}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} tickFormatter={(value) => `$${value}`} />
-                    <Tooltip cursor={{fill: '#f9fafb'}} contentStyle={{border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}} />
-                    <Bar dataKey="sales" fill="#000000" radius={[2, 2, 0, 0]} barSize={40} />
-                </BarChart>
-            </ResponsiveContainer>
-        </div>
+          )}
+       </div>
     </div>
-  );
-
-  const renderFollowers = () => (
-      <div className="space-y-6 animate-fade-in">
-          <h3 className="text-lg font-serif italic mb-4">Community</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {followers.map(follower => (
-                  <div key={follower.id} className="bg-white p-6 border border-gray-100 shadow-sm flex justify-between items-center">
-                      <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gray-50 rounded-full overflow-hidden">
-                              <img src={follower.avatar} className="w-full h-full object-cover" />
-                          </div>
-                          <div>
-                              <h4 className="font-bold text-sm">{follower.name}</h4>
-                              <p className="text-xs text-gray-500">{follower.handle} • Since {follower.since}</p>
-                          </div>
-                      </div>
-                      <div className="flex gap-2">
-                           {follower.status === 'BLOCKED' ? (
-                               <span className="text-xs text-red-500 font-bold uppercase">Blocked</span>
-                           ) : (
-                               <>
-                                <button onClick={() => removeFollower(follower.id)} className="p-2 hover:bg-gray-50 text-gray-400 hover:text-red-500 transition-colors" title="Remove"><UserX size={16} /></button>
-                                <button onClick={() => blockFollower(follower.id)} className="p-2 hover:bg-gray-50 text-gray-400 hover:text-red-500 transition-colors" title="Block"><Ban size={16} /></button>
-                               </>
-                           )}
-                      </div>
-                  </div>
-              ))}
-          </div>
-      </div>
-  );
-  
-  const renderSubscriptionPlan = () => (
-      <div className="space-y-8 animate-fade-in">
-           <h3 className="text-lg font-serif italic">Membership & Plans</h3>
-           
-           {/* Current Plan */}
-           <div className="bg-black text-white p-8 relative overflow-hidden">
-               <div className="relative z-10">
-                   <span className="text-xs font-bold uppercase tracking-widest text-luxury-gold mb-2 block">Current Plan</span>
-                   <h2 className="text-4xl font-serif italic mb-4">{currentVendor?.subscriptionPlan || 'Atelier'}</h2>
-                   <p className="text-gray-400 text-sm max-w-md mb-6">
-                       {currentVendor?.subscriptionStatus === 'ACTIVE' 
-                        ? 'Your subscription is active. You have full access to marketplace features.' 
-                        : 'Your subscription is inactive. Please select a plan to activate your store.'}
-                   </p>
-                   <div className="flex gap-4">
-                       <div className="bg-white/10 px-4 py-2 rounded-sm text-xs">
-                           <span className="block text-gray-400 uppercase tracking-widest text-[10px]">Status</span>
-                           <span className={`font-bold ${currentVendor?.subscriptionStatus === 'ACTIVE' ? 'text-green-400' : 'text-red-400'}`}>
-                               {currentVendor?.subscriptionStatus || 'INACTIVE'}
-                           </span>
-                       </div>
-                       <div className="bg-white/10 px-4 py-2 rounded-sm text-xs">
-                           <span className="block text-gray-400 uppercase tracking-widest text-[10px]">Renewal</span>
-                           <span className="font-bold">Auto-Renews Oct 24</span>
-                       </div>
-                   </div>
-               </div>
-               <Diamond className="absolute -right-10 -bottom-10 text-white/5 w-64 h-64" />
-           </div>
-
-           {/* Plan Options */}
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               {SUBSCRIPTION_PLANS.map(plan => (
-                   <div key={plan.name} className={`bg-white border p-6 flex flex-col ${currentVendor?.subscriptionPlan === plan.name ? 'border-black shadow-lg' : 'border-gray-100'}`}>
-                       <div className="mb-6">
-                           <h4 className="text-xl font-serif italic mb-2">{plan.name}</h4>
-                           <div className="flex items-baseline gap-1">
-                               <span className="text-2xl font-bold">{plan.price}</span>
-                               <span className="text-xs text-gray-500">{plan.period}</span>
-                           </div>
-                           <p className="text-xs text-gray-500 mt-2 min-h-[40px]">{plan.description}</p>
-                       </div>
-                       <div className="flex-1 space-y-3 mb-6">
-                           {plan.features.map((f, i) => (
-                               <div key={i} className="flex items-center gap-2 text-xs">
-                                   <Check size={12} className="text-green-500" />
-                                   <span>{f}</span>
-                               </div>
-                           ))}
-                       </div>
-                       <button 
-                         onClick={() => handlePlanChange(plan.name)}
-                         disabled={currentVendor?.subscriptionPlan === plan.name && currentVendor?.subscriptionStatus === 'ACTIVE'}
-                         className={`w-full py-3 text-xs font-bold uppercase tracking-widest transition-colors ${
-                             currentVendor?.subscriptionPlan === plan.name && currentVendor?.subscriptionStatus === 'ACTIVE'
-                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                             : 'bg-black text-white hover:bg-luxury-gold'
-                         }`}
-                       >
-                           {currentVendor?.subscriptionPlan === plan.name && currentVendor?.subscriptionStatus === 'ACTIVE' ? 'Current Plan' : 'Select Plan'}
-                       </button>
-                   </div>
-               ))}
-           </div>
-      </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row animate-fade-in">
-        {renderSidebar()}
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans text-luxury-black">
+      {/* Mobile Header / Nav Toggle */}
+      <div className="md:hidden bg-white border-b border-gray-100 p-4 flex justify-between items-center sticky top-0 z-20">
+         <div className="flex items-center gap-2">
+            <span className="font-serif font-bold italic text-lg">MyFitStore</span>
+            <span className="text-[10px] uppercase bg-black text-white px-2 py-0.5 rounded-full">{role}</span>
+         </div>
+         <button onClick={() => setMobileNavOpen(!mobileNavOpen)}>
+            {mobileNavOpen ? <X size={24} /> : <Menu size={24} />}
+         </button>
+      </div>
 
-        {/* Mobile Navigation Drawer */}
-        {mobileNavOpen && (
-            <div className="fixed inset-0 z-50 bg-white md:hidden animate-fade-in flex flex-col">
-                <div className="p-6 flex justify-between items-center border-b border-gray-100">
-                     <div className="flex items-center gap-2">
-                         <LayoutDashboard size={20} />
-                         <h2 className="text-xl font-serif font-bold italic">Menu</h2>
+      {/* Mobile Sidebar Overlay */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-50 bg-white p-6 animate-fade-in md:hidden overflow-y-auto">
+           <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-serif italic">Menu</h2>
+              <button onClick={() => setMobileNavOpen(false)}><X size={24} /></button>
+           </div>
+           <nav className="space-y-4">
+              {getSidebarItems().map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                     if (item.action) item.action();
+                     else setActiveTab(item.id as DashboardTab);
+                     setMobileNavOpen(false);
+                  }}
+                  className={`w-full text-left py-3 text-sm font-bold uppercase tracking-widest border-b border-gray-100 ${activeTab === item.id ? 'text-luxury-gold' : 'text-gray-500'}`}
+                >
+                  <div className="flex items-center gap-3">
+                     <item.icon size={18} /> {item.label}
+                  </div>
+                </button>
+              ))}
+              <button 
+                onClick={() => onNavigate('LANDING')}
+                className="w-full text-left py-3 text-sm font-bold uppercase tracking-widest border-b border-gray-100 text-red-500 flex items-center gap-3 mt-8"
+              >
+                <ArrowLeft size={18} /> Exit Dashboard
+              </button>
+           </nav>
+        </div>
+      )}
+
+      {renderSidebar()}
+
+      <div className="flex-1 p-6 md:p-12 overflow-y-auto h-screen">
+        {activeTab === 'OVERVIEW' && renderOverview()}
+        {activeTab === 'PRODUCTS' && renderProducts()}
+        {activeTab === 'UPLOAD' && (
+             // Upload Form Logic
+             <div className="max-w-2xl mx-auto bg-white p-8 border border-gray-100 shadow-sm animate-fade-in">
+                <h2 className="text-2xl font-serif italic mb-6">{isEditing ? 'Edit Piece' : 'New Collection Item'}</h2>
+                <form onSubmit={handleUpload} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Product Name</label>
+                            <input 
+                                required
+                                type="text" 
+                                value={newProduct.name}
+                                onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Price ($)</label>
+                            <input 
+                                required
+                                type="number" 
+                                value={newProduct.price}
+                                onChange={(e) => setNewProduct({...newProduct, price: Number(e.target.value)})}
+                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Category</label>
+                        <select
+                            value={newProduct.category}
+                            onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                            className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-white"
+                        >
+                            {['Outerwear', 'Bottoms', 'Knitwear', 'Footwear', 'Accessories'].map(c => (
+                                <option key={c} value={c}>{c}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Description</label>
+                        <textarea 
+                            required
+                            value={newProduct.description}
+                            onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                            className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32 resize-none"
+                        />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Stock</label>
+                            <input 
+                                type="number" 
+                                value={newProduct.stock}
+                                onChange={(e) => setNewProduct({...newProduct, stock: Number(e.target.value)})}
+                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                         <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Available Sizes</label>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {STANDARD_SIZES.map(size => (
+                                    <button
+                                        type="button"
+                                        key={size}
+                                        onClick={() => {
+                                            const currentSizes = newProduct.sizes || [];
+                                            const newSizes = currentSizes.includes(size) 
+                                                ? currentSizes.filter(s => s !== size)
+                                                : [...currentSizes, size];
+                                            setNewProduct({...newProduct, sizes: newSizes});
+                                        }}
+                                        className={`px-3 py-1 text-[10px] border ${
+                                            (newProduct.sizes || []).includes(size) 
+                                                ? 'bg-black text-white border-black' 
+                                                : 'bg-white text-gray-500 border-gray-200'
+                                        }`}
+                                    >
+                                        {size}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Image Upload */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Product Imagery</label>
+                        <div className="border-2 border-dashed border-gray-200 p-8 flex flex-col items-center justify-center text-gray-400 hover:border-black hover:text-black transition-colors cursor-pointer relative">
+                             {newProduct.image ? (
+                                <img src={newProduct.image} alt="Preview" className="h-48 object-contain" />
+                             ) : (
+                                <>
+                                    <ImageIcon size={32} className="mb-2" />
+                                    <span className="text-xs uppercase font-bold">Upload Image</span>
+                                </>
+                             )}
+                             <input 
+                                type="file" 
+                                accept="image/*"
+                                ref={productFileInputRef}
+                                onChange={(e) => handleFileUpload(e, (base64) => setNewProduct({...newProduct, image: base64}))}
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                             />
+                        </div>
+                    </div>
+                    
+                    {/* Pre-Order Toggle */}
+                    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-sm">
+                        <button
+                            type="button"
+                            onClick={() => setNewProduct({...newProduct, isPreOrder: !newProduct.isPreOrder})}
+                            className={`w-10 h-6 rounded-full p-1 transition-colors ${newProduct.isPreOrder ? 'bg-luxury-gold' : 'bg-gray-300'}`}
+                        >
+                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${newProduct.isPreOrder ? 'translate-x-4' : ''}`} />
+                        </button>
+                        <div>
+                            <p className="text-xs font-bold uppercase">Made-to-Order / Pre-Order</p>
+                            <p className="text-[10px] text-gray-500">Enable if this item requires custom measurements or has a lead time.</p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-4 pt-4">
+                        <button 
+                            type="submit" 
+                            disabled={isSubmitting}
+                            className="flex-1 bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors disabled:opacity-70 flex justify-center items-center gap-2"
+                        >
+                            {isSubmitting ? <Loader className="animate-spin" size={16} /> : (isEditing ? 'Update Product' : 'Publish Product')}
+                        </button>
+                        {isEditing && (
+                             <button 
+                                type="button" 
+                                onClick={handleCancelEdit}
+                                className="px-6 border border-gray-200 text-black text-xs font-bold uppercase tracking-widest hover:border-black transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        )}
+                    </div>
+                </form>
+             </div>
+        )}
+        
+        {activeTab === 'ORDERS' && (
+             <div className="space-y-6 animate-fade-in">
+                 <h2 className="text-2xl font-serif italic mb-6">{isAdmin ? 'All Orders' : 'Order History'}</h2>
+                 {orders.length === 0 ? (
+                     <div className="text-center py-12 text-gray-400 border border-dashed border-gray-200">
+                         <p>No orders found.</p>
                      </div>
-                     <button onClick={() => setMobileNavOpen(false)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-200 transition-colors"><X size={20}/></button>
+                 ) : (
+                     <div className="space-y-4">
+                         {orders.map(order => (
+                             <div key={order.id} className="bg-white border border-gray-100 p-6 shadow-sm">
+                                 <div className="flex justify-between items-start mb-4 border-b border-gray-50 pb-4">
+                                     <div>
+                                         <p className="font-bold text-sm">Order #{order.id}</p>
+                                         <p className="text-xs text-gray-400">{order.date}</p>
+                                     </div>
+                                     <div className="text-right">
+                                         <p className="font-bold text-sm">${order.total}</p>
+                                         <span className={`text-[10px] font-bold uppercase px-2 py-1 ${
+                                             order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
+                                             order.status === 'Shipped' ? 'bg-blue-100 text-blue-700' :
+                                             'bg-yellow-100 text-yellow-700'
+                                         }`}>
+                                             {order.status}
+                                         </span>
+                                     </div>
+                                 </div>
+                                 <div className="space-y-2">
+                                     {order.items.map((item, idx) => (
+                                         <div key={idx} className="flex justify-between text-sm">
+                                             <span className="text-gray-600">{item.name} x{item.quantity}</span>
+                                             <span>${item.price * item.quantity}</span>
+                                         </div>
+                                     ))}
+                                 </div>
+                                 {(isAdmin || isVendor) && order.status !== 'Delivered' && (
+                                     <div className="mt-4 pt-4 border-t border-gray-50 flex gap-2">
+                                         <button 
+                                            onClick={() => onUpdateOrderStatus && onUpdateOrderStatus(order.id, 'Shipped')}
+                                            className="text-[10px] font-bold uppercase border border-gray-200 px-3 py-1 hover:bg-black hover:text-white transition-colors"
+                                         >
+                                             Mark Shipped
+                                         </button>
+                                         <button 
+                                            onClick={() => onUpdateOrderStatus && onUpdateOrderStatus(order.id, 'Delivered')}
+                                            className="text-[10px] font-bold uppercase border border-gray-200 px-3 py-1 hover:bg-black hover:text-white transition-colors"
+                                         >
+                                             Mark Delivered
+                                         </button>
+                                     </div>
+                                 )}
+                             </div>
+                         ))}
+                     </div>
+                 )}
+             </div>
+        )}
+
+        {activeTab === 'CMS' && isAdmin && (
+            <div className="space-y-6 animate-fade-in">
+                <h2 className="text-2xl font-serif italic mb-6">Content Management</h2>
+                {cmsForm ? (
+                    <div className="bg-white p-6 border border-gray-100 space-y-6">
+                         {/* Auth Images */}
+                         <div>
+                            <h3 className="text-sm font-bold uppercase mb-4">Auth Page Imagery</h3>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-2">Login Image</p>
+                                    <div className="relative h-48 bg-gray-100 overflow-hidden group">
+                                        <img src={cmsForm.auth?.loginImage} className="w-full h-full object-cover" />
+                                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpload(e, 'auth', 'loginImage')} />
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold uppercase transition-opacity pointer-events-none">Change</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-2">Register Image</p>
+                                    <div className="relative h-48 bg-gray-100 overflow-hidden group">
+                                        <img src={cmsForm.auth?.registerImage} className="w-full h-full object-cover" />
+                                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpload(e, 'auth', 'registerImage')} />
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold uppercase transition-opacity pointer-events-none">Change</div>
+                                    </div>
+                                </div>
+                            </div>
+                         </div>
+                         <button onClick={handleSaveCMS} className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors">
+                            {isSubmitting ? <Loader className="animate-spin" size={14}/> : 'Save Changes'}
+                         </button>
+                    </div>
+                ) : <p>Loading CMS...</p>}
+            </div>
+        )}
+
+        {activeTab === 'PROFILE' && (
+            <div className="max-w-xl mx-auto space-y-8 animate-fade-in">
+                <h2 className="text-2xl font-serif italic mb-6">Profile Settings</h2>
+                <div className="bg-white p-8 border border-gray-100 shadow-sm">
+                    <div className="flex justify-center mb-8">
+                        <div className="relative w-32 h-32 rounded-full overflow-hidden border border-gray-200 group">
+                            <img src={profileForm.avatar || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <Camera className="text-white" />
+                            </div>
+                            <input 
+                                type="file" 
+                                accept="image/*"
+                                ref={avatarFileInputRef}
+                                onChange={(e) => handleFileUpload(e, (base64) => setProfileForm({...profileForm, avatar: base64}))}
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                            />
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <div>
+                             <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Display Name</label>
+                             <input 
+                                value={profileForm.name}
+                                onChange={e => setProfileForm({...profileForm, name: e.target.value})}
+                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                             />
+                        </div>
+                        <div>
+                             <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Email</label>
+                             <input 
+                                value={profileForm.email}
+                                onChange={e => setProfileForm({...profileForm, email: e.target.value})}
+                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                             />
+                        </div>
+                        <button onClick={handleSaveProfile} className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors mt-4">
+                            Save Changes
+                        </button>
+                    </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-6">
-                    <nav className="space-y-3">
-                        {getSidebarItems().map((item) => (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                                if (item.action) item.action();
-                                else setActiveTab(item.id as DashboardTab);
-                                setMobileNavOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-4 px-4 py-4 text-sm font-bold uppercase tracking-widest transition-all rounded-sm border ${
-                              activeTab === item.id 
-                                ? 'bg-black text-white border-black shadow-lg' 
-                                : 'text-gray-500 border-gray-100 hover:bg-gray-50 hover:text-black hover:border-black'
-                            }`}
-                          >
-                            <item.icon size={18} />
-                            {item.label}
-                          </button>
-                        ))}
-                    </nav>
+            </div>
+        )}
+
+        {activeTab === 'INBOX' && renderInbox()}
+
+        {activeTab === 'USERS' && isAdmin && (
+            <div className="space-y-6 animate-fade-in">
+                <h2 className="text-2xl font-serif italic mb-6">User Management</h2>
+                <div className="bg-white border border-gray-100 overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                            <tr>
+                                <th className="p-4">User</th>
+                                <th className="p-4">Role</th>
+                                <th className="p-4">Joined</th>
+                                <th className="p-4">Status</th>
+                                <th className="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {users.map(u => (
+                                <tr key={u.id}>
+                                    <td className="p-4 flex items-center gap-3">
+                                        <img src={u.avatar} className="w-8 h-8 rounded-full bg-gray-100" />
+                                        <div>
+                                            <p className="font-bold">{u.name}</p>
+                                            <p className="text-xs text-gray-400">{u.email}</p>
+                                        </div>
+                                    </td>
+                                    <td className="p-4"><span className="text-[10px] font-bold uppercase bg-gray-100 px-2 py-1 rounded-sm">{u.role}</span></td>
+                                    <td className="p-4 text-gray-500">{u.joined}</td>
+                                    <td className="p-4">
+                                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${u.status === 'ACTIVE' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                                            {u.status}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <button 
+                                            onClick={() => toggleUserStatus(u)}
+                                            className="text-xs underline hover:text-red-500"
+                                        >
+                                            {u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         )}
         
-        <div className="flex-1 p-6 md:p-12 pb-24 md:pb-12 overflow-x-hidden">
-             {/* Mobile Header with Menu Toggle */}
-             <div className="md:hidden mb-6 pb-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-gray-50 z-20 pt-4">
-                 <div className="flex items-center gap-3">
-                     <button onClick={() => setMobileNavOpen(true)} className="p-2 -ml-2 hover:bg-gray-200 rounded-md transition-colors">
-                         <Menu size={24} />
-                     </button>
-                     <h2 className="text-xl font-serif italic">Dashboard</h2>
+        {['STORE_PREVIEW', 'FULFILLMENT', 'PAYOUTS', 'FOLLOWERS', 'STORE_DESIGN', 'SUBSCRIPTION_PLAN', 'SAVED', 'VERIFICATION', 'SUBSCRIPTIONS', 'REVIEWS', 'TRANSACTIONS', 'SETTINGS'].includes(activeTab) && !['OVERVIEW', 'PRODUCTS', 'UPLOAD', 'ORDERS', 'CMS', 'PROFILE', 'INBOX', 'USERS'].includes(activeTab) && (
+            <div className="h-full flex items-center justify-center text-gray-400 animate-fade-in">
+                 <div className="text-center">
+                    <Settings size={48} className="mx-auto mb-4 opacity-20" />
+                    <p className="text-sm font-serif italic">This module is under development.</p>
                  </div>
-                 {/* Optional: Add simplified actions or user avatar here */}
-             </div>
+            </div>
+        )}
 
-             {/* Tab Content */}
-             {activeTab === 'OVERVIEW' && renderOverview()}
-             {activeTab === 'PRODUCTS' && renderProducts()}
-             {activeTab === 'UPLOAD' && renderUpload()}
-             {activeTab === 'ORDERS' && renderOrders()}
-             {activeTab === 'FULFILLMENT' && renderFulfillment()}
-             {activeTab === 'SETTINGS' && renderSettings()}
-             {activeTab === 'PROFILE' && renderProfile()}
-             {activeTab === 'STORE_DESIGN' && renderStoreDesign()}
-             {activeTab === 'SAVED' && renderSaved()}
-             {activeTab === 'SUBSCRIPTIONS' && renderSubscriptions()}
-             {activeTab === 'VERIFICATION' && renderVerification()}
-             {activeTab === 'USERS' && renderUsers()}
-             {activeTab === 'REVIEWS' && renderReviews()}
-             {activeTab === 'TRANSACTIONS' && renderTransactions()}
-             {activeTab === 'FOLLOWERS' && renderFollowers()}
-             {activeTab === 'SUBSCRIPTION_PLAN' && renderSubscriptionPlan()}
-             {activeTab === 'STORE_PREVIEW' && (
-                 <div className="h-[600px] border border-gray-200 overflow-hidden relative bg-white">
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                          <div className="text-center">
-                              <Store size={48} className="mx-auto text-gray-300 mb-4" />
-                              <p className="text-gray-400 text-sm">Preview of {storeDesign.brandName}</p>
-                              <button onClick={() => onNavigate('VENDOR_PROFILE')} className="mt-4 text-xs font-bold uppercase underline">View Full Page</button>
-                          </div>
-                      </div>
-                 </div>
-             )}
-             {activeTab === 'CMS' && renderCMS()}
-        </div>
+      </div>
     </div>
   );
 };
