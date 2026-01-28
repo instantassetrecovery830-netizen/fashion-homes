@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Loader, Shield, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, RefreshCw, ArrowLeft } from 'lucide-react';
+import { ArrowRight, Loader, Shield, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, RefreshCw, ArrowLeft, ExternalLink } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types';
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, onAuthStateChanged, sendPasswordResetEmail } from '../services/firebase';
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, onAuthStateChanged, sendPasswordResetEmail, mockVerifyEmail } from '../services/firebase';
 import { createVendorInDb, createUserInDb, fetchUsers } from '../services/dataService';
 
 interface AuthViewProps {
@@ -22,6 +22,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
   const [verificationNeeded, setVerificationNeeded] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
   const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [isSimulatingVerification, setIsSimulatingVerification] = useState(false);
 
   // Password Reset State
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -97,6 +98,20 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
         console.error("Resend failed", e);
         setResendStatus('idle');
     }
+  };
+
+  const handleSimulateVerificationLink = async () => {
+      setIsSimulatingVerification(true);
+      await mockVerifyEmail(verificationEmail);
+      setIsSimulatingVerification(false);
+      
+      // Auto transition
+      await signOut(auth);
+      setVerificationNeeded(false);
+      setIsRegister(false);
+      setPassword(''); 
+      setConfirmPassword('');
+      setError("Email Verified! Please sign in.");
   };
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
@@ -326,6 +341,16 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 </div>
 
                 <div className="mt-8 border-t border-gray-100 pt-6">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-4">Demo Environment</p>
+                    <button 
+                        onClick={handleSimulateVerificationLink}
+                        disabled={isSimulatingVerification}
+                        className="w-full border border-dashed border-gray-300 text-gray-500 py-3 text-xs font-bold uppercase tracking-widest hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 mb-4"
+                    >
+                        {isSimulatingVerification ? <Loader size={14} className="animate-spin"/> : <ExternalLink size={14} />} 
+                        Simulate Clicking Link
+                    </button>
+
                     <button 
                         onClick={async () => {
                             await signOut(auth);

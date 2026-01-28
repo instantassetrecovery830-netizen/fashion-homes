@@ -25,6 +25,15 @@ export const LandingView: React.FC<LandingViewProps> = ({
 }) => {
   const [trend, setTrend] = useState<TrendAnalysis | null>(null);
   const [loadingTrend, setLoadingTrend] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const fetchTrend = async () => {
@@ -135,19 +144,21 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </div>
       </section>
 
-      {/* Infinite Marquee */}
-      <div className="bg-luxury-gold text-white py-4 overflow-hidden whitespace-nowrap border-y border-white/10">
-        <div className="inline-flex animate-[marquee_30s_linear_infinite]">
-          {[...Array(6)].map((_, i) => (
-             <React.Fragment key={i}>
-                {marqueeItems.map((item, idx) => (
-                   <React.Fragment key={idx}>
-                      <span className={`text-xs mx-8 ${idx % 2 === 0 ? 'font-bold uppercase tracking-[0.3em]' : 'font-serif italic'}`}>{item}</span>
-                      <span className="mx-8 text-black/50">•</span>
-                   </React.Fragment>
-                ))}
-             </React.Fragment>
-          ))}
+      {/* Infinite Marquee with Parallax */}
+      <div className="bg-luxury-gold text-white py-4 overflow-hidden whitespace-nowrap border-y border-white/10 relative z-30">
+        <div style={{ transform: `translateX(${scrollY * -0.15}px)`, willChange: 'transform' }}>
+          <div className="inline-flex animate-[marquee_30s_linear_infinite]">
+            {[...Array(6)].map((_, i) => (
+               <React.Fragment key={i}>
+                  {marqueeItems.map((item, idx) => (
+                     <React.Fragment key={idx}>
+                        <span className={`text-xs mx-8 ${idx % 2 === 0 ? 'font-bold uppercase tracking-[0.3em]' : 'font-serif italic'}`}>{item}</span>
+                        <span className="mx-8 text-black/50">•</span>
+                     </React.Fragment>
+                  ))}
+               </React.Fragment>
+            ))}
+          </div>
         </div>
         <style>{`
           @keyframes marquee {

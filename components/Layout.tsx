@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft } from 'lucide-react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail } from 'lucide-react';
+import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants';
 import { UserRole, ViewState, CartItem, Order } from '../types';
+import { auth } from '../services/firebase';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -46,13 +48,25 @@ export const Layout: React.FC<LayoutProps> = ({
   
   // Checkout State
   const [checkoutStep, setCheckoutStep] = useState<'CART' | 'PAYMENT'>('CART');
-  const [paymentDetails, setPaymentDetails] = useState({
-    cardName: '',
-    cardNumber: '',
-    expiry: '',
-    cvc: ''
-  });
+  const [customerEmail, setCustomerEmail] = useState('');
   
+  // --- PAYSTACK CONFIGURATION ---
+  // Replace with your public key from Paystack Dashboard
+  const PAYSTACK_PUBLIC_KEY = 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; 
+
+  const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
+
+  const paystackConfig = {
+    reference: (new Date()).getTime().toString(),
+    email: customerEmail,
+    amount: cartTotal * 100, // Paystack expects amount in kobo (or lowest currency unit)
+    publicKey: PAYSTACK_PUBLIC_KEY,
+  };
+
+  // Initialize Paystack hook
+  // @ts-ignore - Types might not resolve perfectly in all envs without install
+  const initializePayment = usePaystackPayment(paystackConfig);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -63,14 +77,19 @@ export const Layout: React.FC<LayoutProps> = ({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Sync email when auth state changes or cart opens
+  useEffect(() => {
+      if (auth.currentUser?.email) {
+          setCustomerEmail(auth.currentUser.email);
+      }
+  }, [auth.currentUser, isCartOpen]);
+
   // Reset checkout step when cart closes
   useEffect(() => {
     if (!isCartOpen) {
         setTimeout(() => setCheckoutStep('CART'), 500);
     }
   }, [isCartOpen]);
-
-  const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
 
   const handleDashboardClick = () => {
     if (role === UserRole.ADMIN) onNavigate('ADMIN_PANEL');
@@ -116,18 +135,13 @@ export const Layout: React.FC<LayoutProps> = ({
     setCheckoutStep('PAYMENT');
   };
 
-  const handleFinalizeOrder = async () => {
-    // Basic validation
-    if (!paymentDetails.cardNumber || !paymentDetails.cvc || !paymentDetails.expiry) {
-        alert("Please enter valid payment details.");
-        return;
-    }
-
+  // Called when Paystack success callback fires
+  const onPaystackSuccess = async (reference: any) => {
     setIsProcessingCheckout(true);
 
     const newOrder: Order = {
         id: `ord_${Date.now()}`,
-        customerName: 'Guest User', // Ideally from Auth context
+        customerName: customerEmail || 'Guest User', 
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         total: cartTotal,
         status: 'Processing',
@@ -143,15 +157,28 @@ export const Layout: React.FC<LayoutProps> = ({
           setOrderComplete(false);
           setIsCartOpen(false);
           handleDashboardClick();
-          // Reset Payment Form
-          setPaymentDetails({ cardName: '', cardNumber: '', expiry: '', cvc: '' });
         }, 2000);
     } catch (e) {
         console.error("Checkout failed", e);
-        alert("Checkout failed. Please try again.");
+        alert("Order creation failed. Please contact support.");
     } finally {
         setIsProcessingCheckout(false);
     }
+  };
+
+  const onPaystackClose = () => {
+      console.log('Payment closed');
+      setIsProcessingCheckout(false);
+  };
+
+  const handleFinalizeOrder = () => {
+    if (!customerEmail) {
+        alert("Please enter your email address for the receipt.");
+        return;
+    }
+    setIsProcessingCheckout(true);
+    // @ts-ignore
+    initializePayment(onPaystackSuccess, onPaystackClose);
   };
 
   return (
@@ -397,7 +424,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 </div>
               ))
             ) : (
-                // PAYMENT VIEW
+                // PAYMENT VIEW (Paystack)
                 <div className="space-y-6 animate-fade-in">
                     <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
                         <div className="flex justify-between items-center mb-2">
@@ -405,62 +432,33 @@ export const Layout: React.FC<LayoutProps> = ({
                             <span className="font-bold text-lg">${cartTotal}</span>
                         </div>
                         <div className="flex gap-2 text-xs text-gray-400">
-                           <Lock size={12} /> <span className="uppercase tracking-wider">Secure Encryption</span>
+                           <Lock size={12} /> <span className="uppercase tracking-wider">Secured by Paystack</span>
                         </div>
                     </div>
 
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Cardholder Name</label>
-                            <input 
-                                type="text"
-                                placeholder="Name on Card"
-                                value={paymentDetails.cardName}
-                                onChange={(e) => setPaymentDetails({...paymentDetails, cardName: e.target.value})}
-                                className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
-                            />
-                        </div>
-                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Card Number</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email Address</label>
                             <div className="relative">
                                 <input 
-                                    type="text"
-                                    placeholder="0000 0000 0000 0000"
-                                    value={paymentDetails.cardNumber}
-                                    onChange={(e) => setPaymentDetails({...paymentDetails, cardNumber: e.target.value})}
-                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                    type="email"
+                                    placeholder="your@email.com"
+                                    value={customerEmail}
+                                    onChange={(e) => setCustomerEmail(e.target.value)}
+                                    disabled={!!auth.currentUser?.email}
+                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent disabled:text-gray-500 disabled:bg-transparent"
                                 />
-                                <CreditCard size={16} className="absolute right-0 top-2 text-gray-400" />
+                                <Mail size={16} className="absolute right-0 top-2 text-gray-400" />
                             </div>
+                            <p className="text-[10px] text-gray-400">Receipt will be sent to this email.</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-6">
-                             <div className="space-y-2">
-                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Expiry Date</label>
-                                <div className="relative">
-                                    <input 
-                                        type="text"
-                                        placeholder="MM/YY"
-                                        value={paymentDetails.expiry}
-                                        onChange={(e) => setPaymentDetails({...paymentDetails, expiry: e.target.value})}
-                                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
-                                    />
-                                    <Calendar size={16} className="absolute right-0 top-2 text-gray-400" />
-                                </div>
-                            </div>
-                             <div className="space-y-2">
-                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">CVC</label>
-                                <div className="relative">
-                                    <input 
-                                        type="text"
-                                        placeholder="123"
-                                        value={paymentDetails.cvc}
-                                        onChange={(e) => setPaymentDetails({...paymentDetails, cvc: e.target.value})}
-                                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
-                                    />
-                                    <Lock size={16} className="absolute right-0 top-2 text-gray-400" />
-                                </div>
-                            </div>
-                        </div>
+                    </div>
+                    
+                    <div className="bg-blue-50 p-4 border border-blue-100 rounded-sm">
+                        <p className="text-[10px] text-blue-800 leading-relaxed">
+                            You will be redirected to Paystack to complete your secure payment. 
+                            We accept Card, Bank Transfer, and USSD.
+                        </p>
                     </div>
                 </div>
             )}
@@ -490,7 +488,7 @@ export const Layout: React.FC<LayoutProps> = ({
                    {isProcessingCheckout ? (
                        <>Processing <Loader className="animate-spin" size={14} /></>
                    ) : (
-                       <>Pay ${cartTotal} <Lock size={16} /></>
+                       <>Pay with Paystack <Lock size={16} /></>
                    )}
                 </button>
               )}

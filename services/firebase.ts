@@ -92,6 +92,19 @@ export const sendEmailVerification = async (user: any) => {
   return Promise.resolve();
 };
 
+// NEW: Helper to manually verify email in demo mode
+export const mockVerifyEmail = async (email: string) => {
+  await new Promise(resolve => setTimeout(resolve, 800));
+  if (userStore[email]) {
+    userStore[email].emailVerified = true;
+  }
+  if (currentUser && currentUser.email === email) {
+    currentUser.emailVerified = true;
+  }
+  notify();
+  return Promise.resolve();
+};
+
 export const sendPasswordResetEmail = async (authInstance: any, email: string) => {
   console.log(`[Mock] Password reset email sent to ${email}`);
   await new Promise(resolve => setTimeout(resolve, 500));
