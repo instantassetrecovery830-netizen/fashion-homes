@@ -1,108 +1,49 @@
 
-// Mocking Firebase Authentication for the purpose of this environment where 'firebase' module seems unavailable or typed incorrectly.
-// In a real application, you would install 'firebase' via npm and use the imports.
+import { initializeApp } from "firebase/app";
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged, 
+  sendEmailVerification, 
+  sendPasswordResetEmail, 
+  updatePassword,
+  signInWithPopup, 
+  GoogleAuthProvider 
+} from "firebase/auth";
 
-// Simulating the user type
-export interface MockUser {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  emailVerified: boolean;
-  reload: () => Promise<void>;
-}
-
-let currentUser: MockUser | null = null;
-const authStateListeners: ((user: MockUser | null) => void)[] = [];
-
-const notifyListeners = () => {
-  authStateListeners.forEach(listener => listener(currentUser));
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBBeM4QB0gkxenQHyGh3vyBz91_-q4qL0o",
+  authDomain: "myfitstore-922b4.firebaseapp.com",
+  projectId: "myfitstore-922b4",
+  messagingSenderId: "85430306162",
+  appId: "1:85430306162:web:0190d789d2a032f15249eb"
 };
 
-export const auth = {
-  get currentUser() {
-    return currentUser;
-  }
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+
+// Export Firebase Auth functions
+export { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged, 
+  sendEmailVerification, 
+  sendPasswordResetEmail,
+  updatePassword,
+  signInWithPopup,
+  GoogleAuthProvider
 };
 
-export const onAuthStateChanged = (authInstance: any, callback: (user: any) => void) => {
-  authStateListeners.push(callback);
-  // Initial callback
-  setTimeout(() => callback(currentUser), 10);
-  return () => {
-    const index = authStateListeners.indexOf(callback);
-    if (index > -1) authStateListeners.splice(index, 1);
-  };
-};
-
-export const createUserWithEmailAndPassword = async (authInstance: any, email: string, pass: string) => {
-  const newUser: MockUser = {
-    uid: 'mock-uid-' + Date.now(),
-    email,
-    displayName: email.split('@')[0],
-    photoURL: 'https://via.placeholder.com/150',
-    emailVerified: false,
-    reload: async () => {
-        // Mock reload behavior
-    }
-  };
-  currentUser = newUser;
-  notifyListeners();
-  return { user: newUser };
-};
-
-export const signInWithEmailAndPassword = async (authInstance: any, email: string, pass: string) => {
-  // Simulate successful login
-  const user: MockUser = {
-    uid: 'mock-uid-login',
-    email,
-    displayName: email.split('@')[0],
-    photoURL: 'https://via.placeholder.com/150',
-    emailVerified: true, // Auto verify for convenience in mock
-    reload: async () => {}
-  };
-  currentUser = user;
-  notifyListeners();
-  return { user };
-};
-
-export const signOut = async (authInstance: any) => {
-  currentUser = null;
-  notifyListeners();
-};
-
-export const sendEmailVerification = async (user: any) => {
-  console.log(`[Mock] Email verification sent to ${user.email}`);
-};
-
-export const sendPasswordResetEmail = async (authInstance: any, email: string) => {
-  console.log(`[Mock] Password reset email sent to ${email}`);
-};
-
-export const updatePassword = async (user: any, newPassword: string) => {
-  console.log(`[Mock] Password updated for ${user.email}`);
-};
-
-// Aliased export for dashboard usage
+// Alias for compatibility with existing components
 export const updateUserPassword = updatePassword;
 
-export const signInWithPopup = async (authInstance: any, provider: any) => {
-  const user: MockUser = {
-    uid: 'mock-google-uid-' + Date.now(),
-    email: 'user@gmail.com',
-    displayName: 'Google User',
-    photoURL: 'https://via.placeholder.com/150',
-    emailVerified: true,
-    reload: async () => {}
-  };
-  currentUser = user;
-  notifyListeners();
-  return { user };
-};
-
-export const GoogleAuthProvider = class {};
-
-// Wrapper for signInWithGoogle as requested by AuthView
+// Helper for Google Sign In to match existing signature
 export const signInWithGoogle = async (authInstance: any) => {
-    return signInWithPopup(authInstance, new GoogleAuthProvider());
+  const provider = new GoogleAuthProvider();
+  return signInWithPopup(authInstance, provider);
 };
