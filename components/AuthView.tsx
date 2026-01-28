@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Loader, Shield, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, RefreshCw } from 'lucide-react';
+import { ArrowRight, Loader, Shield, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, RefreshCw, ArrowLeft } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types';
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, onAuthStateChanged } from '../services/firebase';
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, onAuthStateChanged, sendPasswordResetEmail } from '../services/firebase';
 import { createVendorInDb, createUserInDb } from '../services/dataService';
 
 interface AuthViewProps {
@@ -13,6 +13,7 @@ interface AuthViewProps {
 
 export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsContent }) => {
   const [isRegister, setIsRegister] = useState(false);
+  const [isResetingPassword, setIsResetingPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.BUYER);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
   const [verificationNeeded, setVerificationNeeded] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
   const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+
+  // Password Reset State
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   // Form states
   const [name, setName] = useState('');
@@ -68,6 +72,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     setAvatarFile(null);
     setVerificationNeeded(false);
     setResendStatus('idle');
+    setResetEmailSent(false);
+    setIsResetingPassword(false);
   };
 
   const toggleMode = () => {
@@ -90,6 +96,25 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     } catch (e) {
         console.error("Resend failed", e);
         setResendStatus('idle');
+    }
+  };
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+        setError("Please enter your email address to reset password.");
+        return;
+    }
+    setError(null);
+    setIsLoading(true);
+    try {
+        await sendPasswordResetEmail(auth, email);
+        setResetEmailSent(true);
+    } catch (err: any) {
+        console.error("Reset Password Error:", err);
+        setError("Failed to send reset email. Please try again.");
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -300,6 +325,75 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
       );
   }
 
+  // Reset Password Flow View
+  if (isResetingPassword) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-white p-6 animate-fade-in">
+            <div className="w-full max-w-md">
+                <button onClick={() => setIsResetingPassword(false)} className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-black mb-8">
+                    <ArrowLeft size={16} /> Back to Sign In
+                </button>
+                
+                <div className="text-center mb-10">
+                     <h1 className="text-3xl font-serif italic mb-2">Reset Password</h1>
+                     <p className="text-gray-400 text-sm">Enter your email to receive recovery instructions.</p>
+                </div>
+
+                <form onSubmit={handleForgotPasswordSubmit} className="space-y-6">
+                     <div>
+                        <input 
+                            type="email"
+                            required
+                            placeholder="Email Address"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full border-b border-gray-200 py-3 text-sm focus:border-black outline-none bg-transparent"
+                        />
+                     </div>
+
+                     {error && (
+                        <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-sm">
+                            <AlertCircle size={14} />
+                            <span>{error}</span>
+                        </div>
+                     )}
+
+                     {resetEmailSent && (
+                        <div className="flex items-center gap-2 text-green-600 text-xs bg-green-50 p-3 rounded-sm animate-fade-in">
+                            <CheckCircle size={14} />
+                            <span>Password reset email sent to {email}. Check your inbox.</span>
+                        </div>
+                     )}
+
+                     {!resetEmailSent && (
+                         <button 
+                            type="submit" 
+                            disabled={isLoading}
+                            className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex justify-center items-center gap-2 disabled:opacity-70"
+                         >
+                            {isLoading ? <Loader className="animate-spin" size={16} /> : (
+                                <>
+                                   Send Reset Link <ArrowRight size={16} />
+                                </>
+                            )}
+                         </button>
+                     )}
+                     
+                     {resetEmailSent && (
+                         <button 
+                            type="button" 
+                            onClick={() => setIsResetingPassword(false)}
+                            className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex justify-center items-center gap-2"
+                         >
+                            Return to Login
+                         </button>
+                     )}
+                </form>
+            </div>
+        </div>
+      );
+  }
+
   return (
     <div className="min-h-screen flex animate-fade-in">
         {/* Image Section - Hidden on mobile, 50% on desktop */}
@@ -308,7 +402,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                src={isRegister ? registerImage : loginImage} 
                alt="Editorial" 
                className="w-full h-full object-cover transition-opacity duration-700 ease-in-out"
-               key={isRegister ? 'register' : 'login'} // Force re-render/anim for key change
+               key={isRegister ? 'register' : 'login'} 
              />
              <div className="absolute inset-0 bg-black/20" />
              <div className="absolute bottom-12 left-12 text-white max-w-md z-10 animate-slide-up">
@@ -427,6 +521,18 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                      </div>
+
+                     {!isRegister && (
+                        <div className="flex justify-end mt-1">
+                            <button
+                                type="button"
+                                onClick={() => { setIsResetingPassword(true); setError(null); }}
+                                className="text-[10px] uppercase font-bold tracking-widest text-gray-400 hover:text-black transition-colors"
+                            >
+                                Forgot Password?
+                            </button>
+                        </div>
+                     )}
 
                      {isRegister && (
                         <div className="relative">

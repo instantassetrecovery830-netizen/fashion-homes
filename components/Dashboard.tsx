@@ -11,7 +11,8 @@ import {
   Palette, Layout, Type, FileText, Newspaper, ExternalLink,
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield,
-  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu, Wallet, Banknote, Bitcoin, ArrowLeft, Inbox
+  Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu, Wallet, Banknote, Bitcoin, ArrowLeft, Inbox,
+  Phone, Clock
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission } from '../types';
 
@@ -143,6 +144,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // CMS Form State
   const [cmsForm, setCmsForm] = useState<LandingPageContent | null>(null);
+  const [cmsActiveSection, setCmsActiveSection] = useState<'LANDING' | 'ABOUT' | 'AUTH'>('LANDING');
 
   useEffect(() => {
     if (cmsContent) {
@@ -374,7 +376,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleCmsImageUpload = (e: React.ChangeEvent<HTMLInputElement>, section: 'auth', field: 'loginImage' | 'registerImage') => {
+  // Generalized CMS Image Upload Handler
+  const handleCmsImageUpdate = (e: React.ChangeEvent<HTMLInputElement>, section: string, key: string, subKey?: string) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -382,13 +385,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const result = reader.result as string;
         setCmsForm(prev => {
             if (!prev) return null;
-            return {
-                ...prev,
-                auth: {
-                    ...(prev.auth || { loginImage: '', registerImage: '' }),
-                    [field]: result
-                }
+            
+            // Handle Deep Nested About.Hero, About.Philosophy, etc.
+            if (section === 'about') {
+               const aboutData = { ...prev.about };
+               // @ts-ignore
+               aboutData[key] = { ...aboutData[key], [subKey!]: result };
+               return { ...prev, about: aboutData };
             }
+            
+            // Handle Campaign or Auth (shallow nested)
+            // @ts-ignore
+            const sectionData = { ...prev[section], [key]: result };
+            return { ...prev, [section]: sectionData };
         });
       };
       reader.readAsDataURL(file);
@@ -643,6 +652,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     </div>
   );
 
+  // ... (Other render methods: renderInbox, renderProducts)
   const renderInbox = () => (
       <div className="space-y-6 animate-fade-in">
           <h3 className="text-lg font-serif italic mb-4">Messages & Inquiries</h3>
@@ -1224,37 +1234,229 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
 
         {activeTab === 'CMS' && isAdmin && (
-            <div className="space-y-6 animate-fade-in">
-                <h2 className="text-2xl font-serif italic mb-6">Content Management</h2>
-                {cmsForm ? (
-                    <div className="bg-white p-6 border border-gray-100 space-y-6">
-                         {/* Auth Images */}
-                         <div>
-                            <h3 className="text-sm font-bold uppercase mb-4">Auth Page Imagery</h3>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <p className="text-xs text-gray-500 mb-2">Login Image</p>
-                                    <div className="relative h-48 bg-gray-100 overflow-hidden group">
-                                        <img src={cmsForm.auth?.loginImage} className="w-full h-full object-cover" />
-                                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpload(e, 'auth', 'loginImage')} />
-                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold uppercase transition-opacity pointer-events-none">Change</div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 mb-2">Register Image</p>
-                                    <div className="relative h-48 bg-gray-100 overflow-hidden group">
-                                        <img src={cmsForm.auth?.registerImage} className="w-full h-full object-cover" />
-                                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpload(e, 'auth', 'registerImage')} />
-                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold uppercase transition-opacity pointer-events-none">Change</div>
-                                    </div>
-                                </div>
-                            </div>
-                         </div>
-                         <button onClick={handleSaveCMS} className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors">
-                            {isSubmitting ? <Loader className="animate-spin" size={14}/> : 'Save Changes'}
-                         </button>
+            <div className="space-y-8 animate-fade-in">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-serif italic">Content Management</h2>
+                    <div className="flex gap-2">
+                        {(['LANDING', 'ABOUT', 'AUTH'] as const).map(section => (
+                            <button
+                                key={section}
+                                onClick={() => setCmsActiveSection(section)}
+                                className={`px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-full transition-all ${
+                                    cmsActiveSection === section 
+                                        ? 'bg-black text-white' 
+                                        : 'bg-white border border-gray-200 text-gray-500 hover:border-black hover:text-black'
+                                }`}
+                            >
+                                {section}
+                            </button>
+                        ))}
                     </div>
-                ) : <p>Loading CMS...</p>}
+                </div>
+
+                {cmsForm ? (
+                    <div className="bg-white p-8 border border-gray-100 shadow-sm space-y-12">
+                         {/* LANDING PAGE EDITING */}
+                         {cmsActiveSection === 'LANDING' && (
+                             <>
+                                <section className="space-y-6">
+                                    <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">Hero Section</h3>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Title Line 1</label>
+                                            <input value={cmsForm.hero.titleLine1} onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, titleLine1: e.target.value}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Title Line 2 (Italic)</label>
+                                            <input value={cmsForm.hero.titleLine2} onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, titleLine2: e.target.value}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Subtitle</label>
+                                            <input value={cmsForm.hero.subtitle} onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, subtitle: e.target.value}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Button Text</label>
+                                            <input value={cmsForm.hero.buttonText} onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, buttonText: e.target.value}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2 col-span-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Video URL</label>
+                                            <input value={cmsForm.hero.videoUrl} onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, videoUrl: e.target.value}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2 col-span-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Poster Image URL (Fallback)</label>
+                                            <input value={cmsForm.hero.posterUrl} onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, posterUrl: e.target.value}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section className="space-y-6">
+                                    <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">Marquee</h3>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Scrolling Text (Use • to separate)</label>
+                                        <textarea value={cmsForm.marquee.text} onChange={e => setCmsForm({...cmsForm, marquee: {...cmsForm.marquee, text: e.target.value}})} className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-24" />
+                                    </div>
+                                </section>
+
+                                <section className="space-y-6">
+                                    <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">Campaign & Spotlight</h3>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Campaign Title</label>
+                                            <input value={cmsForm.campaign.title} onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, title: e.target.value}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Spotlight Title</label>
+                                            <input value={cmsForm.spotlight.title} onChange={e => setCmsForm({...cmsForm, spotlight: {...cmsForm.spotlight, title: e.target.value}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2 col-span-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Campaign Overlay Text</label>
+                                            <input value={cmsForm.campaign.overlayText1} onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, overlayText1: e.target.value}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-4">
+                                        {[1, 2, 3, 4].map(num => (
+                                            <div key={num} className="space-y-2">
+                                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Image {num}</label>
+                                                <div className="aspect-[3/4] bg-gray-100 relative group overflow-hidden">
+                                                    {/* @ts-ignore */}
+                                                    <img src={cmsForm.campaign[`image${num}`]} className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+                                                        <span className="text-white text-xs font-bold uppercase">Change</span>
+                                                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'campaign', `image${num}`)} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                             </>
+                         )}
+
+                         {/* ABOUT & CONTACT EDITING */}
+                         {cmsActiveSection === 'ABOUT' && (
+                             <>
+                                <section className="space-y-6">
+                                    <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">About Page Hero</h3>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Title</label>
+                                            <input value={cmsForm.about.hero.title} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, title: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Subtitle</label>
+                                            <input value={cmsForm.about.hero.subtitle} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, subtitle: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2 col-span-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Description</label>
+                                            <textarea value={cmsForm.about.hero.description} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, hero: {...cmsForm.about.hero, description: e.target.value}}})} className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-24" />
+                                        </div>
+                                        <div className="space-y-2 col-span-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Hero Image</label>
+                                            <div className="h-48 bg-gray-100 relative group overflow-hidden">
+                                                <img src={cmsForm.about.hero.imageUrl} className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+                                                    <span className="text-white text-xs font-bold uppercase">Change Image</span>
+                                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'about', 'hero', 'imageUrl')} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section className="space-y-6">
+                                    <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">Philosophy</h3>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Section Title</label>
+                                        <input value={cmsForm.about.philosophy.title} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, title: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Paragraph 1</label>
+                                            <textarea value={cmsForm.about.philosophy.description1} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description1: e.target.value}}})} className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Paragraph 2</label>
+                                            <textarea value={cmsForm.about.philosophy.description2} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description2: e.target.value}}})} className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Image 1</label>
+                                            <div className="aspect-[4/3] bg-gray-100 relative group overflow-hidden">
+                                                <img src={cmsForm.about.philosophy.image1} className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+                                                    <span className="text-white text-xs font-bold uppercase">Change</span>
+                                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'about', 'philosophy', 'image1')} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Image 2</label>
+                                            <div className="aspect-[4/3] bg-gray-100 relative group overflow-hidden">
+                                                <img src={cmsForm.about.philosophy.image2} className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+                                                    <span className="text-white text-xs font-bold uppercase">Change</span>
+                                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'about', 'philosophy', 'image2')} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section className="space-y-6">
+                                    <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">Contact Information</h3>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email</label>
+                                            <input value={cmsForm.about.contact.email} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, email: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Phone</label>
+                                            <input value={cmsForm.about.contact.phone} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, phone: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Hours</label>
+                                            <input value={cmsForm.about.contact.hours} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, hours: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Address</label>
+                                            <textarea value={cmsForm.about.contact.address} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, address: e.target.value}}})} className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none h-20 resize-none" />
+                                        </div>
+                                    </div>
+                                </section>
+                             </>
+                         )}
+
+                         {/* AUTH PAGE EDITING */}
+                         {cmsActiveSection === 'AUTH' && (
+                             <section className="space-y-6">
+                                <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">Auth Page Imagery</h3>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-2">Login Image</p>
+                                        <div className="relative h-64 bg-gray-100 overflow-hidden group">
+                                            <img src={cmsForm.auth?.loginImage} className="w-full h-full object-cover" />
+                                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'auth', 'loginImage')} />
+                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold uppercase transition-opacity pointer-events-none">Change</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-2">Register Image</p>
+                                        <div className="relative h-64 bg-gray-100 overflow-hidden group">
+                                            <img src={cmsForm.auth?.registerImage} className="w-full h-full object-cover" />
+                                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'auth', 'registerImage')} />
+                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold uppercase transition-opacity pointer-events-none">Change</div>
+                                        </div>
+                                    </div>
+                                </div>
+                             </section>
+                         )}
+
+                         <div className="pt-6 border-t border-gray-100">
+                            <button onClick={handleSaveCMS} className="bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2">
+                                {isSubmitting ? <Loader className="animate-spin" size={14}/> : <Save size={16} />} Save Changes
+                            </button>
+                         </div>
+                    </div>
+                ) : <p className="text-center py-12 text-gray-400">Loading Content Management System...</p>}
             </div>
         )}
 

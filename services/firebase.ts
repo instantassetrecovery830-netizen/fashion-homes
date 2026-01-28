@@ -74,6 +74,12 @@ export const sendEmailVerification = async (user: any) => {
   return Promise.resolve();
 };
 
+export const sendPasswordResetEmail = async (authInstance: any, email: string) => {
+  console.log(`[Mock] Password reset email sent to ${email}`);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return Promise.resolve();
+};
+
 export const onAuthStateChanged = (authInstance: any, callback: (user: MockUser | null) => void) => {
   listeners.push(callback);
   // Immediate callback with current state
