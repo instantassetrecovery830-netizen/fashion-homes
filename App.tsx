@@ -33,6 +33,10 @@ const App: React.FC = () => {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string | null>(null);
   
+  // Auth Navigation State
+  const [authInitialMode, setAuthInitialMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [authInitialRole, setAuthInitialRole] = useState<UserRole>(UserRole.BUYER);
+
   // Data State
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -140,10 +144,24 @@ const App: React.FC = () => {
 
   // Handlers
   const handleNavigate = (view: ViewState) => {
+    if (view === 'AUTH') {
+        // Reset defaults if navigating generically
+        setAuthInitialMode('LOGIN');
+        setAuthInitialRole(UserRole.BUYER);
+    }
+    
     if (view !== 'MARKETPLACE') {
         setSelectedDesignerFilter(null);
     }
     setCurrentView(view);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsCartOpen(false);
+  };
+
+  const handleAuthNavigation = (mode: 'LOGIN' | 'REGISTER', role: UserRole) => {
+    setAuthInitialMode(mode);
+    setAuthInitialRole(role);
+    setCurrentView('AUTH');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setIsCartOpen(false);
   };
@@ -160,10 +178,13 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (role: UserRole) => {
+    setUserRole(role);
     if (role === UserRole.ADMIN) {
       handleNavigate('ADMIN_PANEL');
     } else if (role === UserRole.VENDOR) {
       handleNavigate('VENDOR_DASHBOARD');
+    } else if (role === UserRole.BUYER) {
+      handleNavigate('BUYER_DASHBOARD');
     } else {
       handleNavigate('MARKETPLACE');
     }
@@ -277,7 +298,15 @@ const App: React.FC = () => {
   // View Routing
   const renderView = () => {
     if (currentView === 'AUTH') {
-      return <AuthView onLogin={handleLogin} onNavigate={handleNavigate} cmsContent={cmsContent} />;
+      return (
+        <AuthView 
+          onLogin={handleLogin} 
+          onNavigate={handleNavigate} 
+          cmsContent={cmsContent}
+          initialMode={authInitialMode}
+          initialRole={authInitialRole}
+        />
+      );
     }
 
     if (featureFlags.maintenanceMode && userRole !== UserRole.ADMIN) {
@@ -300,6 +329,7 @@ const App: React.FC = () => {
             products={activeProducts}
             onDesignerClick={handleDesignerSelect}
             cmsContent={cmsContent}
+            onAuthRequest={handleAuthNavigation}
           />
         );
       case 'MARKETPLACE':
@@ -394,11 +424,11 @@ const App: React.FC = () => {
           />
         );
       case 'PRICING':
-        return <PricingView onNavigate={handleNavigate} onRegister={() => handleLogin(UserRole.VENDOR)} />;
+        return <PricingView onNavigate={handleNavigate} onRegister={() => handleAuthNavigation('REGISTER', UserRole.VENDOR)} />;
       case 'ABOUT':
         return <AboutView onNavigate={handleNavigate} cmsContent={cmsContent} />;
       default:
-        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} products={activeProducts} onDesignerClick={handleDesignerSelect} cmsContent={cmsContent} />;
+        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} products={activeProducts} onDesignerClick={handleDesignerSelect} cmsContent={cmsContent} onAuthRequest={handleAuthNavigation} />;
     }
   };
 
@@ -427,6 +457,7 @@ const App: React.FC = () => {
       onLogout={handleLogout}
       onPlaceOrder={handlePlaceOrder}
       onVisualSearch={handleVisualSearch}
+      onAuthRequest={handleAuthNavigation}
     >
       {renderView()}
       

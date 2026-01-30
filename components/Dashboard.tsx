@@ -12,21 +12,11 @@ import {
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield,
   Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu, Wallet, Banknote, Bitcoin, ArrowLeft, Inbox,
-  Phone, Clock, Calendar, FileCheck
+  Phone, Clock, Calendar, FileCheck, ArrowDownLeft, ArrowUpRight as ArrowUpRightIcon
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission, KycDocuments } from '../types.ts';
 import { updateUserPassword, auth } from '../services/firebase.ts';
-
-// Initial Empty Data for real-time start
-const SALES_DATA = [
-  { name: 'Mon', sales: 0 },
-  { name: 'Tue', sales: 0 },
-  { name: 'Wed', sales: 0 },
-  { name: 'Thu', sales: 0 },
-  { name: 'Fri', sales: 0 },
-  { name: 'Sat', sales: 0 },
-  { name: 'Sun', sales: 0 },
-];
+import { VendorProfileView } from './VendorProfileView.tsx';
 
 const COLORS = ['#0a0a0a', '#C5A059', '#8B8580', '#E5E5E5', '#4A0404'];
 
@@ -114,8 +104,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [savedItems, setSavedItems] = useState<Product[]>([]); 
   const [followers, setFollowers] = useState<any[]>([]);
-  const [adminReviews, setAdminReviews] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [selectedFollower, setSelectedFollower] = useState<any | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // File Input Refs for Uploads
@@ -133,7 +122,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     avatar: currentVendor?.avatar || '',
     website: currentVendor?.website || '',
     instagram: currentVendor?.instagram || '',
-    twitter: currentVendor?.twitter || ''
+    twitter: currentVendor?.twitter || '',
+    bio: currentVendor?.bio || '',
+    coverImage: currentVendor?.coverImage || ''
   });
   
   // Password Update State
@@ -161,15 +152,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
      cvc: ''
   });
 
-  // Payment Method State
-  const [isAddingPayout, setIsAddingPayout] = useState(false);
-  const [payoutForm, setPayoutForm] = useState<Partial<PaymentMethod>>({
-      type: 'BANK',
-      details: {}
-  });
-  
-  // Admin Vendor Inspection State
-  const [selectedVendorForDetails, setSelectedVendorForDetails] = useState<Vendor | null>(null);
+  // Payout/Withdrawal State
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawStatus, setWithdrawStatus] = useState({ loading: false, success: false, error: '' });
 
   // CMS Form State
   const [cmsForm, setCmsForm] = useState<LandingPageContent | null>(null);
@@ -180,17 +166,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setCmsForm(cmsContent);
     }
   }, [cmsContent]);
-
-  // Store Design State
-  const [storeDesign, setStoreDesign] = useState({
-    brandName: currentVendor?.name || '',
-    location: currentVendor?.location || '',
-    coverImage: currentVendor?.coverImage || '',
-    bio: currentVendor?.bio || "",
-    theme: 'Editorial',
-    layout: 'Grid',
-    accentColor: '#000000'
-  });
   
   // Form State for Upload / Edit
   const [isEditing, setIsEditing] = useState(false);
@@ -210,7 +185,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ? products.filter(p => p.designer === (currentVendor?.name || ''))
     : products; // Admin sees all
 
-  // Calculate stats dynamically for Vendors/Buyers (Original Logic)
+  // --- DYNAMIC CHART DATA GENERATION ---
+  
+  // Create sales data for charts based on actual orders
+  const salesChartData = useMemo(() => {
+     // Initialize last 7 days map
+     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+     const today = new Date();
+     const chartDataMap = new Map<string, number>();
+     
+     // Last 7 days labels
+     const result = [];
+     for(let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const dayName = days[d.getDay()];
+        chartDataMap.set(dayName, 0);
+        result.push({ name: dayName, sales: 0, fullDate: d.toDateString() });
+     }
+
+     // Aggregate Order Totals
+     orders.forEach(order => {
+        const orderDate = new Date(order.date); // Assumes order.date is parsable string
+        const orderDay = days[orderDate.getDay()];
+        
+        // Filter for Vendor logic if applicable
+        let orderTotal = order.total;
+        if (isVendor && currentVendor) {
+            const vendorItems = order.items.filter(i => i.designer === currentVendor.name);
+            if (vendorItems.length === 0) return; // Skip orders not for this vendor
+            orderTotal = vendorItems.reduce((sum, i) => sum + (i.price * (i.quantity || 1)), 0);
+        }
+
+        const dataPoint = result.find(r => r.name === orderDay);
+        if (dataPoint) {
+            dataPoint.sales += orderTotal;
+        }
+     });
+
+     return result;
+  }, [orders, isVendor, currentVendor]);
+
+  // Calculate stats dynamically for Vendors/Buyers
   const stats = useMemo(() => {
     let revenue = 0;
     let activeOrders = 0;
@@ -290,20 +306,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
         avatar: currentVendor.avatar,
         website: currentVendor.website || '',
         instagram: currentVendor.instagram || '',
-        twitter: currentVendor.twitter || ''
+        twitter: currentVendor.twitter || '',
+        bio: currentVendor.bio || '',
+        coverImage: currentVendor.coverImage || ''
       });
-      setStoreDesign(prev => ({
-        ...prev,
-        brandName: currentVendor.name,
-        location: currentVendor.location || '',
-        coverImage: currentVendor.coverImage || '',
-        bio: currentVendor.bio
-      }));
       setKycFiles({
           idFront: currentVendor.kycDocuments?.idFront || '',
           idBack: currentVendor.kycDocuments?.idBack || '',
           proofOfAddress: currentVendor.kycDocuments?.proofOfAddress || ''
       });
+      
+      // Mock followers data with expanded details
+      setFollowers([
+          { id: 1, name: 'Sofia R.', location: 'Milan', avatar: 'https://i.pravatar.cc/150?u=1', joined: 'Oct 2023', purchases: 12, style: 'Avant-Garde' },
+          { id: 2, name: 'James K.', location: 'London', avatar: 'https://i.pravatar.cc/150?u=2', joined: 'Dec 2023', purchases: 3, style: 'Minimalist' },
+          { id: 3, name: 'Arjun P.', location: 'New York', avatar: 'https://i.pravatar.cc/150?u=3', joined: 'Jan 2024', purchases: 8, style: 'Streetwear' },
+          { id: 4, name: 'Wei L.', location: 'Shanghai', avatar: 'https://i.pravatar.cc/150?u=4', joined: 'Feb 2024', purchases: 5, style: 'Luxury' },
+      ]);
     }
   }, [currentVendor]);
 
@@ -377,7 +396,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 rating: 0,
                 stock: newProduct.stock || 1,
                 isNewSeason: true,
-                sizes: newProduct.sizes || ['M']
+                sizes: newProduct.sizes || ['M'],
+                isPreOrder: newProduct.isPreOrder
             };
             
             if (onAddProduct) {
@@ -410,7 +430,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  // Generalized CMS Image Upload Handler
   const handleCmsImageUpdate = (e: React.ChangeEvent<HTMLInputElement>, section: string, key: string, subKey?: string) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -419,16 +438,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const result = reader.result as string;
         setCmsForm(prev => {
             if (!prev) return null;
-            
-            // Handle Deep Nested About.Hero, About.Philosophy, etc.
             if (section === 'about') {
                const aboutData = { ...prev.about };
                // @ts-ignore
                aboutData[key] = { ...aboutData[key], [subKey!]: result };
                return { ...prev, about: aboutData };
             }
-            
-            // Handle Campaign or Auth (shallow nested)
             // @ts-ignore
             const sectionData = { ...prev[section], [key]: result };
             return { ...prev, [section]: sectionData };
@@ -449,7 +464,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               avatar: profileForm.avatar,
               website: profileForm.website,
               instagram: profileForm.instagram,
-              twitter: profileForm.twitter
+              twitter: profileForm.twitter,
+              bio: profileForm.bio,
+              coverImage: profileForm.coverImage
             } 
           : v
       );
@@ -500,140 +517,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
               : v
           );
           
-          // Simulate API call
           setTimeout(() => {
               setVendors(updatedVendors);
               setKycStatus({ loading: false, success: true, error: '' });
           }, 1500);
       }
   };
-  
-  const handleSaveStoreDesign = () => {
-     if (currentVendor && setVendors) {
-      const updatedVendors = vendors.map(v => 
-        v.id === currentVendor.id 
-          ? { ...v, name: storeDesign.brandName, bio: storeDesign.bio, location: storeDesign.location, coverImage: storeDesign.coverImage } 
-          : v
-      );
-      setVendors(updatedVendors);
-      alert("Storefront updated successfully.");
-    }
-  };
 
-  // Payment Methods Handling
-  const handleAddPaymentMethod = () => {
-      if (!currentVendor || !setVendors) return;
-      
-      const newMethod: PaymentMethod = {
-          id: `pm_${Date.now()}`,
-          type: payoutForm.type as any,
-          details: payoutForm.details as any
-      };
-
-      const updatedMethods = [...(currentVendor.paymentMethods || []), newMethod];
-      
-      const updatedVendors = vendors.map(v => 
-        v.id === currentVendor.id 
-          ? { ...v, paymentMethods: updatedMethods } 
-          : v
-      );
-      
-      setVendors(updatedVendors);
-      setIsAddingPayout(false);
-      setPayoutForm({ type: 'BANK', details: {} });
-  };
-
-  const handleDeletePaymentMethod = (id: string) => {
-      if (!currentVendor || !setVendors) return;
-      
-      const updatedMethods = (currentVendor.paymentMethods || []).filter(pm => pm.id !== id);
-      
-      const updatedVendors = vendors.map(v => 
-        v.id === currentVendor.id 
-          ? { ...v, paymentMethods: updatedMethods } 
-          : v
-      );
-      setVendors(updatedVendors);
-  };
-
-  const removeFromSaved = (id: string) => {
-    setSavedItems(prev => prev.filter(p => p.id !== id));
-  };
-
-  const removeFollower = (id: string) => {
-    setFollowers(prev => prev.filter(f => f.id !== id));
-  };
-  
-  const blockFollower = (id: string) => {
-    setFollowers(prev => prev.map(f => f.id === id ? { ...f, status: 'BLOCKED' } : f));
-  };
-  
   const toggleUserStatus = async (user: User & { isVendor?: boolean }) => {
      const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
      
      if (user.isVendor && setVendors) {
-        // Find vendor and toggle subscription status or verification as a proxy for banning
-        // We'll use subscriptionStatus = 'INACTIVE' as suspended
-        const vendor = vendors.find(v => v.id === user.id);
-        if (vendor) {
-           const updatedVendors = vendors.map(v => 
+        const updatedVendors = vendors.map(v => 
              v.id === user.id 
               ? { ...v, subscriptionStatus: newStatus === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE' } as Vendor
               : v
-           );
-           setVendors(updatedVendors);
-        }
+        );
+        setVendors(updatedVendors);
      } else if (!user.isVendor && onUpdateUser) {
         await onUpdateUser({ ...user, status: newStatus as any });
      }
   };
 
   const handleRoleUpdate = async (userId: string, newRole: string) => {
-      // Find user
       const user = users.find(u => u.id === userId);
       if (user && onUpdateUser) {
           await onUpdateUser({ ...user, role: newRole as any });
       }
   };
 
-  const handleSubscriptionToggle = (vendorId: string) => {
-    if (!setVendors) return;
-    const updatedVendors = vendors.map(v => {
-      if (v.id === vendorId) {
-        return { ...v, subscriptionStatus: v.subscriptionStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' } as Vendor;
-      }
-      return v;
-    });
-    setVendors(updatedVendors);
-  };
-  
-  const handleVerificationStatus = (vendorId: string, status: VerificationStatus) => {
-    if (!setVendors) return;
-    const updatedVendors = vendors.map(v => {
-      if (v.id === vendorId) {
-        return { ...v, verificationStatus: status } as Vendor;
-      }
-      return v;
-    });
-    setVendors(updatedVendors);
-  };
-
-  const handleReviewAction = (reviewId: string, action: 'APPROVE' | 'DELETE' | 'FLAG') => {
-    if (action === 'DELETE') {
-        setAdminReviews(prev => prev.filter(r => r.id !== reviewId));
-    } else {
-        const newStatus = action === 'APPROVE' ? 'APPROVED' : 'FLAGGED';
-        setAdminReviews(prev => prev.map(r => r.id === reviewId ? { ...r, status: newStatus } : r));
-    }
-  };
-
   const initiatePlanUpgrade = (planName: string) => {
       setSelectedPlanForUpgrade(planName);
       if (planName === "Atelier") {
-          // Free plan, upgrade immediately
           performPlanUpgrade(planName);
       } else {
-          // Paid plan, show payment modal
           setShowSubscriptionPayment(true);
       }
   };
@@ -656,8 +573,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const handleSubscriptionPaymentSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       setIsSubmitting(true);
-      
-      // Simulate Payment Processing
       setTimeout(() => {
           setIsSubmitting(false);
           if (selectedPlanForUpgrade) {
@@ -666,7 +581,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }, 1500);
   };
   
-  // ... Sidebar logic (omitted for brevity as it doesn't change much, but kept in full component)
   const getSidebarItems = () => {
     if (isBuyer) {
       return [
@@ -692,7 +606,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       items.push({ id: 'FOLLOWERS', label: 'Followers', icon: Users });
       items.push({ id: 'STORE_DESIGN', label: 'Design Store', icon: Palette });
       items.push({ id: 'SUBSCRIPTION_PLAN', label: 'My Subscription', icon: Diamond });
-      items.push({ id: 'SAVED', label: 'Saved Items', icon: Heart });
       items.push({ id: 'MARKETPLACE', label: 'View Storefront', icon: Eye, action: () => onNavigate('DESIGNERS') });
       items.push({ id: 'PROFILE', label: 'Profile Settings', icon: Settings });
     }
@@ -762,7 +675,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     </div>
   );
 
-  // ... (Other render methods: renderInbox, renderProducts)
   const renderInbox = () => (
       <div className="space-y-6 animate-fade-in">
           <h3 className="text-lg font-serif italic mb-4">Messages & Inquiries</h3>
@@ -814,6 +726,428 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
   );
 
+  const renderFulfillment = () => {
+      // Filter orders that contain items from this vendor
+      const vendorOrders = orders.filter(o => 
+          o.items.some(i => i.designer === currentVendor?.name)
+      );
+
+      return (
+          <div className="space-y-6 animate-fade-in">
+              <h2 className="text-2xl font-serif italic mb-6">Client Orders</h2>
+              {vendorOrders.length === 0 ? (
+                   <div className="text-center py-12 text-gray-400 border border-dashed border-gray-200">
+                       <p>No active orders to fulfill.</p>
+                   </div>
+              ) : (
+                  <div className="space-y-4">
+                      {vendorOrders.map(order => {
+                          const vendorItems = order.items.filter(i => i.designer === currentVendor?.name);
+                          const vendorTotal = vendorItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                          
+                          return (
+                              <div key={order.id} className="bg-white border border-gray-100 p-6 shadow-sm">
+                                  <div className="flex justify-between items-start mb-4 border-b border-gray-50 pb-4">
+                                      <div>
+                                          <p className="font-bold text-sm">Order #{order.id}</p>
+                                          <p className="text-xs text-gray-400">{order.date} • {order.customerName}</p>
+                                      </div>
+                                      <div className="text-right">
+                                          <p className="font-bold text-sm">${vendorTotal}</p>
+                                          <span className={`text-[10px] font-bold uppercase px-2 py-1 ${
+                                              order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
+                                              order.status === 'Shipped' ? 'bg-blue-100 text-blue-700' :
+                                              'bg-yellow-100 text-yellow-700'
+                                          }`}>
+                                              {order.status}
+                                          </span>
+                                      </div>
+                                  </div>
+                                  
+                                  <div className="space-y-3 mb-4">
+                                      {vendorItems.map((item, idx) => (
+                                          <div key={idx} className="flex items-center gap-4 text-sm bg-gray-50 p-2 rounded-sm">
+                                              <img src={item.image} className="w-10 h-10 object-cover rounded-sm" />
+                                              <div className="flex-1">
+                                                  <p className="font-bold">{item.name}</p>
+                                                  <p className="text-xs text-gray-500">Size: {item.size} • Qty: {item.quantity}</p>
+                                              </div>
+                                              <span>${item.price * item.quantity}</span>
+                                          </div>
+                                      ))}
+                                  </div>
+
+                                  <div className="flex gap-2 justify-end">
+                                      {order.status !== 'Delivered' && (
+                                          <>
+                                              <button 
+                                                  onClick={() => onUpdateOrderStatus && onUpdateOrderStatus(order.id, 'Shipped')}
+                                                  className="bg-black text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2"
+                                              >
+                                                  <Truck size={14} /> Mark Shipped
+                                              </button>
+                                              <button 
+                                                  onClick={() => onUpdateOrderStatus && onUpdateOrderStatus(order.id, 'Delivered')}
+                                                  className="border border-gray-200 px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors flex items-center gap-2"
+                                              >
+                                                  <CheckCircle size={14} /> Mark Delivered
+                                              </button>
+                                          </>
+                                      )}
+                                      <button className="border border-gray-200 px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors flex items-center gap-2">
+                                          <FileText size={14} /> Print Slip
+                                      </button>
+                                  </div>
+                              </div>
+                          );
+                      })}
+                  </div>
+              )}
+          </div>
+      );
+  };
+
+  const renderPayouts = () => {
+      // Logic for calculating balance
+      const vendorOrders = orders.filter(o => o.items.some(i => i.designer === currentVendor?.name));
+      
+      const deliveredOrders = vendorOrders.filter(o => o.status === 'Delivered');
+      const activeOrders = vendorOrders.filter(o => o.status !== 'Delivered');
+
+      const calculateShare = (orderList: Order[]) => {
+          return orderList.reduce((acc, order) => {
+              const vendorItems = order.items.filter(i => i.designer === currentVendor?.name);
+              const total = vendorItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+              return acc + total;
+          }, 0);
+      };
+
+      const grossDelivered = calculateShare(deliveredOrders);
+      const grossPending = calculateShare(activeOrders);
+      const commissionRate = 0.15; // 15%
+
+      const availableBalance = grossDelivered * (1 - commissionRate);
+      const pendingBalance = grossPending * (1 - commissionRate);
+
+      const handleWithdrawSubmit = (e: React.FormEvent) => {
+          e.preventDefault();
+          const amount = parseFloat(withdrawAmount);
+          if (amount <= 0 || amount > availableBalance) {
+              setWithdrawStatus({ loading: false, success: false, error: 'Invalid amount or insufficient funds.' });
+              return;
+          }
+
+          setWithdrawStatus({ loading: true, success: false, error: '' });
+          
+          // Simulation
+          setTimeout(() => {
+              setWithdrawStatus({ loading: false, success: true, error: '' });
+              setWithdrawAmount('');
+              // Reset after showing success for a moment
+              setTimeout(() => {
+                  setWithdrawStatus({ loading: false, success: false, error: '' });
+                  setShowWithdrawModal(false);
+              }, 2000);
+          }, 1500);
+      };
+
+      return (
+          <div className="space-y-8 animate-fade-in relative">
+              {showWithdrawModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 animate-fade-in">
+                      <div className="bg-white max-w-sm w-full p-8 shadow-2xl relative animate-slide-up">
+                          <button onClick={() => setShowWithdrawModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black transition-colors"><X size={20}/></button>
+                          
+                          <div className="text-center mb-6">
+                              <Wallet size={32} className="mx-auto text-luxury-gold mb-3" />
+                              <h3 className="text-xl font-bold uppercase tracking-widest">Request Payout</h3>
+                              <p className="text-xs text-gray-500">Secure withdrawal to your linked account.</p>
+                          </div>
+
+                          <div className="bg-gray-50 p-4 border border-gray-100 rounded-sm mb-6">
+                              <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Available Balance</p>
+                              <p className="text-2xl font-serif italic font-bold text-black">${availableBalance.toFixed(2)}</p>
+                          </div>
+
+                          {withdrawStatus.success ? (
+                              <div className="flex flex-col items-center justify-center py-6 text-green-600 animate-fade-in">
+                                  <CheckCircle size={48} className="mb-2" />
+                                  <p className="text-sm font-bold">Request Submitted!</p>
+                                  <p className="text-[10px] text-gray-500">Funds typically arrive in 1-3 business days.</p>
+                              </div>
+                          ) : (
+                              <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+                                  <div>
+                                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Withdrawal Amount ($)</label>
+                                      <input 
+                                          type="number"
+                                          step="0.01"
+                                          max={availableBalance}
+                                          min="1"
+                                          value={withdrawAmount}
+                                          onChange={(e) => setWithdrawAmount(e.target.value)}
+                                          className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none font-mono"
+                                          placeholder="0.00"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">To Account</label>
+                                      <div className="flex items-center gap-3 border-b border-gray-200 py-2">
+                                          <Banknote size={16} className="text-gray-400" />
+                                          <span className="text-sm text-gray-600">Bank Account ending in •••• 4281</span>
+                                      </div>
+                                  </div>
+
+                                  {withdrawStatus.error && (
+                                      <p className="text-xs text-red-500 flex items-center gap-1 mt-2"><AlertCircle size={12} /> {withdrawStatus.error}</p>
+                                  )}
+
+                                  <button 
+                                      type="submit" 
+                                      disabled={!withdrawAmount || withdrawStatus.loading || parseFloat(withdrawAmount) > availableBalance}
+                                      className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+                                  >
+                                      {withdrawStatus.loading ? <Loader className="animate-spin" size={14} /> : 'Confirm Withdrawal'}
+                                  </button>
+                              </form>
+                          )}
+                      </div>
+                  </div>
+              )}
+
+              <div className="flex justify-between items-center">
+                   <h2 className="text-2xl font-serif italic">Wallet & Payouts</h2>
+                   <button 
+                      onClick={() => setShowWithdrawModal(true)}
+                      className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2"
+                   >
+                       <ArrowUpRightIcon size={16} /> Withdraw Funds
+                   </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-luxury-black text-white p-6 shadow-lg">
+                      <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Available Balance</p>
+                      <p className="text-3xl font-bold font-serif italic">${availableBalance.toFixed(2)}</p>
+                      <p className="text-[10px] text-gray-400 mt-2">Ready for withdrawal</p>
+                  </div>
+                  <div className="bg-white border border-gray-100 p-6 shadow-sm">
+                      <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Pending Clearance</p>
+                      <p className="text-3xl font-bold">${pendingBalance.toFixed(2)}</p>
+                      <p className="text-[10px] text-gray-400 mt-2">Funds from active orders</p>
+                  </div>
+                   <div className="bg-white border border-gray-100 p-6 shadow-sm">
+                      <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Commission Rate</p>
+                      <p className="text-3xl font-bold">15%</p>
+                      <p className="text-[10px] text-gray-400 mt-2">Standard Tier</p>
+                  </div>
+              </div>
+
+              <div className="bg-white border border-gray-100 shadow-sm">
+                  <div className="p-6 border-b border-gray-50">
+                      <h3 className="font-bold text-sm uppercase tracking-widest">Transaction History</h3>
+                  </div>
+                  {vendorOrders.length === 0 ? (
+                      <div className="p-8 text-center text-gray-400 italic">No transactions recorded yet.</div>
+                  ) : (
+                      <table className="w-full text-left text-sm">
+                          <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                              <tr>
+                                  <th className="p-4">Date</th>
+                                  <th className="p-4">Description</th>
+                                  <th className="p-4">Type</th>
+                                  <th className="p-4 text-right">Amount</th>
+                                  <th className="p-4 text-right">Status</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                              {vendorOrders.slice(0, 10).map(order => {
+                                   const vendorItems = order.items.filter(i => i.designer === currentVendor?.name);
+                                   const total = vendorItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                                   const net = total * 0.85;
+
+                                  return (
+                                      <tr key={order.id}>
+                                          <td className="p-4 text-gray-500">{order.date}</td>
+                                          <td className="p-4 font-medium">Order #{order.id} Revenue</td>
+                                          <td className="p-4"><span className="bg-green-50 text-green-700 px-2 py-1 text-[10px] font-bold uppercase rounded-sm">Sale</span></td>
+                                          <td className="p-4 text-right font-mono">+${net.toFixed(2)}</td>
+                                          <td className="p-4 text-right">
+                                              <span className={`text-[10px] font-bold uppercase px-2 py-1 ${order.status === 'Delivered' ? 'text-gray-500' : 'text-orange-500'}`}>
+                                                  {order.status === 'Delivered' ? 'Cleared' : 'Pending'}
+                                              </span>
+                                          </td>
+                                      </tr>
+                                  );
+                              })}
+                          </tbody>
+                      </table>
+                  )}
+              </div>
+          </div>
+      );
+  };
+
+  const renderFollowers = () => {
+      return (
+          <div className="space-y-6 animate-fade-in">
+              <h2 className="text-2xl font-serif italic mb-6">Community</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {followers.map(follower => (
+                      <div key={follower.id} className="bg-white border border-gray-100 p-6 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow">
+                          <img src={follower.avatar} className="w-16 h-16 rounded-full mb-4 object-cover border border-gray-100" />
+                          <h3 className="font-bold text-sm">{follower.name}</h3>
+                          <p className="text-xs text-gray-400 mb-4">{follower.location}</p>
+                          <button 
+                            onClick={() => setSelectedFollower(follower)}
+                            className="text-[10px] font-bold uppercase tracking-widest border border-gray-200 px-4 py-2 hover:bg-black hover:text-white transition-colors"
+                          >
+                              View Profile
+                          </button>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      );
+  };
+
+  const renderStoreDesign = () => {
+      return (
+          <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
+              <h2 className="text-2xl font-serif italic mb-6">Storefront Design</h2>
+              
+              <div className="bg-white p-8 border border-gray-100 shadow-sm space-y-8">
+                  <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                          <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400">Cover Image</h3>
+                          <span className="text-[10px] text-gray-400">Recommended 2400x600px</span>
+                      </div>
+                      <div className="relative w-full h-48 bg-gray-50 border-2 border-dashed border-gray-200 group overflow-hidden cursor-pointer hover:border-black transition-colors">
+                          <img 
+                              src={profileForm.coverImage || "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200"} 
+                              className="w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" 
+                          />
+                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <ImageIcon className="mb-2 text-gray-400 group-hover:text-black" />
+                              <span className="text-xs font-bold uppercase text-gray-500 group-hover:text-black">Upload New Cover</span>
+                          </div>
+                          <input 
+                              type="file" 
+                              accept="image/*"
+                              ref={coverFileInputRef}
+                              onChange={(e) => handleFileUpload(e, (base64) => setProfileForm({...profileForm, coverImage: base64}))}
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                      </div>
+                  </div>
+
+                  <div className="space-y-4">
+                       <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400">Brand Biography</h3>
+                       <textarea 
+                          value={profileForm.bio}
+                          onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})}
+                          className="w-full border border-gray-200 p-4 text-sm focus:border-black outline-none h-32 resize-none"
+                          placeholder="Tell your brand story..."
+                       />
+                       <p className="text-[10px] text-gray-400">This text will appear on your public atelier profile.</p>
+                  </div>
+
+                  {/* Social Links Section */}
+                  <div className="space-y-4">
+                       <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400">Digital Presence</h3>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <div className="space-y-2">
+                               <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                                   <Globe size={12} /> Website
+                               </label>
+                               <input 
+                                  type="text"
+                                  placeholder="https://www.yourbrand.com"
+                                  value={profileForm.website}
+                                  onChange={(e) => setProfileForm({...profileForm, website: e.target.value})}
+                                  className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                               />
+                           </div>
+                           <div className="space-y-2">
+                               <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                                   <Instagram size={12} /> Instagram Handle
+                               </label>
+                               <input 
+                                  type="text"
+                                  placeholder="@yourbrand"
+                                  value={profileForm.instagram}
+                                  onChange={(e) => setProfileForm({...profileForm, instagram: e.target.value})}
+                                  className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                               />
+                           </div>
+                           <div className="space-y-2">
+                               <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                                   <Twitter size={12} /> Twitter Handle
+                               </label>
+                               <input 
+                                  type="text"
+                                  placeholder="@yourbrand"
+                                  value={profileForm.twitter}
+                                  onChange={(e) => setProfileForm({...profileForm, twitter: e.target.value})}
+                                  className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                               />
+                           </div>
+                       </div>
+                  </div>
+
+                   <div className="space-y-4">
+                       <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400">Visual Theme</h3>
+                       <div className="grid grid-cols-3 gap-4">
+                           <button className="border-2 border-black p-4 text-center">
+                               <div className="w-full h-12 bg-gray-50 mb-2 border border-gray-100" />
+                               <span className="text-xs font-bold">Minimalist (Active)</span>
+                           </button>
+                           <button className="border border-gray-200 p-4 text-center opacity-50 cursor-not-allowed">
+                               <div className="w-full h-12 bg-black mb-2" />
+                               <span className="text-xs font-bold">Dark Mode</span>
+                           </button>
+                           <button className="border border-gray-200 p-4 text-center opacity-50 cursor-not-allowed">
+                               <div className="w-full h-12 bg-luxury-gold mb-2" />
+                               <span className="text-xs font-bold">Atelier Gold</span>
+                           </button>
+                       </div>
+                   </div>
+                   
+                   <div className="pt-6 border-t border-gray-100">
+                        <button onClick={handleSaveProfile} className="bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2">
+                            <Save size={16} /> Save Changes
+                        </button>
+                   </div>
+              </div>
+          </div>
+      );
+  };
+  
+  const renderStorePreview = () => {
+      if (!currentVendor) return null;
+      return (
+          <div className="bg-white border border-gray-200 shadow-2xl overflow-hidden rounded-sm relative">
+              <div className="bg-gray-100 p-2 flex justify-between items-center text-xs text-gray-500 border-b border-gray-200">
+                  <div className="flex gap-1">
+                      <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                  </div>
+                  <span>Preview Mode: Public View</span>
+                  <button onClick={() => setActiveTab('OVERVIEW')}><X size={14}/></button>
+              </div>
+              <div className="h-[80vh] overflow-y-auto">
+                 <VendorProfileView 
+                    vendor={currentVendor} 
+                    onProductSelect={onProductSelect || (() => {})} 
+                    onNavigate={() => {}} // Disable navigation in preview
+                    products={products}
+                 />
+              </div>
+          </div>
+      );
+  };
+
   const renderOverview = () => {
     // Admin Dashboard View
     if (isAdmin && adminStats) {
@@ -861,7 +1195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <h3 className="text-lg font-bold mb-6">Revenue Trajectory</h3>
                         <div className="h-72 w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={SALES_DATA}>
+                                <AreaChart data={salesChartData}>
                                     <defs>
                                         <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#000000" stopOpacity={0.1}/>
@@ -899,7 +1233,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     <Legend verticalAlign="bottom" height={36} iconType="circle" />
                                 </PieChart>
                             </ResponsiveContainer>
-                            {/* Center Text */}
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
                                 <span className="text-xs font-bold text-gray-400 uppercase">Mix</span>
                             </div>
@@ -934,23 +1267,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                         <DollarSign size={10} />
                                     </div>
                                     <div>
-                                        <p className="text-xs font-bold text-gray-900">New Order Recieved</p>
-                                        <p className="text-[10px] text-gray-500">Order {o.id} • {o.customerName} • ${o.total}</p>
+                                        <p className="text-xs font-bold text-gray-900">New Order</p>
+                                        <p className="text-[10px] text-gray-500">#{o.id} • {o.customerName} • ${o.total}</p>
                                     </div>
                                     <span className="ml-auto text-[10px] text-gray-400">{o.date}</span>
                                 </div>
                             ))}
-                            {/* Inject some fake events if empty for visual fullness */}
-                            <div className="flex items-start gap-3">
-                                <div className="mt-1 p-1.5 bg-blue-100 text-blue-600 rounded-full">
-                                    <Users size={10} />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-bold text-gray-900">New User Registration</p>
-                                    <p className="text-[10px] text-gray-500">A new buyer joined the platform.</p>
-                                </div>
-                                <span className="ml-auto text-[10px] text-gray-400">2h ago</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1046,10 +1368,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
       )}
 
+      {/* Follower Profile Modal */}
+      {selectedFollower && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white p-8 max-w-sm w-full shadow-2xl relative animate-slide-up">
+                <button onClick={() => setSelectedFollower(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black transition-colors"><X size={20}/></button>
+                <div className="flex flex-col items-center text-center">
+                    <img src={selectedFollower.avatar} className="w-24 h-24 rounded-full mb-4 object-cover border-2 border-gray-100" />
+                    <h3 className="text-xl font-bold font-serif italic mb-1">{selectedFollower.name}</h3>
+                    <p className="text-xs text-gray-400 mb-6 uppercase tracking-widest flex items-center gap-1">
+                        <MapPin size={10} /> {selectedFollower.location}
+                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-4 w-full mb-6 border-y border-gray-100 py-4">
+                        <div>
+                            <p className="text-lg font-bold">{selectedFollower.purchases}</p>
+                            <p className="text-[10px] text-gray-400 uppercase tracking-widest">Orders</p>
+                        </div>
+                        <div>
+                            <p className="text-lg font-bold">{selectedFollower.style}</p>
+                            <p className="text-[10px] text-gray-400 uppercase tracking-widest">Style</p>
+                        </div>
+                    </div>
+                    
+                    <div className="w-full space-y-3">
+                        <p className="text-xs text-gray-500 mb-2">Member since {selectedFollower.joined}</p>
+                        <button className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors">
+                            Message Client
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-end">
         <div>
            <h2 className="text-3xl font-serif italic mb-2">Dashboard Overview</h2>
-           <p className="text-gray-500 text-sm">Welcome back, {role === UserRole.VENDOR ? currentVendor?.name : 'Admin'}</p>
+           <p className="text-gray-500 text-sm">Welcome back, {role === UserRole.VENDOR ? currentVendor?.name : 'User'}</p>
         </div>
         <div className="text-right">
            <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Total Revenue</p>
@@ -1094,10 +1450,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
          <div className="lg:col-span-2 bg-white p-6 border border-gray-100 shadow-sm">
-            <h3 className="text-lg font-bold mb-6">Revenue Analytics</h3>
+            <h3 className="text-lg font-bold mb-6">Revenue Analytics (Last 7 Days)</h3>
             <div className="h-64 w-full">
                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={SALES_DATA}>
+                  <BarChart data={salesChartData}>
                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
@@ -1111,7 +1467,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
          <div className="bg-white p-6 border border-gray-100 shadow-sm">
             <h3 className="text-lg font-bold mb-6">Recent Activity</h3>
             <div className="space-y-6">
-                <p className="text-sm text-gray-400 italic text-center py-12">No recent activity recorded.</p>
+                {orders.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic text-center py-12">No recent activity recorded.</p>
+                ) : (
+                    orders.slice(0, 5).map(o => (
+                         <div key={o.id} className="flex items-start gap-3 border-b border-gray-50 pb-3 last:border-0">
+                            <div className="mt-1 p-1.5 bg-green-100 text-green-600 rounded-full">
+                                <DollarSign size={10} />
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-gray-900">New Sale</p>
+                                <p className="text-xs text-gray-500">#{o.id} • ${o.total}</p>
+                            </div>
+                            <span className="ml-auto text-[10px] text-gray-400">{o.date}</span>
+                        </div>
+                    ))
+                )}
             </div>
          </div>
       </div>
@@ -1223,6 +1594,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="flex-1 p-6 md:p-12 overflow-y-auto h-screen">
         {activeTab === 'OVERVIEW' && renderOverview()}
         {activeTab === 'PRODUCTS' && renderProducts()}
+        {activeTab === 'FULFILLMENT' && renderFulfillment()}
+        {activeTab === 'PAYOUTS' && renderPayouts()}
+        {activeTab === 'FOLLOWERS' && renderFollowers()}
+        {activeTab === 'STORE_DESIGN' && renderStoreDesign()}
+        {activeTab === 'STORE_PREVIEW' && renderStorePreview()}
         
         {/* SUBSCRIPTION PLAN TAB */}
         {activeTab === 'SUBSCRIPTION_PLAN' && (
@@ -1308,7 +1684,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
                             className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-white"
                         >
-                            {['Outerwear', 'Bottoms', 'Knitwear', 'Footwear', 'Accessories'].map(c => (
+                            {['Outerwear', 'Bottoms', 'Knitwear', 'Footwear', 'Accessories', 'Tops'].map(c => (
                                 <option key={c} value={c}>{c}</option>
                             ))}
                         </select>
@@ -1422,14 +1798,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         
         {activeTab === 'ORDERS' && (
              <div className="space-y-6 animate-fade-in">
-                 <h2 className="text-2xl font-serif italic mb-6">{isAdmin ? 'All Orders' : 'Order History'}</h2>
+                 <h2 className="text-2xl font-serif italic mb-6">{isAdmin ? 'All Orders' : 'My Purchases'}</h2>
                  {orders.length === 0 ? (
                      <div className="text-center py-12 text-gray-400 border border-dashed border-gray-200">
                          <p>No orders found.</p>
                      </div>
                  ) : (
                      <div className="space-y-4">
-                         {orders.map(order => (
+                         {/* For Vendors/Buyers, show purchases. For Admin, show all. */}
+                         {orders.filter(o => isAdmin || o.customerName === (auth.currentUser?.email || '')).map(order => (
                              <div key={order.id} className="bg-white border border-gray-100 p-6 shadow-sm">
                                  <div className="flex justify-between items-start mb-4 border-b border-gray-50 pb-4">
                                      <div>
@@ -1455,7 +1832,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                          </div>
                                      ))}
                                  </div>
-                                 {(isAdmin || isVendor) && order.status !== 'Delivered' && (
+                                 {(isAdmin) && order.status !== 'Delivered' && (
                                      <div className="mt-4 pt-4 border-t border-gray-50 flex gap-2">
                                          <button 
                                             onClick={() => onUpdateOrderStatus && onUpdateOrderStatus(order.id, 'Shipped')}
@@ -1473,6 +1850,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                  )}
                              </div>
                          ))}
+                         {orders.filter(o => isAdmin || o.customerName === (auth.currentUser?.email || '')).length === 0 && (
+                             <div className="text-center py-12 text-gray-400">
+                                 <p>You haven't made any purchases yet.</p>
+                             </div>
+                         )}
                      </div>
                  )}
              </div>
@@ -1604,66 +1986,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                     <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'about', 'hero', 'imageUrl')} />
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                </section>
-
-                                <section className="space-y-6">
-                                    <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">Philosophy</h3>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Section Title</label>
-                                        <input value={cmsForm.about.philosophy.title} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, title: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Paragraph 1</label>
-                                            <textarea value={cmsForm.about.philosophy.description1} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description1: e.target.value}}})} className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Paragraph 2</label>
-                                            <textarea value={cmsForm.about.philosophy.description2} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description2: e.target.value}}})} className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Image 1</label>
-                                            <div className="aspect-[4/3] bg-gray-100 relative group overflow-hidden">
-                                                <img src={cmsForm.about.philosophy.image1} className="w-full h-full object-cover" />
-                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-                                                    <span className="text-white text-xs font-bold uppercase">Change</span>
-                                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'about', 'philosophy', 'image1')} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Image 2</label>
-                                            <div className="aspect-[4/3] bg-gray-100 relative group overflow-hidden">
-                                                <img src={cmsForm.about.philosophy.image2} className="w-full h-full object-cover" />
-                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-                                                    <span className="text-white text-xs font-bold uppercase">Change</span>
-                                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCmsImageUpdate(e, 'about', 'philosophy', 'image2')} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </section>
-
-                                <section className="space-y-6">
-                                    <h3 className="text-sm font-bold uppercase border-b border-gray-100 pb-2">Contact Information</h3>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email</label>
-                                            <input value={cmsForm.about.contact.email} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, email: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Phone</label>
-                                            <input value={cmsForm.about.contact.phone} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, phone: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Hours</label>
-                                            <input value={cmsForm.about.contact.hours} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, hours: e.target.value}}})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Address</label>
-                                            <textarea value={cmsForm.about.contact.address} onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, address: e.target.value}}})} className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none h-20 resize-none" />
                                         </div>
                                     </div>
                                 </section>
@@ -1917,7 +2239,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
         )}
         
-        {['STORE_PREVIEW', 'FULFILLMENT', 'PAYOUTS', 'FOLLOWERS', 'STORE_DESIGN', 'SAVED', 'VERIFICATION', 'SUBSCRIPTIONS', 'REVIEWS', 'TRANSACTIONS', 'SETTINGS'].includes(activeTab) && !['OVERVIEW', 'PRODUCTS', 'UPLOAD', 'ORDERS', 'CMS', 'PROFILE', 'INBOX', 'USERS', 'SUBSCRIPTION_PLAN'].includes(activeTab) && (
+        {['REVIEWS', 'TRANSACTIONS', 'SETTINGS', 'VERIFICATION', 'SUBSCRIPTIONS'].includes(activeTab) && (
             <div className="h-full flex items-center justify-center text-gray-400 animate-fade-in">
                  <div className="text-center">
                     <Settings size={48} className="mx-auto mb-4 opacity-20" />

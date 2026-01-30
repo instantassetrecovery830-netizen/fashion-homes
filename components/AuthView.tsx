@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, ArrowLeft, RefreshCw, Briefcase, ShoppingBag } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types';
 import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail } from '../services/firebase';
 import { createVendorInDb, createUserInDb, fetchUsers, fetchVendors } from '../services/dataService';
@@ -106,27 +106,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     }
   };
 
-  const handleCheckVerification = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-        if (auth.currentUser) {
-            await auth.currentUser.reload();
-            if (auth.currentUser.emailVerified) {
-                await routeUser(auth.currentUser);
-                setVerificationNeeded(false);
-            } else {
-                setError("Email not verified yet. Please check your inbox or spam folder.");
-            }
-        }
-    } catch (e) {
-        console.error("Verification check failed", e);
-        setError("Unable to verify status. Please try again.");
-    } finally {
-        setIsLoading(false);
-    }
-  };
-
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
@@ -150,7 +129,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     setIsLoading(true);
     setError(null);
     try {
-      const result = await signInWithGoogle(auth);
+      const result = await signInWithGoogle();
       const user = result.user;
       
       if (!user.email) throw new Error("Google account email not found.");
@@ -212,31 +191,32 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
       const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
       if (adminEmails.includes(user.email?.toLowerCase() || '')) {
           onLogin(UserRole.ADMIN);
-      } else {
-          try {
-              // Check Buyers (Users table)
-              const dbUsers = await fetchUsers();
-              const dbUser = dbUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
-              
-              if (dbUser && dbUser.role) {
-                  onLogin(dbUser.role);
-                  return;
-              }
-
-              // Check Vendors (Vendors table)
-              const dbVendors = await fetchVendors();
-              const dbVendor = dbVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
-
-              if (dbVendor) {
-                  onLogin(UserRole.VENDOR);
-                  return;
-              }
-
-              // Fallback: If DB entry doesn't exist yet, use the role they selected on the toggle
-              onLogin(selectedRole); 
-          } catch {
-              onLogin(selectedRole);
+          return;
+      } 
+      
+      try {
+          // Check Buyers (Users table)
+          const dbUsers = await fetchUsers();
+          const dbUser = dbUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
+          
+          if (dbUser && dbUser.role) {
+              onLogin(dbUser.role);
+              return;
           }
+
+          // Check Vendors (Vendors table)
+          const dbVendors = await fetchVendors();
+          const dbVendor = dbVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
+
+          if (dbVendor) {
+              onLogin(UserRole.VENDOR);
+              return;
+          }
+
+          // Fallback: If DB entry doesn't exist yet, use the role they selected on the toggle
+          onLogin(selectedRole); 
+      } catch {
+          onLogin(selectedRole);
       }
   };
 
@@ -318,6 +298,28 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             setError(err.message || "Authentication failed.");
         }
     } finally {
+        // isLoading handled in routeUser if checking DB, otherwise false
+        if (error) setIsLoading(false);
+    }
+  };
+
+  const handleCheckVerification = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+        if (auth.currentUser) {
+            await auth.currentUser.reload();
+            if (auth.currentUser.emailVerified) {
+                await routeUser(auth.currentUser);
+                setVerificationNeeded(false);
+            } else {
+                setError("Email not verified yet. Please check your inbox or wait a moment.");
+            }
+        }
+    } catch(e) {
+         console.error(e);
+         setError("Failed to check verification status.");
+    } finally {
         setIsLoading(false);
     }
   };
@@ -330,9 +332,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                     <Mail size={32} />
                 </div>
                 <h2 className="text-2xl font-serif italic mb-4">Verify Your Email</h2>
-                <p className="text-gray-500 text-sm leading-relaxed mb-6">
-                    We have sent a verification link to <span className="font-bold text-black">{verificationEmail}</span>.
-                    Please check your inbox to activate your account.
+                <p className="text-gray-500 text-sm leading-relaxed mb-8">
+                    We have sent you a verification email to <span className="font-bold text-black">{verificationEmail}</span>. 
+                    Verify it and log in.
                 </p>
 
                 {error && (
@@ -345,10 +347,22 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 <button 
                     onClick={handleCheckVerification}
                     disabled={isLoading}
-                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-6 flex justify-center items-center gap-2"
+                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-3 flex justify-center items-center gap-2 disabled:opacity-70"
                 >
-                    {isLoading ? <Loader size={14} className="animate-spin"/> : <CheckCircle size={14} />} 
-                    I've Verified My Email
+                    {isLoading ? <Loader className="animate-spin" size={16} /> : "I've Verified My Email"}
+                </button>
+
+                <button 
+                    onClick={async () => {
+                        await signOut(auth);
+                        setVerificationNeeded(false);
+                        setIsRegister(false);
+                        setVerificationEmail('');
+                        setError(null);
+                    }}
+                    className="w-full bg-white border border-gray-200 text-black py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-gray-50 transition-colors mb-6 flex justify-center items-center gap-2"
+                >
+                    Sign Out & Log In
                 </button>
                 
                 <div className="bg-gray-50 p-4 rounded-sm">
@@ -371,19 +385,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                             )}
                         </button>
                     )}
-                </div>
-
-                <div className="mt-8 border-t border-gray-100 pt-6">
-                    <button 
-                        onClick={async () => {
-                            await signOut(auth);
-                            setVerificationNeeded(false);
-                            onNavigate('LANDING');
-                        }}
-                        className="text-[10px] text-gray-400 uppercase tracking-widest hover:text-black transition-colors"
-                    >
-                        Sign Out / Back to Store
-                    </button>
                 </div>
             </div>
         </div>
@@ -493,26 +494,29 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
-                     {/* Role Selection for Register */}
-                     <div className="flex bg-gray-50 p-1 rounded-sm mb-6">
+                     {/* Role Selection Tabs */}
+                     <div className="flex p-1 rounded-full border border-gray-100 mb-8 relative bg-gray-50/50">
+                         {/* Sliding Background */}
+                         <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white shadow-sm rounded-full transition-all duration-300 ease-in-out ${selectedRole === UserRole.VENDOR ? 'left-[calc(50%+2px)]' : 'left-1'}`} />
+                         
                          <button
                             type="button" 
                             onClick={() => setSelectedRole(UserRole.BUYER)}
-                            className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-all ${selectedRole === UserRole.BUYER ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
+                            className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest transition-all relative z-10 flex items-center justify-center gap-2 ${selectedRole === UserRole.BUYER ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
                          >
-                             Buyer
+                             <ShoppingBag size={14} /> Buyer
                          </button>
                          <button 
                             type="button"
                             onClick={() => setSelectedRole(UserRole.VENDOR)}
-                            className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-all ${selectedRole === UserRole.VENDOR ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
+                            className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest transition-all relative z-10 flex items-center justify-center gap-2 ${selectedRole === UserRole.VENDOR ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
                          >
-                             Vendor
+                             <Briefcase size={14} /> Vendor
                          </button>
                      </div>
 
                      {isRegister && (
-                        <>
+                        <div className="animate-fade-in space-y-5">
                              {/* Profile Photo Upload */}
                              <div className="flex justify-center mb-4">
                                 <div className="relative w-24 h-24 rounded-full bg-gray-50 border border-gray-200 overflow-hidden flex items-center justify-center group cursor-pointer">
@@ -548,7 +552,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
 
                             {/* Business Name (Vendor Only) */}
                             {selectedRole === UserRole.VENDOR && (
-                                 <div>
+                                 <div className="animate-fade-in">
                                     <input 
                                         type="text"
                                         required
@@ -559,7 +563,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                                     />
                                  </div>
                             )}
-                        </>
+                        </div>
                      )}
 
                      <div>
@@ -638,18 +642,18 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                      >
                         {isLoading ? <Loader className="animate-spin" size={16} /> : (
                             <>
-                               {isRegister ? 'Create Account' : 'Sign In'} <ArrowRight size={16} />
+                               {isRegister ? (selectedRole === UserRole.VENDOR ? 'Apply for Vendor Access' : 'Create Buyer Account') : (selectedRole === UserRole.VENDOR ? 'Vendor Sign In' : 'Buyer Sign In')} <ArrowRight size={16} />
                             </>
                         )}
                      </button>
 
-                     {/* Google Sign In */}
-                     <div className="relative my-6">
+                     {/* Google Sign In Separator */}
+                     <div className="relative my-8">
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-gray-100"></div>
                         </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-white px-2 text-gray-400">Or continue with</span>
+                        <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-medium">
+                            <span className="bg-white px-3 text-gray-400">Or Continue With</span>
                         </div>
                      </div>
 
@@ -657,15 +661,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                         type="button"
                         onClick={handleGoogleLogin}
                         disabled={isLoading}
-                        className="w-full border border-gray-200 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-black hover:text-white transition-colors flex justify-center items-center gap-2"
+                        className="w-full bg-white border border-gray-200 hover:border-black text-luxury-black py-4 text-xs font-bold uppercase tracking-[0.2em] transition-all flex justify-center items-center gap-3 group shadow-sm hover:shadow-md"
                      >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
                             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                         </svg>
-                        <span>Sign in with Google</span>
+                        <span>Google</span>
                      </button>
                 </form>
 

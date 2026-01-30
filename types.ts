@@ -15,6 +15,7 @@ export interface User {
   status: 'ACTIVE' | 'SUSPENDED';
   spend?: string;
   location?: string;
+  verificationStatus?: VerificationStatus;
 }
 
 export interface Product {

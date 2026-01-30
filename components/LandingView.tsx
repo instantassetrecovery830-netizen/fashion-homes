@@ -12,6 +12,7 @@ interface LandingViewProps {
   products: Product[];
   onDesignerClick: (designerName: string) => void;
   cmsContent?: LandingPageContent;
+  onAuthRequest?: (mode: 'LOGIN' | 'REGISTER', role: UserRole) => void;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({ 
@@ -21,7 +22,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
   vendors = [], 
   products = [],
   onDesignerClick,
-  cmsContent
+  cmsContent,
+  onAuthRequest
 }) => {
   const [trend, setTrend] = useState<TrendAnalysis | null>(null);
   const [loadingTrend, setLoadingTrend] = useState(false);
@@ -118,7 +120,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
             
             {!isLoggedIn && (
               <button 
-                onClick={() => onNavigate('AUTH')}
+                onClick={() => onAuthRequest ? onAuthRequest('REGISTER', UserRole.BUYER) : onNavigate('AUTH')}
                 className="group relative inline-flex items-center gap-2 px-8 py-4 bg-luxury-gold text-white text-xs font-bold tracking-widest uppercase hover:bg-white hover:text-black transition-all duration-300 w-full md:w-auto min-w-[200px] justify-center shadow-lg"
               >
                 <UserPlus size={14} /> Get Started

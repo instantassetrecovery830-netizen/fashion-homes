@@ -21,6 +21,7 @@ interface LayoutProps {
   onLogout: () => void;
   onPlaceOrder?: (order: Order) => Promise<void>;
   onVisualSearch?: (file: File) => Promise<void>;
+  onAuthRequest?: (mode: 'LOGIN' | 'REGISTER', role: UserRole) => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -37,7 +38,8 @@ export const Layout: React.FC<LayoutProps> = ({
   isLoggedIn,
   onLogout,
   onPlaceOrder,
-  onVisualSearch
+  onVisualSearch,
+  onAuthRequest
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -127,7 +129,7 @@ export const Layout: React.FC<LayoutProps> = ({
     setMeasurementError(false);
 
     if (!isLoggedIn) {
-       onNavigate('AUTH');
+       onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH');
        setIsCartOpen(false);
        return;
     }
@@ -279,7 +281,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 </>
               ) : (
                 <button 
-                  onClick={() => onNavigate('AUTH')}
+                  onClick={() => onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH')}
                   className="bg-black text-white px-5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors whitespace-nowrap"
                 >
                   Get Started
@@ -321,7 +323,7 @@ export const Layout: React.FC<LayoutProps> = ({
               </button>
             <div className="border-t border-gray-100 pt-6 mt-2">
               <button 
-                onClick={() => { setMobileMenuOpen(false); onNavigate('AUTH'); }}
+                onClick={() => { setMobileMenuOpen(false); onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH'); }}
                 className="text-2xl font-serif italic hover:text-luxury-gold transition-colors"
               >
                 Sign In / Register

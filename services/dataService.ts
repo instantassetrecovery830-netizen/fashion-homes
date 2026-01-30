@@ -1,52 +1,130 @@
 
 import { pool } from './db.ts';
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission } from '../types.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus } from '../types.ts';
 
-// Helper to map DB row to Vendor type
-const mapVendor = (row: any): Vendor => ({
-  id: row.id,
-  name: row.name,
-  bio: row.bio,
-  avatar: row.avatar,
-  verificationStatus: row.verification_status as any,
-  subscriptionStatus: row.subscription_status as any,
-  location: row.location,
-  coverImage: row.cover_image,
-  email: row.email,
-  subscriptionPlan: row.subscription_plan as any,
-  website: row.website,
-  instagram: row.instagram,
-  twitter: row.twitter,
-  paymentMethods: row.payment_methods || [],
-  kycDocuments: row.kyc_documents || {}
-});
+// --- MOCK DATA FOR SEEDING ---
 
-// Helper to map DB row to Product type
-const mapProduct = (row: any): Product => ({
-  id: row.id,
-  name: row.name,
-  designer: row.designer,
-  price: Number(row.price),
-  category: row.category,
-  image: row.image,
-  description: row.description,
-  rating: Number(row.rating),
-  isNewSeason: row.is_new_season,
-  stock: row.stock,
-  sizes: row.sizes,
-  isPreOrder: row.is_pre_order
-});
+const MOCK_VENDORS: Vendor[] = [
+  {
+    id: 'v1',
+    name: 'Aura Atelier',
+    bio: 'Merging digital craftsmanship with sustainable organic fibers. Based in Copenhagen.',
+    avatar: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=600',
+    verificationStatus: 'VERIFIED',
+    subscriptionStatus: 'ACTIVE',
+    location: 'Copenhagen, Denmark',
+    coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200',
+    email: 'contact@aura.com',
+    subscriptionPlan: 'Maison',
+    website: 'www.aura-atelier.com',
+    instagram: '@aura_atelier',
+    twitter: '@aura'
+  },
+  {
+    id: 'v2',
+    name: 'Noir Et Blanc',
+    bio: 'Monochromatic minimalism for the modern avant-garde. Tokyo styling meets Parisian cut.',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600',
+    verificationStatus: 'VERIFIED',
+    subscriptionStatus: 'ACTIVE',
+    location: 'Tokyo, Japan',
+    coverImage: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=1200',
+    email: 'studio@noiretblanc.jp',
+    subscriptionPlan: 'Couture',
+    website: 'www.noiretblanc.jp',
+    instagram: '@noiretblanc',
+    twitter: ''
+  },
+  {
+    id: 'v3',
+    name: 'Neo-Genesis',
+    bio: 'Futuristic streetwear inspired by cybernetic aesthetics.',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=600',
+    verificationStatus: 'PENDING',
+    subscriptionStatus: 'ACTIVE',
+    location: 'Berlin, Germany',
+    coverImage: 'https://images.unsplash.com/photo-1485230946086-1d99d529c7d4?q=80&w=1200',
+    email: 'info@neogenesis.de',
+    subscriptionPlan: 'Atelier',
+    website: '',
+    instagram: '@neogenesis',
+    twitter: ''
+  }
+];
 
-const mapOrder = (row: any): Order => ({
-  id: row.id,
-  customerName: row.customer_name,
-  date: row.date,
-  total: Number(row.total),
-  status: row.status as any,
-  items: row.items
-});
+const MOCK_PRODUCTS: Product[] = [
+  {
+    id: 'p1',
+    name: 'Structured Wool Trench',
+    designer: 'Aura Atelier',
+    price: 850,
+    category: 'Outerwear',
+    image: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?q=80&w=800',
+    description: 'Oversized wool trench coat with asymmetrical lapels and hidden button placket.',
+    rating: 4.8,
+    isNewSeason: true,
+    stock: 5,
+    sizes: ['S', 'M', 'L'],
+    isPreOrder: false
+  },
+  {
+    id: 'p2',
+    name: 'Cyber-Knit Turtleneck',
+    designer: 'Noir Et Blanc',
+    price: 320,
+    category: 'Knitwear',
+    image: 'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?q=80&w=800',
+    description: 'Fine gauge merino wool turtleneck with distressed detailing.',
+    rating: 5.0,
+    isNewSeason: true,
+    stock: 12,
+    sizes: ['M', 'L', 'XL'],
+    isPreOrder: false
+  },
+  {
+    id: 'p3',
+    name: 'Obsidian Wide Trousers',
+    designer: 'Noir Et Blanc',
+    price: 450,
+    category: 'Bottoms',
+    image: 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?q=80&w=800',
+    description: 'High-waisted wide leg trousers in Japanese denim.',
+    rating: 4.5,
+    isNewSeason: false,
+    stock: 8,
+    sizes: ['28', '30', '32', '34'],
+    isPreOrder: false
+  },
+  {
+    id: 'p4',
+    name: 'Void Runner Boots',
+    designer: 'Neo-Genesis',
+    price: 680,
+    category: 'Footwear',
+    image: 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?q=80&w=800',
+    description: 'Platform leather boots with metallic hardware.',
+    rating: 4.9,
+    isNewSeason: true,
+    stock: 3,
+    sizes: ['39', '40', '41', '42'],
+    isPreOrder: true
+  },
+  {
+    id: 'p5',
+    name: 'Silk Wrap Blouse',
+    designer: 'Aura Atelier',
+    price: 290,
+    category: 'Tops',
+    image: 'https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=800',
+    description: '100% organic silk blouse with elongated sleeves.',
+    rating: 4.7,
+    isNewSeason: false,
+    stock: 15,
+    sizes: ['XS', 'S', 'M'],
+    isPreOrder: false
+  }
+];
 
-// Default CMS Content
 const DEFAULT_CMS_CONTENT: LandingPageContent = {
   hero: {
     videoUrl: "https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4",
@@ -102,299 +180,402 @@ const DEFAULT_CMS_CONTENT: LandingPageContent = {
   }
 };
 
+// --- INITIALIZATION ---
+
+const initSchema = async () => {
+    // Create tables if not exist
+    const queries = [
+        `CREATE TABLE IF NOT EXISTS vendors (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            bio TEXT,
+            avatar TEXT,
+            verificationStatus TEXT,
+            subscriptionStatus TEXT,
+            location TEXT,
+            coverImage TEXT,
+            email TEXT,
+            subscriptionPlan TEXT,
+            website TEXT,
+            instagram TEXT,
+            twitter TEXT,
+            paymentMethods JSONB,
+            kycDocuments JSONB
+        )`,
+        `CREATE TABLE IF NOT EXISTS products (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            designer TEXT,
+            price NUMERIC,
+            category TEXT,
+            image TEXT,
+            description TEXT,
+            rating NUMERIC,
+            isNewSeason BOOLEAN,
+            stock INTEGER,
+            sizes JSONB,
+            isPreOrder BOOLEAN
+        )`,
+        `CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            email TEXT,
+            role TEXT,
+            avatar TEXT,
+            joined TEXT,
+            status TEXT,
+            spend TEXT,
+            location TEXT,
+            verificationStatus TEXT
+        )`,
+        `CREATE TABLE IF NOT EXISTS orders (
+            id TEXT PRIMARY KEY,
+            customerName TEXT,
+            date TEXT,
+            total NUMERIC,
+            status TEXT,
+            items JSONB
+        )`,
+        `CREATE TABLE IF NOT EXISTS cms (
+            id TEXT PRIMARY KEY,
+            content JSONB
+        )`,
+        `CREATE TABLE IF NOT EXISTS contacts (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            email TEXT,
+            subject TEXT,
+            message TEXT,
+            date TEXT,
+            status TEXT
+        )`
+    ];
+
+    for (const q of queries) {
+        await pool.query(q);
+    }
+
+    // --- MIGRATIONS ---
+    // Ensure all columns exist even if tables were created by an older version of the schema.
+    const migrations = [
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS verificationStatus TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS subscriptionStatus TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS location TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS coverImage TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS email TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS subscriptionPlan TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS website TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS instagram TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS twitter TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS paymentMethods JSONB`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS kycDocuments JSONB`,
+        
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS verificationStatus TEXT`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS joined TEXT`,
+
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS isPreOrder BOOLEAN`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes JSONB`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS rating NUMERIC`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS isNewSeason BOOLEAN`,
+        
+        // Critical Fix: Ensure 'sizes' is JSONB. 
+        // We use to_jsonb() to correctly cast from text[] to jsonb.
+        // If the column is already jsonb, this is harmless.
+        `ALTER TABLE products ALTER COLUMN sizes TYPE JSONB USING to_jsonb(sizes)`
+    ];
+
+    for (const m of migrations) {
+        try {
+            await pool.query(m);
+        } catch (e) {
+            console.warn("Migration warning:", e);
+        }
+    }
+};
+
 export const seedDatabase = async () => {
-  try {
-    console.log('Initializing database for production...');
-    
-    // Create Vendors Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS vendors (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        bio TEXT,
-        avatar TEXT,
-        verification_status TEXT,
-        subscription_status TEXT,
-        location TEXT,
-        cover_image TEXT,
-        email TEXT,
-        subscription_plan TEXT,
-        website TEXT,
-        instagram TEXT,
-        twitter TEXT
-      );
-    `);
-    
-    // Add columns if not exists (for updates)
     try {
-        await pool.query('ALTER TABLE vendors ADD COLUMN IF NOT EXISTS payment_methods JSONB');
-        await pool.query('ALTER TABLE vendors ADD COLUMN IF NOT EXISTS kyc_documents JSONB');
+        await initSchema();
+
+        // Check if vendors exist
+        const res = await pool.query('SELECT count(*) FROM vendors');
+        if (res.rows[0].count === '0') {
+            console.log('Seeding Database...');
+            
+            // Seed Vendors
+            for (const v of MOCK_VENDORS) {
+                await pool.query(
+                    `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, website, instagram, twitter)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+                    [v.id, v.name, v.bio, v.avatar, v.verificationStatus, v.subscriptionStatus, v.location, v.coverImage, v.email, v.subscriptionPlan, v.website, v.instagram, v.twitter]
+                );
+            }
+
+            // Seed Products
+            for (const p of MOCK_PRODUCTS) {
+                await pool.query(
+                    `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                    [p.id, p.name, p.designer, p.price, p.category, p.image, p.description, p.rating, p.isNewSeason, p.stock, JSON.stringify(p.sizes), p.isPreOrder]
+                );
+            }
+
+            // Seed CMS
+            await pool.query(
+                `INSERT INTO cms (id, content) VALUES ($1, $2)`,
+                ['main', JSON.stringify(DEFAULT_CMS_CONTENT)]
+            );
+        } else {
+            console.log('Database already initialized.');
+        }
     } catch (e) {
-        console.log("Column additions might already exist or error adding them.", e);
+        console.error("Error seeding database:", e);
     }
-
-    // Create Users Table (For Buyers/Admins)
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        email TEXT,
-        role TEXT,
-        avatar TEXT,
-        joined_date TEXT,
-        status TEXT
-      );
-    `);
-
-    // Create Products Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS products (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        designer TEXT,
-        price NUMERIC,
-        category TEXT,
-        image TEXT,
-        description TEXT,
-        rating NUMERIC,
-        is_new_season BOOLEAN,
-        stock INTEGER,
-        sizes TEXT[],
-        is_pre_order BOOLEAN
-      );
-    `);
-
-    // Create Orders Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS orders (
-        id TEXT PRIMARY KEY,
-        customer_name TEXT,
-        date TEXT,
-        total NUMERIC,
-        status TEXT,
-        items JSONB
-      );
-    `);
-
-    // Create CMS Content Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS cms_content (
-        id TEXT PRIMARY KEY,
-        data JSONB
-      );
-    `);
-
-    // Create Contact Submissions Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS contact_submissions (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        email TEXT,
-        subject TEXT,
-        message TEXT,
-        date TEXT,
-        status TEXT
-      );
-    `);
-
-    // CLEAR DEMO DATA - ENSURE FRESH START
-    // This removes any data from previous demo sessions.
-    await pool.query('DELETE FROM products');
-    await pool.query('DELETE FROM vendors');
-    await pool.query('DELETE FROM orders');
-    // Note: We are not deleting 'users' indiscriminately to avoid locking out the admin immediately if they just registered, 
-    // but in a true "start fresh" scenario, we might. 
-    // For now, let's clear the business logic tables.
-    // If you want to clear users too, uncomment the next line:
-    // await pool.query('DELETE FROM users');
-
-    // Seed CMS Content if empty
-    const cmsCount = await pool.query('SELECT COUNT(*) FROM cms_content');
-    if (parseInt(cmsCount.rows[0].count) === 0) {
-      console.log('Seeding Default CMS Content...');
-      await pool.query(`
-        INSERT INTO cms_content (id, data) VALUES ($1, $2)
-      `, ['landing_page', JSON.stringify(DEFAULT_CMS_CONTENT)]);
-    }
-    
-    console.log('Database initialized and cleaned for production.');
-  } catch (err) {
-    console.error('Error initializing database:', err);
-    throw err; 
-  }
 };
 
 // --- READ OPERATIONS ---
 
 export const fetchVendors = async (): Promise<Vendor[]> => {
-  try {
-    const res = await pool.query('SELECT * FROM vendors');
-    return res.rows.map(mapVendor);
-  } catch (e) {
-    console.error("Failed to fetch vendors", e);
-    return [];
-  }
+    try {
+        const { rows } = await pool.query('SELECT * FROM vendors');
+        return rows.map(row => ({
+            ...row,
+            paymentMethods: row.paymentmethods, // Postgres lowercases by default if not quoted
+            kycDocuments: row.kycdocuments,
+            verificationStatus: row.verificationstatus,
+            subscriptionStatus: row.subscriptionstatus,
+            coverImage: row.coverimage,
+            subscriptionPlan: row.subscriptionplan
+        })) as Vendor[];
+    } catch (e) {
+        console.error(e);
+        return [];
+    }
 };
 
 export const fetchProducts = async (): Promise<Product[]> => {
-  try {
-    const res = await pool.query('SELECT * FROM products ORDER BY is_new_season DESC');
-    return res.rows.map(mapProduct);
-  } catch (e) {
-    console.error("Failed to fetch products", e);
-    return [];
-  }
+    try {
+        const { rows } = await pool.query('SELECT * FROM products');
+        return rows.map(row => ({
+            ...row,
+            price: Number(row.price),
+            rating: Number(row.rating),
+            stock: Number(row.stock),
+            sizes: row.sizes, // JSONB is auto-parsed by node-postgres
+            isNewSeason: row.isnewseason,
+            isPreOrder: row.ispreorder
+        })) as Product[];
+    } catch (e) {
+        console.error(e);
+        return [];
+    }
 };
 
 export const fetchOrders = async (): Promise<Order[]> => {
-  try {
-    const res = await pool.query('SELECT * FROM orders ORDER BY date DESC');
-    return res.rows.map(mapOrder);
-  } catch (e) {
-    console.error("Failed to fetch orders", e);
-    return [];
-  }
+    try {
+        const { rows } = await pool.query('SELECT * FROM orders ORDER BY date DESC');
+        return rows.map(row => ({
+            ...row,
+            customerName: row.customername,
+            total: Number(row.total),
+            items: row.items
+        })) as Order[];
+    } catch (e) {
+        console.error(e);
+        return [];
+    }
 };
 
 export const fetchUsers = async (): Promise<User[]> => {
-  try {
-    const res = await pool.query('SELECT * FROM users ORDER BY joined_date DESC');
-    return res.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      role: row.role as any,
-      avatar: row.avatar,
-      joined: new Date(row.joined_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      status: (row.status || 'ACTIVE') as any, 
-      spend: '-',
-      location: 'Global'
-    }));
-  } catch (e) {
-    console.error("Failed to fetch users", e);
-    return [];
-  }
+    try {
+        const { rows } = await pool.query('SELECT * FROM users');
+        return rows.map(row => ({
+            ...row,
+            verificationStatus: row.verificationstatus
+        })) as User[];
+    } catch (e) {
+        console.error(e);
+        return [];
+    }
 };
 
 export const fetchLandingContent = async (): Promise<LandingPageContent> => {
-  try {
-    const res = await pool.query('SELECT data FROM cms_content WHERE id = $1', ['landing_page']);
-    if (res.rows.length > 0) {
-      const data = res.rows[0].data;
-      // Merge with default to ensure keys exists if previously missing
-      return { ...DEFAULT_CMS_CONTENT, ...data };
+    try {
+        const { rows } = await pool.query("SELECT content FROM cms WHERE id = 'main'");
+        if (rows.length > 0) return rows[0].content as LandingPageContent;
+        return DEFAULT_CMS_CONTENT;
+    } catch (e) {
+        console.error(e);
+        return DEFAULT_CMS_CONTENT;
     }
-    return DEFAULT_CMS_CONTENT;
-  } catch (e) {
-    console.error("Failed to fetch CMS content", e);
-    return DEFAULT_CMS_CONTENT;
-  }
 };
 
 export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> => {
-  try {
-    const res = await pool.query('SELECT * FROM contact_submissions ORDER BY date DESC');
-    return res.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      subject: row.subject,
-      message: row.message,
-      date: row.date,
-      status: row.status as any
-    }));
-  } catch (e) {
-    console.error("Failed to fetch contact submissions", e);
-    return [];
-  }
+    try {
+        const { rows } = await pool.query('SELECT * FROM contacts ORDER BY date DESC');
+        return rows as ContactSubmission[];
+    } catch (e) {
+        console.error(e);
+        return [];
+    }
 };
 
 // --- WRITE OPERATIONS (PRODUCTS) ---
 
 export const addProductToDb = async (product: Product) => {
-  await pool.query(`
-    INSERT INTO products (id, name, designer, price, category, image, description, rating, is_new_season, stock, sizes, is_pre_order)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-  `, [product.id, product.name, product.designer, product.price, product.category, product.image, product.description, product.rating, product.isNewSeason || false, product.stock, product.sizes, product.isPreOrder || false]);
+    try {
+        await pool.query(
+            `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            [product.id, product.name, product.designer, product.price, product.category, product.image, product.description, product.rating, product.isNewSeason, product.stock, JSON.stringify(product.sizes), product.isPreOrder]
+        );
+    } catch (e) {
+        console.error("Add Product Failed", e);
+    }
 };
 
 export const updateProductInDb = async (product: Product) => {
-  await pool.query(`
-    UPDATE products 
-    SET name=$2, price=$3, category=$4, image=$5, description=$6, stock=$7, sizes=$8, is_pre_order=$9
-    WHERE id=$1
-  `, [product.id, product.name, product.price, product.category, product.image, product.description, product.stock, product.sizes, product.isPreOrder]);
+    try {
+        await pool.query(
+            `UPDATE products SET name=$1, price=$2, category=$3, image=$4, description=$5, stock=$6, sizes=$7, isPreOrder=$8 WHERE id=$9`,
+            [product.name, product.price, product.category, product.image, product.description, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.id]
+        );
+    } catch (e) {
+        console.error("Update Product Failed", e);
+    }
 };
 
 export const deleteProductFromDb = async (productId: string) => {
-  await pool.query('DELETE FROM products WHERE id=$1', [productId]);
+    try {
+        await pool.query('DELETE FROM products WHERE id = $1', [productId]);
+    } catch (e) {
+        console.error("Delete Product Failed", e);
+    }
 };
 
 // --- WRITE OPERATIONS (VENDORS) ---
 
 export const updateVendorInDb = async (vendor: Vendor) => {
-  await pool.query(`
-    UPDATE vendors
-    SET name=$2, bio=$3, avatar=$4, location=$5, cover_image=$6, email=$7, website=$8, instagram=$9, twitter=$10, subscription_plan=$11, subscription_status=$12, verification_status=$13, payment_methods=$14, kyc_documents=$15
-    WHERE id=$1
-  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.location, vendor.coverImage, vendor.email, vendor.website, vendor.instagram, vendor.twitter, vendor.subscriptionPlan, vendor.subscriptionStatus, vendor.verificationStatus, JSON.stringify(vendor.paymentMethods || []), JSON.stringify(vendor.kycDocuments || {})]);
+    try {
+        await pool.query(
+            `UPDATE vendors SET 
+                name=$1, bio=$2, avatar=$3, verificationStatus=$4, subscriptionStatus=$5, 
+                location=$6, coverImage=$7, email=$8, subscriptionPlan=$9, 
+                website=$10, instagram=$11, twitter=$12, kycDocuments=$13 
+             WHERE id=$14`,
+            [vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus,
+             vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan,
+             vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.kycDocuments), vendor.id]
+        );
+    } catch (e) {
+        console.error("Update Vendor Failed", e);
+    }
 };
 
 export const createVendorInDb = async (vendor: Vendor) => {
-  await pool.query(`
-    INSERT INTO vendors (id, name, bio, avatar, verification_status, subscription_status, location, cover_image, email, subscription_plan, website, instagram, twitter, payment_methods, kyc_documents)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-  `, [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.paymentMethods || []), JSON.stringify(vendor.kycDocuments || {})]);
+    try {
+        // Check duplication
+        const check = await pool.query('SELECT id FROM vendors WHERE id = $1', [vendor.id]);
+        if (check.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan]
+            );
+        }
+    } catch (e) {
+        console.error("Create Vendor Failed", e);
+    }
 };
 
-// --- WRITE OPERATIONS (USERS/BUYERS) ---
+// --- WRITE OPERATIONS (USERS) ---
 
-export const createUserInDb = async (user: { id: string, name: string, email: string, role: string, avatar: string, status: string }) => {
-  await pool.query(`
-    INSERT INTO users (id, name, email, role, avatar, joined_date, status)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
-  `, [user.id, user.name, user.email, user.role, user.avatar, new Date().toISOString(), user.status]);
+export const createUserInDb = async (user: { id: string, name: string, email: string, role: string, avatar: string, status: string, verificationStatus?: VerificationStatus }) => {
+    try {
+        const check = await pool.query('SELECT id FROM users WHERE id = $1', [user.id]);
+        if (check.rows.length === 0) {
+             await pool.query(
+                 `INSERT INTO users (id, name, email, role, avatar, joined, status, verificationStatus)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                 [user.id, user.name, user.email, user.role, user.avatar, new Date().toISOString(), user.status, user.verificationStatus || 'PENDING']
+             );
+        }
+    } catch (e) {
+        console.error("Create User Failed", e);
+    }
 };
 
 export const updateUserInDb = async (user: User) => {
-  await pool.query(`
-    UPDATE users
-    SET role=$2, status=$3
-    WHERE id=$1
-  `, [user.id, user.role, user.status]);
+    try {
+        await pool.query(
+            `UPDATE users SET role=$1, status=$2, verificationStatus=$3 WHERE id=$4`,
+            [user.role, user.status, user.verificationStatus, user.id]
+        );
+    } catch (e) {
+        console.error("Update User Failed", e);
+    }
 };
 
 // --- WRITE OPERATIONS (CMS) ---
 
 export const updateLandingContentInDb = async (content: LandingPageContent) => {
-  await pool.query(`
-    INSERT INTO cms_content (id, data) VALUES ($1, $2)
-    ON CONFLICT (id) DO UPDATE SET data = $2
-  `, ['landing_page', JSON.stringify(content)]);
+    try {
+        // Upsert logic for ID 'main'
+        const check = await pool.query("SELECT id FROM cms WHERE id = 'main'");
+        if (check.rows.length > 0) {
+             await pool.query("UPDATE cms SET content = $1 WHERE id = 'main'", [JSON.stringify(content)]);
+        } else {
+             await pool.query("INSERT INTO cms (id, content) VALUES ('main', $1)", [JSON.stringify(content)]);
+        }
+    } catch (e) {
+        console.error("Update CMS Failed", e);
+    }
 };
 
 // --- WRITE OPERATIONS (ORDERS) ---
 
 export const createOrderInDb = async (order: Order) => {
-  await pool.query(`
-    INSERT INTO orders (id, customer_name, date, total, status, items)
-    VALUES ($1, $2, $3, $4, $5, $6)
-  `, [order.id, order.customerName, order.date, order.total, order.status, JSON.stringify(order.items)]);
+    try {
+        await pool.query(
+            `INSERT INTO orders (id, customerName, date, total, status, items)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [order.id, order.customerName, order.date, order.total, order.status, JSON.stringify(order.items)]
+        );
+    } catch (e) {
+        console.error("Create Order Failed", e);
+    }
 };
 
 export const updateOrderStatusInDb = async (orderId: string, status: string) => {
-  await pool.query(`UPDATE orders SET status=$2 WHERE id=$1`, [orderId, status]);
+    try {
+        await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, orderId]);
+    } catch (e) {
+        console.error("Update Order Status Failed", e);
+    }
 };
 
 // --- WRITE OPERATIONS (CONTACT) ---
 
 export const submitContactFormInDb = async (submission: ContactSubmission) => {
-  await pool.query(`
-    INSERT INTO contact_submissions (id, name, email, subject, message, date, status)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
-  `, [submission.id, submission.name, submission.email, submission.subject, submission.message, submission.date, submission.status]);
+    try {
+        await pool.query(
+            `INSERT INTO contacts (id, name, email, subject, message, date, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [submission.id, submission.name, submission.email, submission.subject, submission.message, submission.date, submission.status]
+        );
+    } catch (e) {
+        console.error("Submit Contact Failed", e);
+    }
 };
 
 export const updateContactStatusInDb = async (id: string, status: 'NEW' | 'READ' | 'ARCHIVED') => {
-  await pool.query(`UPDATE contact_submissions SET status=$2 WHERE id=$1`, [id, status]);
+    try {
+        await pool.query("UPDATE contacts SET status = $1 WHERE id = $2", [status, id]);
+    } catch (e) {
+        console.error("Update Contact Status Failed", e);
+    }
 };
