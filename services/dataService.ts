@@ -1,6 +1,6 @@
 
-import { pool } from './db';
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission } from '../types';
+import { pool } from './db.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission } from '../types.ts';
 
 // Helper to map DB row to Vendor type
 const mapVendor = (row: any): Vendor => ({

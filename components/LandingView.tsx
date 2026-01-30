@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, Sparkles, Loader, Diamond, UserPlus } from 'lucide-react';
-import { generateSeasonalTrend } from '../services/geminiService';
-import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types';
+import { generateSeasonalTrend } from '../services/geminiService.ts';
+import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types.ts';
 
 interface LandingViewProps {
   onNavigate: (view: ViewState) => void;

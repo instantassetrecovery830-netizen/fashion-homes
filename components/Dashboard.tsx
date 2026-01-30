@@ -14,8 +14,8 @@ import {
   Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu, Wallet, Banknote, Bitcoin, ArrowLeft, Inbox,
   Phone, Clock, Calendar, FileCheck
 } from 'lucide-react';
-import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission, KycDocuments } from '../types';
-import { updateUserPassword, auth } from '../services/firebase';
+import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission, KycDocuments } from '../types.ts';
+import { updateUserPassword, auth } from '../services/firebase.ts';
 
 // Initial Empty Data for real-time start
 const SALES_DATA = [

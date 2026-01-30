@@ -16,8 +16,63 @@
 
     <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              luxury: {
+                black: '#0a0a0a',
+                charcoal: '#1A1A1A',
+                gold: '#C5A059',
+                'gold-hover': '#B08D48',
+                cream: '#FDFCF8',
+                'cream-dark': '#F5F2EA',
+                taupe: '#8B8580',
+                burgundy: '#4A0404',
+                sage: '#9CAF88',
+                clay: '#BA6B56',
+                navy: '#1B2432',
+                silver: '#E5E5E5'
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              serif: ['Playfair Display', 'serif'],
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.8s ease-out forwards',
+              'slide-up': 'slideUp 0.8s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            }
+          }
+        }
+      }
+    </script>
 
-    <!-- ✅ IMPORT MAP (STABLE & CORRECT) -->
+    <!-- Babel Standalone for in-browser JSX/TSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Polyfill process.env for Gemini Service -->
+    <script>
+      window.process = {
+        env: {
+          API_KEY: '', // API Key will be injected by the environment or replaced manually
+          NODE_ENV: 'development'
+        }
+      };
+    </script>
+
+    <!-- ✅ IMPORT MAP -->
     <script type="importmap">
 {
   "imports": {
@@ -49,7 +104,7 @@
   <body>
     <div id="root"></div>
 
-    <!-- ✅ FIXED ENTRY POINT -->
-    <script type="module" src="./index.tsx"></script>
+    <!-- ✅ FIXED ENTRY POINT: Uses index.jsx -->
+    <script type="text/babel" data-type="module" data-presets="react,typescript" src="./index.jsx"></script>
   </body>
 </html>

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Filter, ChevronDown, Heart, Camera, X } from 'lucide-react';
-import { Product, ViewState, Vendor } from '../types';
+import { Product, ViewState, Vendor } from '../types.ts';
 
 interface MarketplaceViewProps {
   onProductSelect: (product: Product) => void;

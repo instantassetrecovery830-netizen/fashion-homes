@@ -1,26 +1,26 @@
 
 import React, { useState, useEffect } from 'react';
-import { Layout } from './components/Layout';
-import { LandingView } from './components/LandingView';
-import { MarketplaceView } from './components/MarketplaceView';
-import { NewArrivalsView } from './components/NewArrivalsView';
-import { DesignersView } from './components/DesignersView';
-import { VendorProfileView } from './components/VendorProfileView';
-import { ProductDetail } from './components/ProductDetail';
-import { Dashboard } from './components/Dashboard';
-import { AuthView } from './components/AuthView';
-import { PricingView } from './components/PricingView';
-import { AboutView } from './components/AboutView';
-import { AiConcierge } from './components/AiConcierge'; // Import Concierge
-import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission } from './types';
+import { Layout } from './components/Layout.tsx';
+import { LandingView } from './components/LandingView.tsx';
+import { MarketplaceView } from './components/MarketplaceView.tsx';
+import { NewArrivalsView } from './components/NewArrivalsView.tsx';
+import { DesignersView } from './components/DesignersView.tsx';
+import { VendorProfileView } from './components/VendorProfileView.tsx';
+import { ProductDetail } from './components/ProductDetail.tsx';
+import { Dashboard } from './components/Dashboard.tsx';
+import { AuthView } from './components/AuthView.tsx';
+import { PricingView } from './components/PricingView.tsx';
+import { AboutView } from './components/AboutView.tsx';
+import { AiConcierge } from './components/AiConcierge.tsx';
+import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission } from './types.ts';
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb
-} from './services/dataService';
-import { searchProductsByImage } from './services/geminiService';
+} from './services/dataService.ts';
+import { searchProductsByImage } from './services/geminiService.ts';
 import { Loader } from 'lucide-react';
-import { auth, onAuthStateChanged, signOut } from './services/firebase';
+import { auth, onAuthStateChanged, signOut } from './services/firebase.ts';
 
 const App: React.FC = () => {
   // State
@@ -160,14 +160,12 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (role: UserRole) => {
-    setUserRole(role); // Set role immediately to ensure dashboard renders with correct permissions
     if (role === UserRole.ADMIN) {
       handleNavigate('ADMIN_PANEL');
     } else if (role === UserRole.VENDOR) {
       handleNavigate('VENDOR_DASHBOARD');
     } else {
-      // Explicitly route buyers to their dashboard
-      handleNavigate('BUYER_DASHBOARD');
+      handleNavigate('MARKETPLACE');
     }
   };
 

@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
-import { NAV_LINKS } from '../constants';
-import { UserRole, ViewState, CartItem, Order } from '../types';
-import { auth } from '../services/firebase';
+import { NAV_LINKS } from '../constants.ts';
+import { UserRole, ViewState, CartItem, Order } from '../types.ts';
+import { auth } from '../services/firebase.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
