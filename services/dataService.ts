@@ -270,13 +270,6 @@ const initSchema = async () => {
             purchases INTEGER,
             style TEXT,
             vendorId TEXT
-        )`,
-        // Real-time Authentication Table
-        `CREATE TABLE IF NOT EXISTS auth_accounts (
-            email TEXT PRIMARY KEY,
-            password TEXT,
-            uid TEXT,
-            email_verified BOOLEAN DEFAULT FALSE
         )`
     ];
 
@@ -322,11 +315,6 @@ const initSchema = async () => {
             console.warn("Migration warning:", e);
         }
     }
-
-    // --- AUTH BACKFILL ---
-    // Ensure existing users/vendors have auth accounts (default password: 'password')
-    await pool.query(`INSERT INTO auth_accounts (email, password, uid, email_verified) SELECT email, 'password', id, true FROM vendors ON CONFLICT (email) DO NOTHING`);
-    await pool.query(`INSERT INTO auth_accounts (email, password, uid, email_verified) SELECT email, 'password', id, true FROM users ON CONFLICT (email) DO NOTHING`);
 };
 
 export const seedDatabase = async () => {
@@ -344,11 +332,6 @@ export const seedDatabase = async () => {
                     `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, website, instagram, twitter, visualTheme)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
                     [v.id, v.name, v.bio, v.avatar, v.verificationStatus, v.subscriptionStatus, v.location, v.coverImage, v.email, v.subscriptionPlan, v.website, v.instagram, v.twitter, v.visualTheme || 'MINIMALIST']
-                );
-                // Create auth account for seeded vendor
-                await pool.query(
-                    `INSERT INTO auth_accounts (email, password, uid, email_verified) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING`,
-                    [v.email, 'password', v.id, true]
                 );
             }
 
