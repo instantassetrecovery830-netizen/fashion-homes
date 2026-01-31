@@ -15,7 +15,7 @@ import {
   Phone, Clock, Calendar, FileCheck, ArrowDownLeft, ArrowUpRight as ArrowUpRightIcon, User as UserIcon
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission, KycDocuments, Follower } from '../types.ts';
-import { updateUserPassword, auth } from '../services/firebase.ts';
+import { updatePassword, auth } from '../services/firebase.ts';
 import { VendorProfileView } from './VendorProfileView.tsx';
 import { fetchVendorFollowers, addFollowerToDb } from '../services/dataService.ts';
 
@@ -549,7 +549,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setPasswordStatus({ loading: true, success: false, error: '' });
       try {
           if (auth.currentUser) {
-              await updateUserPassword(auth.currentUser, passwords.new);
+              await updatePassword(auth.currentUser, passwords.new);
               setPasswordStatus({ loading: false, success: true, error: '' });
               setPasswords({ new: '', confirm: '' });
               setTimeout(() => setPasswordStatus({ loading: false, success: false, error: '' }), 3000);
