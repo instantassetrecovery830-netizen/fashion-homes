@@ -1,139 +1,161 @@
 
-// Mock Firebase Service
-// Replaces actual firebase imports to resolve environment issues where the package is missing or types are incompatible.
+// Mock implementation of Firebase Auth to resolve import errors
+// and provide functional authentication in the preview environment.
 
-// Mock User Interface
 export interface User {
   uid: string;
   email: string | null;
-  emailVerified: boolean;
   displayName: string | null;
+  emailVerified: boolean;
   photoURL: string | null;
   reload: () => Promise<void>;
 }
 
-// Your web app's Firebase configuration  
-const firebaseConfig = {  
-  apiKey: "AIzaSyBZkNjNGQT0A7sKnWj2dNCJxyvS8d5OxOA",  
-  authDomain: "myfitstore2-97079.firebaseapp.com",  
-  projectId: "myfitstore2-97079",  
-  storageBucket: "myfitstore2-97079.firebasestorage.app",  
-  messagingSenderId: "54647664240",  
-  appId: "1:54647664240:web:31c452f1c34e3e800e4eb5"  
-};  
-  
-// Initialize Firebase  
-const app = initializeApp(firebaseConfig);
+let currentUser: User | null = null;
+const observers: Array<(user: User | null) => void> = [];
+
+const notifyObservers = () => {
+  observers.forEach(cb => cb(currentUser));
 };
 
-// Internal State
-let _currentUser: User | null = null;
-const _listeners: Array<(user: User | null) => void> = [];
-
-function _notify() {
-    _listeners.forEach(cb => cb(_currentUser));
-}
-
-// Mock Auth Object
-export const auth = {
-    get currentUser() { return _currentUser; },
-    set currentUser(v) { _currentUser = v; }
+// Persistence helper
+const saveUser = (user: User | null) => {
+  if (user) {
+    // We strip methods before saving to JSON
+    const { reload, ...userData } = user;
+    localStorage.setItem('firebase_mock_user', JSON.stringify(userData));
+  } else {
+    localStorage.removeItem('firebase_mock_user');
+  }
 };
 
-// --- Mock Functions ---
-
-export const initializeApp = (config: any) => {
-    console.log('Firebase Mock Initialized');
-    return {};
-};
-
-export const getAuth = (app: any) => auth;
-
-export const createUserWithEmailAndPassword = async (a: any, email: string, pass: string) => {
-    // Simulate user creation
-    const user: User = {
-        uid: 'user_' + Date.now(),
-        email,
-        emailVerified: false,
-        displayName: email.split('@')[0],
-        photoURL: null,
-        reload: async () => {
-            // Simulate verification on reload for demo purposes
-            if (_currentUser && _currentUser.email === email) {
-                // In a real app this would check server status. 
-                // Here we verify it to unblock the demo flow.
-                const updated = { ..._currentUser, emailVerified: true };
-                _currentUser = updated;
-                // No notify needed for reload usually, but updating state internally
-            }
+const loadUser = (): User | null => {
+  const stored = localStorage.getItem('firebase_mock_user');
+  if (stored) {
+    const u = JSON.parse(stored);
+    // Restore method
+    u.reload = async () => {
+        const fresh = loadUser();
+        if (fresh && currentUser) {
+            currentUser.emailVerified = fresh.emailVerified;
+            // update local ref
+            Object.assign(currentUser, fresh);
         }
     };
-    _currentUser = user;
-    _notify();
-    return { user };
+    return u;
+  }
+  return null;
 };
 
-export const signInWithEmailAndPassword = async (a: any, email: string, pass: string) => {
-    // Basic mock login - allow any credentials in mock
-    if (email.includes('error')) throw new Error('Mock Login Failed');
-    
-    const user: User = {
-        uid: 'user_' + Date.now(),
-        email,
-        emailVerified: true, // Assume verified for login simplicity in mock
-        displayName: email.split('@')[0],
-        photoURL: null,
-        reload: async () => {}
-    };
-    _currentUser = user;
-    _notify();
-    return { user };
+// Initialize from storage on load
+currentUser = loadUser();
+
+export const auth = {
+  get currentUser() { return currentUser; }
 };
 
-export const signOut = async (a: any) => {
-    _currentUser = null;
-    _notify();
+export const onAuthStateChanged = (authObj: any, callback: (user: User | null) => void) => {
+  observers.push(callback);
+  // Fire immediately
+  callback(currentUser);
+  return () => {
+    const idx = observers.indexOf(callback);
+    if (idx > -1) observers.splice(idx, 1);
+  };
 };
 
-export const onAuthStateChanged = (a: any, cb: (user: User | null) => void) => {
-    _listeners.push(cb);
-    // Trigger immediately with current state
-    cb(_currentUser);
-    // Return unsubscribe function
-    return () => {
-        const idx = _listeners.indexOf(cb);
-        if (idx !== -1) _listeners.splice(idx, 1);
-    };
+export const signOut = async (authObj: any) => {
+  currentUser = null;
+  saveUser(null);
+  notifyObservers();
+};
+
+export const signInWithEmailAndPassword = async (authObj: any, email: string, pass: string) => {
+  await new Promise(r => setTimeout(r, 800)); // Simulate network delay
+  
+  if (pass === 'error') throw { code: 'auth/wrong-password', message: 'Invalid password' };
+  
+  // Simulate login success - for demo, we assume existing users are verified
+  // unless we want to test the unverified flow via login (rare in demos)
+  const user: User = {
+    uid: 'mock-uid-' + Date.now(),
+    email,
+    displayName: email.split('@')[0],
+    emailVerified: true, 
+    photoURL: 'https://i.pravatar.cc/150?u=' + email,
+    reload: async () => {}
+  };
+  
+  currentUser = user;
+  saveUser(user);
+  notifyObservers();
+  return { user };
+};
+
+export const createUserWithEmailAndPassword = async (authObj: any, email: string, pass: string) => {
+  await new Promise(r => setTimeout(r, 800));
+  
+  const user: User = {
+    uid: 'mock-uid-' + Date.now(),
+    email,
+    displayName: null,
+    emailVerified: false, // New users start unverified
+    photoURL: null,
+    reload: async () => {
+         const fresh = loadUser();
+         if (fresh) {
+             user.emailVerified = fresh.emailVerified;
+         }
+    }
+  };
+  
+  currentUser = user;
+  saveUser(user);
+  notifyObservers();
+  return { user };
 };
 
 export const sendEmailVerification = async (user: User) => {
-    console.log(`[Mock] Verification email sent to ${user.email}`);
+  console.log('Mock Verification Email sent to', user.email);
+  // Auto-verify after 3 seconds to simulate user clicking email link
+  setTimeout(() => {
+    const u = loadUser();
+    if (u && u.uid === user.uid) {
+        u.emailVerified = true;
+        saveUser(u);
+        console.log('Mock User email verified automatically (backend simulation).');
+    }
+  }, 3000);
 };
 
-export const sendPasswordResetEmail = async (a: any, email: string) => {
-    console.log(`[Mock] Password reset email sent to ${email}`);
+export const sendPasswordResetEmail = async (authObj: any, email: string) => {
+    console.log('Mock Password Reset sent to', email);
+    await new Promise(r => setTimeout(r, 500));
 };
 
-export const updatePassword = async (user: User, pass: string) => {
-    console.log(`[Mock] Password updated for ${user.email}`);
-};
-
-export class GoogleAuthProvider {}
-
-export const signInWithPopup = async (a: any, provider: any) => {
-    const user: User = {
-        uid: 'google_' + Date.now(),
-        email: 'google@example.com',
-        emailVerified: true,
-        displayName: 'Google User',
-        photoURL: null,
-        reload: async () => {}
-    };
-    _currentUser = user;
-    _notify();
-    return { user };
+export const updatePassword = async (user: User, newPass: string) => {
+    console.log('Mock Password updated');
+    await new Promise(r => setTimeout(r, 500));
 };
 
 export const signInWithGoogle = async () => {
-  return signInWithPopup(auth, new GoogleAuthProvider());
+    await new Promise(r => setTimeout(r, 1000));
+    const user: User = {
+        uid: 'google-uid-' + Date.now(),
+        email: 'google_user@example.com',
+        displayName: 'Google User',
+        emailVerified: true,
+        photoURL: 'https://via.placeholder.com/150',
+        reload: async () => {}
+    };
+    currentUser = user;
+    saveUser(user);
+    notifyObservers();
+    return { user };
 };
+
+export const signInWithPopup = async (authObj: any, provider: any) => {
+    return signInWithGoogle();
+};
+
+export class GoogleAuthProvider {}
