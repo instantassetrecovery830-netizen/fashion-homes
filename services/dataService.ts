@@ -1,6 +1,6 @@
 
 import { pool } from './db.ts';
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus } from '../types.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus, Follower } from '../types.ts';
 
 // --- MOCK DATA FOR SEEDING ---
 
@@ -18,7 +18,8 @@ const MOCK_VENDORS: Vendor[] = [
     subscriptionPlan: 'Maison',
     website: 'www.aura-atelier.com',
     instagram: '@aura_atelier',
-    twitter: '@aura'
+    twitter: '@aura',
+    visualTheme: 'MINIMALIST'
   },
   {
     id: 'v2',
@@ -33,7 +34,8 @@ const MOCK_VENDORS: Vendor[] = [
     subscriptionPlan: 'Couture',
     website: 'www.noiretblanc.jp',
     instagram: '@noiretblanc',
-    twitter: ''
+    twitter: '',
+    visualTheme: 'DARK'
   },
   {
     id: 'v3',
@@ -48,7 +50,8 @@ const MOCK_VENDORS: Vendor[] = [
     subscriptionPlan: 'Atelier',
     website: '',
     instagram: '@neogenesis',
-    twitter: ''
+    twitter: '',
+    visualTheme: 'MINIMALIST'
   }
 ];
 
@@ -123,6 +126,14 @@ const MOCK_PRODUCTS: Product[] = [
     sizes: ['XS', 'S', 'M'],
     isPreOrder: false
   }
+];
+
+const MOCK_FOLLOWERS: Follower[] = [
+    { id: 'f1', name: 'Sofia R.', location: 'Milan', avatar: 'https://i.pravatar.cc/150?u=1', joined: 'Oct 2023', purchases: 12, style: 'Avant-Garde', vendorId: 'v1' },
+    { id: 'f2', name: 'James K.', location: 'London', avatar: 'https://i.pravatar.cc/150?u=2', joined: 'Dec 2023', purchases: 3, style: 'Minimalist', vendorId: 'v1' },
+    { id: 'f3', name: 'Arjun P.', location: 'New York', avatar: 'https://i.pravatar.cc/150?u=3', joined: 'Jan 2024', purchases: 8, style: 'Streetwear', vendorId: 'v1' },
+    { id: 'f4', name: 'Wei L.', location: 'Shanghai', avatar: 'https://i.pravatar.cc/150?u=4', joined: 'Feb 2024', purchases: 5, style: 'Luxury', vendorId: 'v2' },
+    { id: 'f5', name: 'Zoe M.', location: 'Berlin', avatar: 'https://i.pravatar.cc/150?u=5', joined: 'Mar 2024', purchases: 1, style: 'Techno', vendorId: 'v3' }
 ];
 
 const DEFAULT_CMS_CONTENT: LandingPageContent = {
@@ -200,7 +211,8 @@ const initSchema = async () => {
             instagram TEXT,
             twitter TEXT,
             paymentMethods JSONB,
-            kycDocuments JSONB
+            kycDocuments JSONB,
+            visualTheme TEXT
         )`,
         `CREATE TABLE IF NOT EXISTS products (
             id TEXT PRIMARY KEY,
@@ -248,6 +260,23 @@ const initSchema = async () => {
             message TEXT,
             date TEXT,
             status TEXT
+        )`,
+        `CREATE TABLE IF NOT EXISTS followers (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            avatar TEXT,
+            location TEXT,
+            joined TEXT,
+            purchases INTEGER,
+            style TEXT,
+            vendorId TEXT
+        )`,
+        // Real-time Authentication Table
+        `CREATE TABLE IF NOT EXISTS auth_accounts (
+            email TEXT PRIMARY KEY,
+            password TEXT,
+            uid TEXT,
+            email_verified BOOLEAN DEFAULT FALSE
         )`
     ];
 
@@ -269,6 +298,7 @@ const initSchema = async () => {
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS twitter TEXT`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS paymentMethods JSONB`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS kycDocuments JSONB`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS visualTheme TEXT`,
         
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS verificationStatus TEXT`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`,
@@ -282,9 +312,6 @@ const initSchema = async () => {
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS rating NUMERIC`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS isNewSeason BOOLEAN`,
         
-        // Critical Fix: Ensure 'sizes' is JSONB. 
-        // We use to_jsonb() to correctly cast from text[] to jsonb.
-        // If the column is already jsonb, this is harmless.
         `ALTER TABLE products ALTER COLUMN sizes TYPE JSONB USING to_jsonb(sizes)`
     ];
 
@@ -295,6 +322,11 @@ const initSchema = async () => {
             console.warn("Migration warning:", e);
         }
     }
+
+    // --- AUTH BACKFILL ---
+    // Ensure existing users/vendors have auth accounts (default password: 'password')
+    await pool.query(`INSERT INTO auth_accounts (email, password, uid, email_verified) SELECT email, 'password', id, true FROM vendors ON CONFLICT (email) DO NOTHING`);
+    await pool.query(`INSERT INTO auth_accounts (email, password, uid, email_verified) SELECT email, 'password', id, true FROM users ON CONFLICT (email) DO NOTHING`);
 };
 
 export const seedDatabase = async () => {
@@ -309,9 +341,14 @@ export const seedDatabase = async () => {
             // Seed Vendors
             for (const v of MOCK_VENDORS) {
                 await pool.query(
-                    `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, website, instagram, twitter)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-                    [v.id, v.name, v.bio, v.avatar, v.verificationStatus, v.subscriptionStatus, v.location, v.coverImage, v.email, v.subscriptionPlan, v.website, v.instagram, v.twitter]
+                    `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, website, instagram, twitter, visualTheme)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                    [v.id, v.name, v.bio, v.avatar, v.verificationStatus, v.subscriptionStatus, v.location, v.coverImage, v.email, v.subscriptionPlan, v.website, v.instagram, v.twitter, v.visualTheme || 'MINIMALIST']
+                );
+                // Create auth account for seeded vendor
+                await pool.query(
+                    `INSERT INTO auth_accounts (email, password, uid, email_verified) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING`,
+                    [v.email, 'password', v.id, true]
                 );
             }
 
@@ -321,6 +358,15 @@ export const seedDatabase = async () => {
                     `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
                     [p.id, p.name, p.designer, p.price, p.category, p.image, p.description, p.rating, p.isNewSeason, p.stock, JSON.stringify(p.sizes), p.isPreOrder]
+                );
+            }
+
+            // Seed Followers
+            for (const f of MOCK_FOLLOWERS) {
+                await pool.query(
+                    `INSERT INTO followers (id, name, avatar, location, joined, purchases, style, vendorId)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    [f.id, f.name, f.avatar, f.location, f.joined, f.purchases, f.style, f.vendorId]
                 );
             }
 
@@ -349,7 +395,8 @@ export const fetchVendors = async (): Promise<Vendor[]> => {
             verificationStatus: row.verificationstatus,
             subscriptionStatus: row.subscriptionstatus,
             coverImage: row.coverimage,
-            subscriptionPlan: row.subscriptionplan
+            subscriptionPlan: row.subscriptionplan,
+            visualTheme: row.visualtheme
         })) as Vendor[];
     } catch (e) {
         console.error(e);
@@ -397,6 +444,16 @@ export const fetchUsers = async (): Promise<User[]> => {
             ...row,
             verificationStatus: row.verificationstatus
         })) as User[];
+    } catch (e) {
+        console.error(e);
+        return [];
+    }
+};
+
+export const fetchVendorFollowers = async (vendorId: string): Promise<Follower[]> => {
+    try {
+        const { rows } = await pool.query('SELECT * FROM followers WHERE vendorId = $1 ORDER BY id DESC', [vendorId]);
+        return rows as Follower[];
     } catch (e) {
         console.error(e);
         return [];
@@ -465,11 +522,11 @@ export const updateVendorInDb = async (vendor: Vendor) => {
             `UPDATE vendors SET 
                 name=$1, bio=$2, avatar=$3, verificationStatus=$4, subscriptionStatus=$5, 
                 location=$6, coverImage=$7, email=$8, subscriptionPlan=$9, 
-                website=$10, instagram=$11, twitter=$12, kycDocuments=$13 
-             WHERE id=$14`,
+                website=$10, instagram=$11, twitter=$12, kycDocuments=$13, visualTheme=$14 
+             WHERE id=$15`,
             [vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus,
              vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan,
-             vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.kycDocuments), vendor.id]
+             vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.kycDocuments), vendor.visualTheme, vendor.id]
         );
     } catch (e) {
         console.error("Update Vendor Failed", e);
@@ -482,13 +539,25 @@ export const createVendorInDb = async (vendor: Vendor) => {
         const check = await pool.query('SELECT id FROM vendors WHERE id = $1', [vendor.id]);
         if (check.rows.length === 0) {
             await pool.query(
-                `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan]
+                `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, visualTheme)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.visualTheme || 'MINIMALIST']
             );
         }
     } catch (e) {
         console.error("Create Vendor Failed", e);
+    }
+};
+
+export const addFollowerToDb = async (follower: Follower) => {
+    try {
+        await pool.query(
+            `INSERT INTO followers (id, name, avatar, location, joined, purchases, style, vendorId)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [follower.id, follower.name, follower.avatar, follower.location, follower.joined, follower.purchases, follower.style, follower.vendorId]
+        );
+    } catch (e) {
+        console.error("Add Follower Failed", e);
     }
 };
 

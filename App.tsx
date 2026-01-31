@@ -115,6 +115,7 @@ const App: React.FC = () => {
               }
           }
         } else {
+          // User exists but is not verified
           setIsLoggedIn(false);
           setUserRole(UserRole.BUYER);
           setCurrentView('AUTH');

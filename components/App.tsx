@@ -1,26 +1,26 @@
 
 import React, { useState, useEffect } from 'react';
-import { Layout } from './components/Layout';
-import { LandingView } from './components/LandingView';
-import { MarketplaceView } from './components/MarketplaceView';
-import { NewArrivalsView } from './components/NewArrivalsView';
-import { DesignersView } from './components/DesignersView';
-import { VendorProfileView } from './components/VendorProfileView';
-import { ProductDetail } from './components/ProductDetail';
-import { Dashboard } from './components/Dashboard';
-import { AuthView } from './components/AuthView';
-import { PricingView } from './components/PricingView';
-import { AboutView } from './components/AboutView';
-import { AiConcierge } from './components/AiConcierge'; // Import Concierge
-import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission } from './types';
+import { Layout } from './Layout.tsx';
+import { LandingView } from './LandingView.tsx';
+import { MarketplaceView } from './MarketplaceView.tsx';
+import { NewArrivalsView } from './NewArrivalsView.tsx';
+import { DesignersView } from './DesignersView.tsx';
+import { VendorProfileView } from './VendorProfileView.tsx';
+import { ProductDetail } from './ProductDetail.tsx';
+import { Dashboard } from './Dashboard.tsx';
+import { AuthView } from './AuthView.tsx';
+import { PricingView } from './PricingView.tsx';
+import { AboutView } from './AboutView.tsx';
+import { AiConcierge } from './AiConcierge.tsx';
+import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission } from '../types.ts';
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb
-} from './services/dataService';
-import { searchProductsByImage } from './services/geminiService';
+} from '../services/dataService.ts';
+import { searchProductsByImage } from '../services/geminiService.ts';
 import { Loader } from 'lucide-react';
-import { auth, onAuthStateChanged, signOut } from './services/firebase';
+import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
 
 const App: React.FC = () => {
   // State
@@ -33,6 +33,10 @@ const App: React.FC = () => {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string | null>(null);
   
+  // Auth Navigation State
+  const [authInitialMode, setAuthInitialMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [authInitialRole, setAuthInitialRole] = useState<UserRole>(UserRole.BUYER);
+
   // Data State
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -48,6 +52,7 @@ const App: React.FC = () => {
   // Initialize DB and Fetch Data
   const refreshData = async () => {
     try {
+      // Parallel fetch for speed
       const [dbVendors, dbProducts, dbOrders, dbUsers, dbContent, dbContacts] = await Promise.all([
         fetchVendors(), 
         fetchProducts(),
@@ -81,6 +86,14 @@ const App: React.FC = () => {
     initData();
   }, []);
 
+  // Poll for updates periodically (Real-time simulation)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshData();
+    }, 30000); // Refresh every 30s
+    return () => clearInterval(interval);
+  }, []);
+
   // Listen for Auth State Changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -88,7 +101,7 @@ const App: React.FC = () => {
         if (user.emailVerified) {
           setIsLoggedIn(true);
           // Determine Role
-          const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
+          const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me', 'mikelarry00764@proton.me'];
           if (adminEmails.includes(user.email?.toLowerCase() || '')) {
               setUserRole(UserRole.ADMIN);
           } else {
@@ -111,6 +124,7 @@ const App: React.FC = () => {
               }
           }
         } else {
+          // User exists but is not verified
           setIsLoggedIn(false);
           setUserRole(UserRole.BUYER);
           setCurrentView('AUTH');
@@ -140,10 +154,28 @@ const App: React.FC = () => {
 
   // Handlers
   const handleNavigate = (view: ViewState) => {
+    if (view === 'AUTH') {
+        // Reset defaults if navigating generically
+        setAuthInitialMode('LOGIN');
+        setAuthInitialRole(UserRole.BUYER);
+    }
+    
     if (view !== 'MARKETPLACE') {
         setSelectedDesignerFilter(null);
     }
+    
+    // Refresh data on navigation to ensure real-time feel
+    refreshData();
+    
     setCurrentView(view);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsCartOpen(false);
+  };
+
+  const handleAuthNavigation = (mode: 'LOGIN' | 'REGISTER', role: UserRole) => {
+    setAuthInitialMode(mode);
+    setAuthInitialRole(role);
+    setCurrentView('AUTH');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setIsCartOpen(false);
   };
@@ -160,10 +192,13 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (role: UserRole) => {
+    setUserRole(role);
     if (role === UserRole.ADMIN) {
       handleNavigate('ADMIN_PANEL');
     } else if (role === UserRole.VENDOR) {
       handleNavigate('VENDOR_DASHBOARD');
+    } else if (role === UserRole.BUYER) {
+      handleNavigate('BUYER_DASHBOARD');
     } else {
       handleNavigate('MARKETPLACE');
     }
@@ -277,7 +312,15 @@ const App: React.FC = () => {
   // View Routing
   const renderView = () => {
     if (currentView === 'AUTH') {
-      return <AuthView onLogin={handleLogin} onNavigate={handleNavigate} cmsContent={cmsContent} />;
+      return (
+        <AuthView 
+          onLogin={handleLogin} 
+          onNavigate={handleNavigate} 
+          cmsContent={cmsContent}
+          initialMode={authInitialMode}
+          initialRole={authInitialRole}
+        />
+      );
     }
 
     if (featureFlags.maintenanceMode && userRole !== UserRole.ADMIN) {
@@ -300,6 +343,7 @@ const App: React.FC = () => {
             products={activeProducts}
             onDesignerClick={handleDesignerSelect}
             cmsContent={cmsContent}
+            onAuthRequest={handleAuthNavigation}
           />
         );
       case 'MARKETPLACE':
@@ -394,11 +438,11 @@ const App: React.FC = () => {
           />
         );
       case 'PRICING':
-        return <PricingView onNavigate={handleNavigate} onLogin={() => handleLogin(UserRole.VENDOR)} />;
+        return <PricingView onNavigate={handleNavigate} onRegister={() => handleAuthNavigation('REGISTER', UserRole.VENDOR)} />;
       case 'ABOUT':
         return <AboutView onNavigate={handleNavigate} cmsContent={cmsContent} />;
       default:
-        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} products={activeProducts} onDesignerClick={handleDesignerSelect} cmsContent={cmsContent} />;
+        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} products={activeProducts} onDesignerClick={handleDesignerSelect} cmsContent={cmsContent} onAuthRequest={handleAuthNavigation} />;
     }
   };
 
@@ -427,6 +471,7 @@ const App: React.FC = () => {
       onLogout={handleLogout}
       onPlaceOrder={handlePlaceOrder}
       onVisualSearch={handleVisualSearch}
+      onAuthRequest={handleAuthNavigation}
     >
       {renderView()}
       

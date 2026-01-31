@@ -188,7 +188,11 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
 
   // Helper to route user based on DB role
   const routeUser = async (user: any) => {
-      const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
+      const adminEmails = [
+          'instantassetrecovery830@gmail.com', 
+          'juliemtrice7@proton.me', 
+          'mikelarry00764@proton.me'
+      ];
       if (adminEmails.includes(user.email?.toLowerCase() || '')) {
           onLogin(UserRole.ADMIN);
           return;
@@ -288,7 +292,12 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             await routeUser(user);
         }
     } catch (err: any) {
-        console.error("Auth Error:", err);
+        // Suppress expected operational errors from console to avoid alarming logs
+        const expectedAuthErrors = ['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password', 'auth/email-already-in-use'];
+        if (!expectedAuthErrors.includes(err.code)) {
+             console.error("Auth Error:", err);
+        }
+
         // Specific Error Handling as requested
         if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
             setError("Password or Email Incorrect");

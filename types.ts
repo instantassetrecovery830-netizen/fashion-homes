@@ -74,6 +74,18 @@ export interface Vendor {
   twitter?: string;
   paymentMethods?: PaymentMethod[];
   kycDocuments?: KycDocuments;
+  visualTheme?: 'MINIMALIST' | 'DARK' | 'GOLD';
+}
+
+export interface Follower {
+  id: string;
+  name: string;
+  avatar: string;
+  location: string;
+  joined: string;
+  purchases: number;
+  style: string;
+  vendorId: string;
 }
 
 export interface CartItem extends Product {
