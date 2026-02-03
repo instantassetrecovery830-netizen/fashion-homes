@@ -92,7 +92,7 @@ const App: React.FC = () => {
         if (user.emailVerified) {
           setIsLoggedIn(true);
           // Determine Role
-          const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
+          const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me', 'mikelarry00764@proton.me'];
           if (adminEmails.includes(user.email?.toLowerCase() || '')) {
               setUserRole(UserRole.ADMIN);
           } else {

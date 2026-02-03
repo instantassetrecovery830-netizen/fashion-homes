@@ -212,8 +212,7 @@ const initSchema = async () => {
             twitter TEXT,
             paymentMethods JSONB,
             kycDocuments JSONB,
-            visualTheme TEXT,
-            password_hash TEXT
+            visualTheme TEXT
         )`,
         `CREATE TABLE IF NOT EXISTS products (
             id TEXT PRIMARY KEY,
@@ -239,8 +238,7 @@ const initSchema = async () => {
             status TEXT,
             spend TEXT,
             location TEXT,
-            verificationStatus TEXT,
-            password_hash TEXT
+            verificationStatus TEXT
         )`,
         `CREATE TABLE IF NOT EXISTS orders (
             id TEXT PRIMARY KEY,
@@ -272,6 +270,13 @@ const initSchema = async () => {
             purchases INTEGER,
             style TEXT,
             vendorId TEXT
+        )`,
+        // Real-time Authentication Table
+        `CREATE TABLE IF NOT EXISTS auth_accounts (
+            email TEXT PRIMARY KEY,
+            password TEXT,
+            uid TEXT,
+            email_verified BOOLEAN DEFAULT FALSE
         )`
     ];
 
@@ -280,6 +285,7 @@ const initSchema = async () => {
     }
 
     // --- MIGRATIONS ---
+    // Ensure all columns exist even if tables were created by an older version of the schema.
     const migrations = [
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS verificationStatus TEXT`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS subscriptionStatus TEXT`,
@@ -293,14 +299,12 @@ const initSchema = async () => {
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS paymentMethods JSONB`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS kycDocuments JSONB`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS visualTheme TEXT`,
-        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS password_hash TEXT`,
         
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS verificationStatus TEXT`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS joined TEXT`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`,
 
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS isPreOrder BOOLEAN`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER`,
@@ -318,12 +322,18 @@ const initSchema = async () => {
             console.warn("Migration warning:", e);
         }
     }
+
+    // --- AUTH BACKFILL ---
+    // Ensure existing users/vendors have auth accounts (default password: 'password')
+    await pool.query(`INSERT INTO auth_accounts (email, password, uid, email_verified) SELECT email, 'password', id, true FROM vendors ON CONFLICT (email) DO NOTHING`);
+    await pool.query(`INSERT INTO auth_accounts (email, password, uid, email_verified) SELECT email, 'password', id, true FROM users ON CONFLICT (email) DO NOTHING`);
 };
 
 export const seedDatabase = async () => {
     try {
         await initSchema();
 
+        // Check if vendors exist
         const res = await pool.query('SELECT count(*) FROM vendors');
         if (res.rows[0].count === '0') {
             console.log('Seeding Database...');
@@ -334,6 +344,11 @@ export const seedDatabase = async () => {
                     `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, website, instagram, twitter, visualTheme)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
                     [v.id, v.name, v.bio, v.avatar, v.verificationStatus, v.subscriptionStatus, v.location, v.coverImage, v.email, v.subscriptionPlan, v.website, v.instagram, v.twitter, v.visualTheme || 'MINIMALIST']
+                );
+                // Create auth account for seeded vendor
+                await pool.query(
+                    `INSERT INTO auth_accounts (email, password, uid, email_verified) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING`,
+                    [v.email, 'password', v.id, true]
                 );
             }
 
@@ -360,30 +375,11 @@ export const seedDatabase = async () => {
                 `INSERT INTO cms (id, content) VALUES ($1, $2)`,
                 ['main', JSON.stringify(DEFAULT_CMS_CONTENT)]
             );
+        } else {
+            console.log('Database already initialized.');
         }
     } catch (e) {
         console.error("Error seeding database:", e);
-    }
-};
-
-// --- AUTH HELPERS ---
-
-export const getUserAuthData = async (email: string) => {
-    try {
-        // Check Users
-        const userRes = await pool.query('SELECT id, name, email, role, avatar, password_hash, verificationstatus FROM users WHERE email = $1', [email]);
-        if (userRes.rows.length > 0) {
-            return { ...userRes.rows[0], type: 'USER' };
-        }
-        // Check Vendors
-        const vendorRes = await pool.query('SELECT id, name, email, avatar, password_hash, verificationstatus FROM vendors WHERE email = $1', [email]);
-        if (vendorRes.rows.length > 0) {
-             return { ...vendorRes.rows[0], role: 'VENDOR', type: 'VENDOR' };
-        }
-        return null;
-    } catch (e) {
-        console.error("Auth Data Fetch Failed", e);
-        return null;
     }
 };
 
@@ -394,7 +390,7 @@ export const fetchVendors = async (): Promise<Vendor[]> => {
         const { rows } = await pool.query('SELECT * FROM vendors');
         return rows.map(row => ({
             ...row,
-            paymentMethods: row.paymentmethods,
+            paymentMethods: row.paymentmethods, // Postgres lowercases by default if not quoted
             kycDocuments: row.kycdocuments,
             verificationStatus: row.verificationstatus,
             subscriptionStatus: row.subscriptionstatus,
@@ -416,7 +412,7 @@ export const fetchProducts = async (): Promise<Product[]> => {
             price: Number(row.price),
             rating: Number(row.rating),
             stock: Number(row.stock),
-            sizes: row.sizes,
+            sizes: row.sizes, // JSONB is auto-parsed by node-postgres
             isNewSeason: row.isnewseason,
             isPreOrder: row.ispreorder
         })) as Product[];
@@ -537,14 +533,15 @@ export const updateVendorInDb = async (vendor: Vendor) => {
     }
 };
 
-export const createVendorInDb = async (vendor: Vendor, passwordHash?: string) => {
+export const createVendorInDb = async (vendor: Vendor) => {
     try {
+        // Check duplication
         const check = await pool.query('SELECT id FROM vendors WHERE id = $1', [vendor.id]);
         if (check.rows.length === 0) {
             await pool.query(
-                `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, visualTheme, password_hash)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-                [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.visualTheme || 'MINIMALIST', passwordHash || '']
+                `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, visualTheme)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.visualTheme || 'MINIMALIST']
             );
         }
     } catch (e) {
@@ -564,6 +561,52 @@ export const addFollowerToDb = async (follower: Follower) => {
     }
 };
 
+// --- WRITE OPERATIONS (USERS) ---
+
+export const createUserInDb = async (user: { id: string, name: string, email: string, role: string, avatar: string, status: string, verificationStatus?: VerificationStatus }) => {
+    try {
+        const check = await pool.query('SELECT id FROM users WHERE id = $1', [user.id]);
+        if (check.rows.length === 0) {
+             await pool.query(
+                 `INSERT INTO users (id, name, email, role, avatar, joined, status, verificationStatus)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                 [user.id, user.name, user.email, user.role, user.avatar, new Date().toISOString(), user.status, user.verificationStatus || 'PENDING']
+             );
+        }
+    } catch (e) {
+        console.error("Create User Failed", e);
+    }
+};
+
+export const updateUserInDb = async (user: User) => {
+    try {
+        await pool.query(
+            `UPDATE users SET role=$1, status=$2, verificationStatus=$3 WHERE id=$4`,
+            [user.role, user.status, user.verificationStatus, user.id]
+        );
+    } catch (e) {
+        console.error("Update User Failed", e);
+    }
+};
+
+// --- WRITE OPERATIONS (CMS) ---
+
+export const updateLandingContentInDb = async (content: LandingPageContent) => {
+    try {
+        // Upsert logic for ID 'main'
+        const check = await pool.query("SELECT id FROM cms WHERE id = 'main'");
+        if (check.rows.length > 0) {
+             await pool.query("UPDATE cms SET content = $1 WHERE id = 'main'", [JSON.stringify(content)]);
+        } else {
+             await pool.query("INSERT INTO cms (id, content) VALUES ('main', $1)", [JSON.stringify(content)]);
+        }
+    } catch (e) {
+        console.error("Update CMS Failed", e);
+    }
+};
+
+// --- WRITE OPERATIONS (ORDERS) ---
+
 export const createOrderInDb = async (order: Order) => {
     try {
         await pool.query(
@@ -576,66 +619,15 @@ export const createOrderInDb = async (order: Order) => {
     }
 };
 
-export const updateOrderStatusInDb = async (orderId: string, status: Order['status']) => {
+export const updateOrderStatusInDb = async (orderId: string, status: string) => {
     try {
-        await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [status, orderId]);
+        await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, orderId]);
     } catch (e) {
         console.error("Update Order Status Failed", e);
     }
 };
 
-export const createUserInDb = async (user: Partial<User>, passwordHash?: string) => {
-    try {
-        const check = await pool.query('SELECT id FROM users WHERE id = $1', [user.id]);
-        if (check.rows.length === 0) {
-             await pool.query(
-                `INSERT INTO users (id, name, email, role, avatar, status, joined, verificationStatus, password_hash)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                [user.id, user.name, user.email, user.role, user.avatar, user.status, new Date().toISOString(), 'PENDING', passwordHash || '']
-            );
-        }
-    } catch (e) {
-        console.error("Create User Failed", e);
-    }
-};
-
-export const updateUserInDb = async (user: User) => {
-    try {
-        await pool.query(
-            `UPDATE users SET name=$1, role=$2, avatar=$3, status=$4 WHERE id=$5`,
-            [user.name, user.role, user.avatar, user.status, user.id]
-        );
-    } catch (e) {
-        console.error("Update User Failed", e);
-    }
-};
-
-export const updatePasswordInDb = async (email: string, passwordHash: string) => {
-    try {
-        // Try update user
-        const res = await pool.query('UPDATE users SET password_hash = $1 WHERE email = $2', [passwordHash, email]);
-        if (res.rowCount === 0) {
-            // Try update vendor if user not found
-             await pool.query('UPDATE vendors SET password_hash = $1 WHERE email = $2', [passwordHash, email]);
-        }
-    } catch (e) {
-        console.error("Update Password Failed", e);
-        throw e;
-    }
-};
-
-export const updateLandingContentInDb = async (content: LandingPageContent) => {
-    try {
-        const check = await pool.query("SELECT id FROM cms WHERE id = 'main'");
-        if (check.rows.length > 0) {
-            await pool.query("UPDATE cms SET content = $1 WHERE id = 'main'", [JSON.stringify(content)]);
-        } else {
-             await pool.query("INSERT INTO cms (id, content) VALUES ('main', $1)", [JSON.stringify(content)]);
-        }
-    } catch (e) {
-        console.error("Update CMS Failed", e);
-    }
-};
+// --- WRITE OPERATIONS (CONTACT) ---
 
 export const submitContactFormInDb = async (submission: ContactSubmission) => {
     try {
@@ -646,5 +638,13 @@ export const submitContactFormInDb = async (submission: ContactSubmission) => {
         );
     } catch (e) {
         console.error("Submit Contact Failed", e);
+    }
+};
+
+export const updateContactStatusInDb = async (id: string, status: 'NEW' | 'READ' | 'ARCHIVED') => {
+    try {
+        await pool.query("UPDATE contacts SET status = $1 WHERE id = $2", [status, id]);
+    } catch (e) {
+        console.error("Update Contact Status Failed", e);
     }
 };

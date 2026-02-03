@@ -12,12 +12,12 @@ import {
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield, BadgeCheck,
   Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu, Wallet, Banknote, Bitcoin, ArrowLeft, Inbox,
-  Phone, Clock, Calendar, FileCheck, ArrowDownLeft, ArrowUpRight as ArrowUpRightIcon, User as UserIcon, LogOut
+  Phone, Clock, Calendar, FileCheck, ArrowDownLeft, ArrowUpRight as ArrowUpRightIcon, User as UserIcon
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission, KycDocuments, Follower } from '../types.ts';
+import { updateUserPassword, auth } from '../services/firebase.ts';
 import { VendorProfileView } from './VendorProfileView.tsx';
 import { fetchVendorFollowers, addFollowerToDb } from '../services/dataService.ts';
-import { authService } from '../services/auth.ts';
 
 const COLORS = ['#0a0a0a', '#C5A059', '#8B8580', '#E5E5E5', '#4A0404'];
 
@@ -41,7 +41,6 @@ interface DashboardProps {
   cmsContent?: LandingPageContent;
   onUpdateCMSContent?: (content: LandingPageContent) => Promise<void>;
   contactSubmissions?: ContactSubmission[];
-  onLogout: () => void;
 }
 
 type DashboardTab = 'OVERVIEW' | 'PRODUCTS' | 'UPLOAD' | 'ORDERS' | 'SETTINGS' | 'MARKETPLACE' | 'PROFILE' | 'STORE_DESIGN' | 'SAVED' | 'FULFILLMENT' | 'SUBSCRIPTIONS' | 'FOLLOWERS' | 'SUBSCRIPTION_PLAN' | 'VERIFICATION' | 'USERS' | 'REVIEWS' | 'TRANSACTIONS' | 'STORE_PREVIEW' | 'CMS' | 'PAYOUTS' | 'INBOX';
@@ -91,8 +90,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onUpdateUser,
   cmsContent,
   onUpdateCMSContent,
-  contactSubmissions = [],
-  onLogout
+  contactSubmissions = []
 }) => {
   const isAdmin = role === UserRole.ADMIN;
   const isVendor = role === UserRole.VENDOR;
@@ -550,10 +548,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
       
       setPasswordStatus({ loading: true, success: false, error: '' });
       try {
-          await authService.updatePassword(passwords.new);
-          setPasswordStatus({ loading: false, success: true, error: '' });
-          setPasswords({ new: '', confirm: '' });
-          setTimeout(() => setPasswordStatus({ loading: false, success: false, error: '' }), 3000);
+          if (auth.currentUser) {
+              await updateUserPassword(auth.currentUser, passwords.new);
+              setPasswordStatus({ loading: false, success: true, error: '' });
+              setPasswords({ new: '', confirm: '' });
+              setTimeout(() => setPasswordStatus({ loading: false, success: false, error: '' }), 3000);
+          } else {
+              setPasswordStatus({ loading: false, success: false, error: 'User session invalid.' });
+          }
       } catch (err) {
           setPasswordStatus({ loading: false, success: false, error: 'Failed to update password.' });
       }
@@ -763,15 +765,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         ))}
       </nav>
-      
-      <div className="mt-8 border-t border-gray-100 pt-4">
-          <button 
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold uppercase tracking-widest text-red-500 hover:bg-red-50 transition-all rounded-sm"
-          >
-            <LogOut size={16} /> Logout
-          </button>
-      </div>
       
       {isVendor && (
          <div className="mt-8 space-y-4">
