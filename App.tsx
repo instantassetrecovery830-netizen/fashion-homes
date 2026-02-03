@@ -1,26 +1,26 @@
 
 import React, { useState, useEffect } from 'react';
-import { Layout } from './Layout.tsx';
-import { LandingView } from './LandingView.tsx';
-import { MarketplaceView } from './MarketplaceView.tsx';
-import { NewArrivalsView } from './NewArrivalsView.tsx';
-import { DesignersView } from './DesignersView.tsx';
-import { VendorProfileView } from './VendorProfileView.tsx';
-import { ProductDetail } from './ProductDetail.tsx';
-import { Dashboard } from './Dashboard.tsx';
-import { AuthView } from './AuthView.tsx';
-import { PricingView } from './PricingView.tsx';
-import { AboutView } from './AboutView.tsx';
-import { AiConcierge } from './AiConcierge.tsx';
-import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission } from '../types.ts';
+import { Layout } from './components/Layout.tsx';
+import { LandingView } from './components/LandingView.tsx';
+import { MarketplaceView } from './components/MarketplaceView.tsx';
+import { NewArrivalsView } from './components/NewArrivalsView.tsx';
+import { DesignersView } from './components/DesignersView.tsx';
+import { VendorProfileView } from './components/VendorProfileView.tsx';
+import { ProductDetail } from './components/ProductDetail.tsx';
+import { Dashboard } from './components/Dashboard.tsx';
+import { AuthView } from './components/AuthView.tsx';
+import { PricingView } from './components/PricingView.tsx';
+import { AboutView } from './components/AboutView.tsx';
+import { AiConcierge } from './components/AiConcierge.tsx';
+import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission } from './types.ts';
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb
-} from '../services/dataService.ts';
-import { searchProductsByImage } from '../services/geminiService.ts';
+} from './services/dataService.ts';
+import { searchProductsByImage } from './services/geminiService.ts';
 import { Loader } from 'lucide-react';
-import { authService } from '../services/auth.ts';
+import { authService } from './services/auth.ts';
 
 const App: React.FC = () => {
   // State
