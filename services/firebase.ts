@@ -105,12 +105,18 @@ export const signInWithEmailAndPassword = async (_auth: any, email: string, pass
       throw error;
   }
 
+  // Auto-verify if not verified (Fix for auto-verification request)
+  if (!account.email_verified) {
+      await pool.query('UPDATE auth_accounts SET email_verified = true WHERE uid = $1', [account.uid]);
+      account.email_verified = true;
+  }
+
   const profile = await fetchUserProfile(account.uid);
 
   const user: User = {
       uid: account.uid,
       email: account.email,
-      emailVerified: account.email_verified,
+      emailVerified: true, // Always true due to auto-verification above
       displayName: profile?.name || email.split('@')[0],
       photoURL: profile?.avatar || null,
       reload: async () => {
@@ -138,10 +144,10 @@ export const createUserWithEmailAndPassword = async (_auth: any, email: string, 
 
   const uid = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
-  // Insert into Auth Table
+  // Insert into Auth Table - Auto Verify is TRUE
   await pool.query(
       'INSERT INTO auth_accounts (email, password, uid, email_verified) VALUES ($1, $2, $3, $4)',
-      [email, password, uid, false] 
+      [email, password, uid, true] 
   );
 
   const user: User = {
@@ -149,7 +155,7 @@ export const createUserWithEmailAndPassword = async (_auth: any, email: string, 
     email,
     displayName: email.split('@')[0],
     photoURL: null,
-    emailVerified: false,
+    emailVerified: true, // Auto verified
     reload: async () => {
          const refreshRes = await pool.query('SELECT email_verified FROM auth_accounts WHERE uid = $1', [uid]);
          if (refreshRes.rows.length > 0 && currentUser?.uid === uid) {
@@ -204,15 +210,10 @@ export const signInWithGoogle = async () => {
 
 export const sendEmailVerification = async (_user: User) => {
   console.log(`Sending verification email to ${_user.email}`);
-  // Simulate verification link click for this "real-time" DB version 
-  // In a full app, you'd send an email with a token.
-  // Here we'll simulate the user verifying after 3 seconds by updating the DB.
-  setTimeout(async () => {
-      if (_user.email) {
-          await pool.query('UPDATE auth_accounts SET email_verified = true WHERE email = $1', [_user.email]);
-          console.log("Email auto-verified in Database (Simulation)");
-      }
-  }, 3000);
+  // Force update immediately for any stragglers
+  if (_user.email) {
+      await pool.query('UPDATE auth_accounts SET email_verified = true WHERE email = $1', [_user.email]);
+  }
 };
 
 export const sendPasswordResetEmail = async (_auth: any, email: string) => {

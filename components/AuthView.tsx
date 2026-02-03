@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, ArrowLeft, RefreshCw, Briefcase, ShoppingBag } from 'lucide-react';
-import { UserRole, ViewState, Vendor, LandingPageContent } from '../types';
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail } from '../services/firebase';
-import { createVendorInDb, createUserInDb, fetchUsers, fetchVendors } from '../services/dataService';
+import { UserRole, ViewState, Vendor, LandingPageContent } from '../types.ts';
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail } from '../services/firebase.ts';
+import { createVendorInDb, createUserInDb, fetchUsers, fetchVendors } from '../services/dataService.ts';
 
 interface AuthViewProps {
   onLogin: (role: UserRole) => void;
@@ -271,12 +271,16 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 });
             }
 
-            // Send Verification Email
-            await sendEmailVerification(user);
-            
-            // Show Verification Screen immediately
-            setVerificationEmail(user.email || email);
-            setVerificationNeeded(true);
+            // If user is auto-verified (as per simplified req), skip verification screen
+            if (user.emailVerified) {
+                await routeUser(user);
+            } else {
+                // Send Verification Email
+                await sendEmailVerification(user);
+                // Show Verification Screen immediately
+                setVerificationEmail(user.email || email);
+                setVerificationNeeded(true);
+            }
 
         } else {
             // Login Flow
