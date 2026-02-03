@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, ArrowLeft, RefreshCw, Briefcase, ShoppingBag } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types';
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail } from '../services/firebase';
-import { createVendorInDb, createUserInDb, fetchUsers, fetchVendors } from '../services/dataService';
+import { authService } from '../services/auth';
 
 interface AuthViewProps {
   onLogin: (role: UserRole) => void;
@@ -15,18 +14,9 @@ interface AuthViewProps {
 
 export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsContent, initialMode = 'LOGIN', initialRole = UserRole.BUYER }) => {
   const [isRegister, setIsRegister] = useState(initialMode === 'REGISTER');
-  const [isResetingPassword, setIsResetingPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>(initialRole);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Verification State
-  const [verificationNeeded, setVerificationNeeded] = useState(false);
-  const [verificationEmail, setVerificationEmail] = useState('');
-  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
-
-  // Password Reset State
-  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   // Form states
   const [name, setName] = useState('');
@@ -37,20 +27,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
   const [showPassword, setShowPassword] = useState(false);
   const [avatar, setAvatar] = useState<string>('');
   
-  // Get images from CMS or fallbacks
   const loginImage = cmsContent?.auth?.loginImage || "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2070";
   const registerImage = cmsContent?.auth?.registerImage || "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=2574";
 
-  // Check for existing unverified session on mount
-  useEffect(() => {
-    // If user is logged in but stuck in verification flow
-    if (auth.currentUser && !auth.currentUser.emailVerified) {
-        setVerificationEmail(auth.currentUser.email || '');
-        setVerificationNeeded(true);
-    }
-  }, []);
-
-  // Update Role state when props change
   useEffect(() => {
     setIsRegister(initialMode === 'REGISTER');
     setSelectedRole(initialRole);
@@ -67,161 +46,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     }
   };
 
-  const handleReset = () => {
-    setError(null);
-    setName('');
-    setBrandName('');
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    setAvatar('');
-    setVerificationNeeded(false);
-    setResendStatus('idle');
-    setResetEmailSent(false);
-    setIsResetingPassword(false);
-  };
-
   const toggleMode = () => {
     setIsRegister(!isRegister);
-    handleReset();
-  };
-
-  const handleResendVerification = async () => {
-    const user = auth.currentUser;
-    if (!user) {
-        setError("Session expired. Please sign in again.");
-        return;
-    }
-
-    setResendStatus('sending');
-    try {
-        await sendEmailVerification(user);
-        setResendStatus('sent');
-        // Reset to idle after 5 seconds so they can send again if needed
-        setTimeout(() => setResendStatus('idle'), 5000); 
-    } catch (e) {
-        console.error("Resend failed", e);
-        setError("Failed to resend email. Please try again.");
-        setResendStatus('idle');
-    }
-  };
-
-  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-        setError("Please enter your email address to reset password.");
-        return;
-    }
     setError(null);
-    setIsLoading(true);
-    try {
-        await sendPasswordResetEmail(auth, email);
-        setResetEmailSent(true);
-    } catch (err: any) {
-        console.error("Reset Password Error:", err);
-        setError("Failed to send reset email. Please try again.");
-    } finally {
-        setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await signInWithGoogle();
-      const user = result.user;
-      
-      if (!user.email) throw new Error("Google account email not found.");
-
-      // Attempt to create user in DB if they don't exist
-      try {
-         const displayName = user.displayName || 'Google User';
-         const photoURL = user.photoURL || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200';
-
-         if (selectedRole === UserRole.VENDOR) {
-            // Check if vendor already exists to avoid overwriting details
-            const vendors = await fetchVendors();
-            if (!vendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase())) {
-                await createVendorInDb({
-                    id: user.uid,
-                    name: brandName || displayName, // Fallback to displayName if brandName not set
-                    bio: 'Joined via Google',
-                    avatar: photoURL,
-                    verificationStatus: 'PENDING',
-                    subscriptionStatus: 'INACTIVE',
-                    location: 'Unknown',
-                    coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=200',
-                    email: user.email,
-                    subscriptionPlan: 'Atelier',
-                    website: '',
-                    instagram: '',
-                    twitter: ''
-                });
-            }
-         } else {
-            const users = await fetchUsers();
-            if (!users.find(u => u.email?.toLowerCase() === user.email?.toLowerCase())) {
-                await createUserInDb({
-                    id: user.uid,
-                    name: displayName,
-                    email: user.email,
-                    role: UserRole.BUYER,
-                    avatar: photoURL,
-                    status: 'ACTIVE'
-                });
-            }
-         }
-      } catch (dbError) {
-          console.warn("DB user creation check skipped/failed:", dbError);
-          // User likely exists or DB error - we proceed to routeUser which handles lookup
-      }
-
-      await routeUser(user);
-    } catch (err: any) {
-        console.error("Google Auth Error:", err);
-        setError("Google Sign In Failed. Please try again.");
-    } finally {
-        setIsLoading(false);
-    }
-  };
-
-  // Helper to route user based on DB role
-  const routeUser = async (user: any) => {
-      const adminEmails = [
-          'instantassetrecovery830@gmail.com', 
-          'juliemtrice7@proton.me', 
-          'mikelarry00764@proton.me'
-      ];
-      if (adminEmails.includes(user.email?.toLowerCase() || '')) {
-          onLogin(UserRole.ADMIN);
-          return;
-      } 
-      
-      try {
-          // Check Buyers (Users table)
-          const dbUsers = await fetchUsers();
-          const dbUser = dbUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
-          
-          if (dbUser && dbUser.role) {
-              onLogin(dbUser.role);
-              return;
-          }
-
-          // Check Vendors (Vendors table)
-          const dbVendors = await fetchVendors();
-          const dbVendor = dbVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
-
-          if (dbVendor) {
-              onLogin(UserRole.VENDOR);
-              return;
-          }
-
-          // Fallback: If DB entry doesn't exist yet, use the role they selected on the toggle
-          onLogin(selectedRole); 
-      } catch {
-          onLogin(selectedRole);
-      }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -231,7 +58,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     
     try {
         if (isRegister) {
-            // Registration Flow
             if (password !== confirmPassword) {
                 throw new Error("Passwords do not match");
             }
@@ -242,232 +68,26 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 throw new Error("Business Name is required for vendors");
             }
 
-            const { user } = await createUserWithEmailAndPassword(auth, email, password);
-            const finalAvatar = avatar || 'https://via.placeholder.com/150';
+            const details = {
+              name,
+              brandName,
+              avatar
+            };
 
-            // Save to Database based on Role
-            if (selectedRole === UserRole.VENDOR) {
-                const newVendor: Vendor = {
-                    id: user.uid,
-                    name: brandName,
-                    bio: `Bio for ${name}`,
-                    avatar: finalAvatar,
-                    verificationStatus: 'PENDING',
-                    subscriptionStatus: 'INACTIVE',
-                    location: 'Unknown',
-                    coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070',
-                    email: user.email || '',
-                    subscriptionPlan: 'Atelier'
-                };
-                await createVendorInDb(newVendor);
-            } else {
-                await createUserInDb({
-                    id: user.uid,
-                    name: name,
-                    email: user.email || '',
-                    role: UserRole.BUYER,
-                    avatar: finalAvatar,
-                    status: 'ACTIVE'
-                });
-            }
-
-            // Send Verification Email
-            await sendEmailVerification(user);
-            
-            // Show Verification Screen immediately
-            setVerificationEmail(user.email || email);
-            setVerificationNeeded(true);
+            const user = await authService.register(email, password, selectedRole, details);
+            onLogin(user.role);
 
         } else {
-            // Login Flow
-            const { user } = await signInWithEmailAndPassword(auth, email, password);
-
-            // Check verification status
-            if (!user.emailVerified) {
-                setVerificationEmail(user.email || email);
-                setVerificationNeeded(true);
-                return; 
-            }
-            
-            await routeUser(user);
+            const user = await authService.signIn(email, password);
+            onLogin(user.role);
         }
     } catch (err: any) {
-        // Suppress expected operational errors from console to avoid alarming logs
-        const expectedAuthErrors = ['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password', 'auth/email-already-in-use'];
-        if (!expectedAuthErrors.includes(err.code)) {
-             console.error("Auth Error:", err);
-        }
-
-        // Specific Error Handling as requested
-        if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-            setError("Password or Email Incorrect");
-        } else if (err.code === 'auth/email-already-in-use') {
-            setError("User already exists. Sign in?");
-        } else {
-            setError(err.message || "Authentication failed.");
-        }
-    } finally {
-        // isLoading handled in routeUser if checking DB, otherwise false
-        if (error) setIsLoading(false);
-    }
-  };
-
-  const handleCheckVerification = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-        if (auth.currentUser) {
-            await auth.currentUser.reload();
-            if (auth.currentUser.emailVerified) {
-                await routeUser(auth.currentUser);
-                setVerificationNeeded(false);
-            } else {
-                setError("Email not verified yet. Please check your inbox or wait a moment.");
-            }
-        }
-    } catch(e) {
-         console.error(e);
-         setError("Failed to check verification status.");
+        console.error("Auth Error:", err);
+        setError(err.message || "Authentication failed.");
     } finally {
         setIsLoading(false);
     }
   };
-
-  if (verificationNeeded) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-white p-6 animate-fade-in">
-            <div className="w-full max-w-md text-center">
-                <div className="mx-auto w-16 h-16 bg-luxury-gold/10 text-luxury-gold rounded-full flex items-center justify-center mb-6">
-                    <Mail size={32} />
-                </div>
-                <h2 className="text-2xl font-serif italic mb-4">Verify Your Email</h2>
-                <p className="text-gray-500 text-sm leading-relaxed mb-8">
-                    We have sent you a verification email to <span className="font-bold text-black">{verificationEmail}</span>. 
-                    Verify it and log in.
-                </p>
-
-                {error && (
-                    <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-sm mb-6 text-left">
-                        <AlertCircle size={14} className="shrink-0" />
-                        <span>{error}</span>
-                    </div>
-                )}
-                
-                <button 
-                    onClick={handleCheckVerification}
-                    disabled={isLoading}
-                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-3 flex justify-center items-center gap-2 disabled:opacity-70"
-                >
-                    {isLoading ? <Loader className="animate-spin" size={16} /> : "I've Verified My Email"}
-                </button>
-
-                <button 
-                    onClick={async () => {
-                        await signOut(auth);
-                        setVerificationNeeded(false);
-                        setIsRegister(false);
-                        setVerificationEmail('');
-                        setError(null);
-                    }}
-                    className="w-full bg-white border border-gray-200 text-black py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-gray-50 transition-colors mb-6 flex justify-center items-center gap-2"
-                >
-                    Sign Out & Log In
-                </button>
-                
-                <div className="bg-gray-50 p-4 rounded-sm">
-                    <p className="text-xs text-gray-500 mb-3">Didn't receive the email?</p>
-                    
-                    {resendStatus === 'sent' ? (
-                        <div className="text-green-600 text-xs font-bold animate-fade-in flex items-center justify-center gap-2">
-                            <CheckCircle size={14} /> Link Sent!
-                        </div>
-                    ) : (
-                        <button
-                            onClick={handleResendVerification}
-                            disabled={resendStatus === 'sending'}
-                            className="text-xs text-black font-bold uppercase tracking-widest hover:text-luxury-gold underline transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mx-auto"
-                        >
-                            {resendStatus === 'sending' ? (
-                                <><Loader size={12} className="animate-spin" /> Sending...</>
-                            ) : (
-                                <><RefreshCw size={12} /> Resend Link</>
-                            )}
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div>
-      );
-  }
-
-  // Reset Password Flow View
-  if (isResetingPassword) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-white p-6 animate-fade-in">
-            <div className="w-full max-w-md">
-                <button onClick={() => setIsResetingPassword(false)} className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-black mb-8">
-                    <ArrowLeft size={16} /> Back to Sign In
-                </button>
-                
-                <div className="text-center mb-10">
-                     <h1 className="text-3xl font-serif italic mb-2">Reset Password</h1>
-                     <p className="text-gray-400 text-sm">Enter your email to receive recovery instructions.</p>
-                </div>
-
-                <form onSubmit={handleForgotPasswordSubmit} className="space-y-6">
-                     <div>
-                        <input 
-                            type="email"
-                            required
-                            placeholder="Email Address"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full border-b border-gray-200 py-3 text-sm focus:border-black outline-none bg-transparent"
-                        />
-                     </div>
-
-                     {error && (
-                        <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-sm">
-                            <AlertCircle size={14} />
-                            <span>{error}</span>
-                        </div>
-                     )}
-
-                     {resetEmailSent && (
-                        <div className="flex items-center gap-2 text-green-600 text-xs bg-green-50 p-3 rounded-sm animate-fade-in">
-                            <CheckCircle size={14} />
-                            <span>Password reset email sent to {email}. Check your inbox.</span>
-                        </div>
-                     )}
-
-                     {!resetEmailSent && (
-                         <button 
-                            type="submit" 
-                            disabled={isLoading}
-                            className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex justify-center items-center gap-2 disabled:opacity-70"
-                         >
-                            {isLoading ? <Loader className="animate-spin" size={16} /> : (
-                                <>
-                                   Send Reset Link <ArrowRight size={16} />
-                                </>
-                            )}
-                         </button>
-                     )}
-                     
-                     {resetEmailSent && (
-                         <button 
-                            type="button" 
-                            onClick={() => setIsResetingPassword(false)}
-                            className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex justify-center items-center gap-2"
-                         >
-                            Return to Login
-                         </button>
-                     )}
-                </form>
-            </div>
-        </div>
-      );
-  }
 
   return (
     <div className="min-h-screen flex animate-fade-in">
@@ -604,18 +224,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                         </button>
                      </div>
 
-                     {!isRegister && (
-                        <div className="flex justify-end mt-1">
-                            <button
-                                type="button"
-                                onClick={() => { setIsResetingPassword(true); setError(null); }}
-                                className="text-[10px] uppercase font-bold tracking-widest text-gray-400 hover:text-black transition-colors"
-                            >
-                                Forgot Password?
-                            </button>
-                        </div>
-                     )}
-
                      {isRegister && (
                         <div className="relative">
                             <input 
@@ -632,15 +240,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                      {error && (
                         <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-sm animate-fade-in">
                             <AlertCircle size={14} />
-                            <span>
-                                {error === "User already exists. Sign in?" ? (
-                                    <>
-                                        User already exists. <button type="button" onClick={() => { setIsRegister(false); setError(null); }} className="underline font-bold hover:text-red-700">Sign in?</button>
-                                    </>
-                                ) : (
-                                    error
-                                )}
-                            </span>
+                            <span>{error}</span>
                         </div>
                      )}
 
@@ -654,31 +254,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                                {isRegister ? (selectedRole === UserRole.VENDOR ? 'Apply for Vendor Access' : 'Create Buyer Account') : (selectedRole === UserRole.VENDOR ? 'Vendor Sign In' : 'Buyer Sign In')} <ArrowRight size={16} />
                             </>
                         )}
-                     </button>
-
-                     {/* Google Sign In Separator */}
-                     <div className="relative my-8">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-gray-100"></div>
-                        </div>
-                        <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-medium">
-                            <span className="bg-white px-3 text-gray-400">Or Continue With</span>
-                        </div>
-                     </div>
-
-                     <button 
-                        type="button"
-                        onClick={handleGoogleLogin}
-                        disabled={isLoading}
-                        className="w-full bg-white border border-gray-200 hover:border-black text-luxury-black py-4 text-xs font-bold uppercase tracking-[0.2em] transition-all flex justify-center items-center gap-3 group shadow-sm hover:shadow-md"
-                     >
-                        <svg className="w-5 h-5 group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
-                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                        </svg>
-                        <span>Google</span>
                      </button>
                 </form>
 

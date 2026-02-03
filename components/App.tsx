@@ -20,7 +20,7 @@ import {
 } from '../services/dataService.ts';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { Loader } from 'lucide-react';
-import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
+import { authService } from '../services/auth.ts';
 
 const App: React.FC = () => {
   // State
@@ -96,38 +96,16 @@ const App: React.FC = () => {
 
   // Listen for Auth State Changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = authService.onAuthStateChanged(async (user) => {
       if (user) {
-        if (user.emailVerified) {
-          setIsLoggedIn(true);
-          // Determine Role
-          const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me', 'mikelarry00764@proton.me'];
-          if (adminEmails.includes(user.email?.toLowerCase() || '')) {
-              setUserRole(UserRole.ADMIN);
-          } else {
-              // Check if user has an assigned role in the Users table
-              const currentUsers = await fetchUsers();
-              const dbUser = currentUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
-
-              if (dbUser && dbUser.role) {
-                  setUserRole(dbUser.role);
-              } else {
-                  // Fallback to Vendor check
-                  const currentVendors = await fetchVendors();
-                  const matchingVendor = currentVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
-                  
-                  if (matchingVendor) {
-                      setUserRole(UserRole.VENDOR);
-                  } else {
-                      setUserRole(UserRole.BUYER);
-                  }
-              }
-          }
+        setIsLoggedIn(true);
+        // Determine Role
+        const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me', 'mikelarry00764@proton.me'];
+        if (adminEmails.includes(user.email?.toLowerCase() || '')) {
+            setUserRole(UserRole.ADMIN);
         } else {
-          // User exists but is not verified
-          setIsLoggedIn(false);
-          setUserRole(UserRole.BUYER);
-          setCurrentView('AUTH');
+             // AuthService puts the role in the user object based on DB lookup
+             setUserRole(user.role || UserRole.BUYER);
         }
       } else {
         setIsLoggedIn(false);
@@ -206,7 +184,7 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await authService.signOut();
       handleNavigate('LANDING');
     } catch (error) {
       console.error("Logout Error:", error);
@@ -413,6 +391,7 @@ const App: React.FC = () => {
             cmsContent={cmsContent}
             onUpdateCMSContent={handleUpdateCMSContent}
             contactSubmissions={contactSubmissions}
+            onLogout={handleLogout}
           />
         );
       case 'PROFILE_SETTINGS':
@@ -435,6 +414,7 @@ const App: React.FC = () => {
             cmsContent={cmsContent}
             onUpdateCMSContent={handleUpdateCMSContent}
             contactSubmissions={contactSubmissions}
+            onLogout={handleLogout}
           />
         );
       case 'PRICING':

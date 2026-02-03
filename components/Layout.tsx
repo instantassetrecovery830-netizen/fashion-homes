@@ -4,7 +4,7 @@ import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, 
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
 import { UserRole, ViewState, CartItem, Order } from '../types.ts';
-import { auth } from '../services/firebase.ts';
+import { authService } from '../services/auth.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -81,15 +81,18 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // Sync email when auth state changes or cart opens
   useEffect(() => {
-      if (auth.currentUser?.email) {
-          setCustomerEmail(auth.currentUser.email);
+      if (authService.user?.email) {
+          setCustomerEmail(authService.user.email);
       }
-  }, [auth.currentUser, isCartOpen]);
+  }, [isCartOpen, isLoggedIn]);
 
   // Reset checkout step when cart closes
   useEffect(() => {
     if (!isCartOpen) {
-        setTimeout(() => setCheckoutStep('CART'), 500);
+        setTimeout(() => {
+            setCheckoutStep('CART');
+            setOrderComplete(false);
+        }, 500);
     }
   }, [isCartOpen]);
 
@@ -138,409 +141,339 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   // Called when Paystack success callback fires
-  const onPaystackSuccess = async (reference: any) => {
-    setIsProcessingCheckout(true);
-
-    const newOrder: Order = {
-        id: `ord_${Date.now()}`,
-        customerName: customerEmail || 'Guest User', 
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        total: cartTotal,
-        status: 'Processing',
-        items: [...cart]
-    };
-
-    try {
-        if (onPlaceOrder) {
-            await onPlaceOrder(newOrder);
-        }
-        setOrderComplete(true);
-        setTimeout(() => {
-          setOrderComplete(false);
-          setIsCartOpen(false);
-          handleDashboardClick();
-        }, 2000);
-    } catch (e) {
-        console.error("Checkout failed", e);
-        alert("Order creation failed. Please contact support.");
-    } finally {
-        setIsProcessingCheckout(false);
-    }
-  };
-
-  const onPaystackClose = () => {
-      console.log('Payment closed');
-      setIsProcessingCheckout(false);
-  };
-
-  const handleFinalizeOrder = () => {
-    if (!customerEmail) {
-        alert("Please enter your email address for the receipt.");
-        return;
-    }
-    setIsProcessingCheckout(true);
-    // @ts-ignore
-    initializePayment(onPaystackSuccess, onPaystackClose);
+  const onPaystackSuccess = async () => {
+      setIsProcessingCheckout(true);
+      try {
+          if (onPlaceOrder) {
+              const order: Order = {
+                  id: `ord_${Date.now()}`,
+                  customerName: authService.user?.displayName || customerEmail || 'Guest',
+                  date: new Date().toISOString().split('T')[0],
+                  total: cartTotal,
+                  status: 'Processing',
+                  items: [...cart]
+              };
+              await onPlaceOrder(order);
+              setOrderComplete(true);
+          }
+      } catch (error) {
+          console.error("Order processing failed", error);
+          alert("Payment successful but order creation failed. Please contact support.");
+      } finally {
+          setIsProcessingCheckout(false);
+      }
   };
 
   return (
-    <div className="min-h-screen bg-luxury-cream text-luxury-black font-sans selection:bg-luxury-gold selection:text-white transition-colors duration-500">
-      {/* Navigation */}
-      <nav 
-        className={`fixed top-0 w-full z-50 transition-all duration-300 border-b border-transparent ${
-          isScrolled || mobileMenuOpen ? 'bg-white/95 backdrop-blur-md border-gray-100 py-3' : 'bg-transparent py-6'
-        }`}
-      >
+    <div className="min-h-screen bg-white text-black font-sans selection:bg-luxury-gold selection:text-white">
+      {/* Visual Search Input */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        className="hidden" 
+        accept="image/*"
+      />
+
+      {/* Navigation Bar */}
+      <header className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${isScrolled ? 'bg-white/95 backdrop-blur-md border-b border-gray-100 py-4 shadow-sm' : 'bg-transparent py-6'}`}>
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           
-          {/* Mobile Menu Button */}
-          <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-
-          {/* Logo */}
-          <div 
-            className="text-2xl md:text-3xl font-serif font-bold tracking-widest cursor-pointer hover:opacity-70 transition-opacity"
-            onClick={() => onNavigate('LANDING')}
-          >
-            MyFitStore
+          <div className="flex items-center gap-6">
+            <button className="md:hidden" onClick={() => setMobileMenuOpen(true)}>
+              <Menu size={24} />
+            </button>
+            <h1 
+              onClick={() => onNavigate('LANDING')} 
+              className={`text-2xl font-serif font-bold italic cursor-pointer ${currentView === 'LANDING' && !isScrolled ? 'text-white' : 'text-black'}`}
+            >
+              MyFitStore
+            </h1>
           </div>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex gap-8 text-xs font-medium tracking-widest uppercase">
-            {NAV_LINKS.map((link) => (
-              <a 
-                key={link.label} 
+          <nav className="hidden md:flex items-center gap-8">
+            {NAV_LINKS.map(link => (
+              <button
+                key={link.label}
                 onClick={() => onNavigate(link.view)}
-                className={`hover:text-luxury-gold transition-colors cursor-pointer ${currentView === link.view ? 'text-luxury-gold border-b border-luxury-gold pb-0.5' : ''}`}
+                className={`text-xs font-bold uppercase tracking-widest hover:text-luxury-gold transition-colors ${currentView === 'LANDING' && !isScrolled ? 'text-white/80' : 'text-gray-500'}`}
               >
                 {link.label}
-              </a>
+              </button>
             ))}
-          </div>
+          </nav>
 
-          {/* Icons */}
-          <div className="flex items-center gap-4 md:gap-6">
-            {/* Visual Search */}
-            <div className="relative group">
+          <div className="flex items-center gap-6">
+            {isSearching ? (
+                <Loader className={`animate-spin ${currentView === 'LANDING' && !isScrolled ? 'text-white' : 'text-black'}`} size={20} />
+            ) : (
                 <button 
-                    onClick={handleCameraClick}
-                    className="hover:text-luxury-gold transition-colors relative"
-                    title="Visual Search (Gemini)"
+                  onClick={handleCameraClick}
+                  className={`hover:scale-110 transition-transform ${currentView === 'LANDING' && !isScrolled ? 'text-white' : 'text-black'}`}
+                  title="Visual Search"
                 >
-                    {isSearching ? <Loader size={20} className="animate-spin text-luxury-gold" /> : <Camera size={20} />}
+                  <Camera size={20} />
                 </button>
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    accept="image/*" 
-                    className="hidden" 
-                />
-            </div>
-
-            <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
+            )}
             
-            {/* User / Auth Menu */}
-            <div className="relative group">
-              {isLoggedIn ? (
-                <>
-                  <User 
-                    size={20} 
-                    className="cursor-pointer transition-colors text-luxury-black hover:text-luxury-gold"
-                    onClick={() => onNavigate('PROFILE_SETTINGS')}
-                  />
-                  
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-200">
-                    <div className="p-4 border-b border-gray-50">
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signed in as</p>
-                      <p className="font-bold text-sm">{role}</p>
-                    </div>
-                    
-                    <button
-                      onClick={handleDashboardClick}
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Settings size={14} /> Dashboard
-                    </button>
-
-                    <button
-                      onClick={() => onNavigate('PROFILE_SETTINGS')}
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <User size={14} /> Profile Settings
-                    </button>
-                    
-                    <button
-                      onClick={onLogout}
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-500"
-                    >
-                      <LogOut size={14} /> Sign Out
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <button 
-                  onClick={() => onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH')}
-                  className="bg-black text-white px-5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors whitespace-nowrap"
-                >
-                  Get Started
-                </button>
-              )}
-            </div>
-
-            <div 
-              className="relative cursor-pointer hover:text-luxury-gold transition-colors" 
+            <button 
+                onClick={isLoggedIn ? handleDashboardClick : () => onNavigate('AUTH')}
+                className={`hover:scale-110 transition-transform ${currentView === 'LANDING' && !isScrolled ? 'text-white' : 'text-black'}`}
+            >
+                <User size={20} />
+            </button>
+            
+            <button 
               onClick={() => setIsCartOpen(true)}
+              className={`relative hover:scale-110 transition-transform ${currentView === 'LANDING' && !isScrolled ? 'text-white' : 'text-black'}`}
             >
               <ShoppingBag size={20} />
               {cart.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-luxury-black text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full">
+                <span className="absolute -top-2 -right-2 bg-luxury-gold text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
                   {cart.length}
                 </span>
               )}
-            </div>
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* Mobile Menu Overlay */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 top-0 left-0 w-full h-full bg-white z-40 overflow-y-auto pt-24 pb-10 px-6 flex flex-col gap-6 animate-fade-in">
-             {NAV_LINKS.map((link) => (
-              <a 
-                key={link.label} 
-                onClick={() => { setMobileMenuOpen(false); onNavigate(link.view); }}
-                className="text-2xl font-serif italic hover:text-luxury-gold transition-colors"
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 bg-white p-6 animate-fade-in">
+          <div className="flex justify-between items-center mb-12">
+            <h2 className="text-2xl font-serif italic">Menu</h2>
+            <button onClick={() => setMobileMenuOpen(false)}>
+              <X size={24} />
+            </button>
+          </div>
+          <nav className="flex flex-col gap-8">
+            {NAV_LINKS.map(link => (
+              <button
+                key={link.label}
+                onClick={() => {
+                  onNavigate(link.view);
+                  setMobileMenuOpen(false);
+                }}
+                className="text-2xl font-serif italic text-left"
               >
                 {link.label}
-              </a>
+              </button>
             ))}
-             <button 
-                onClick={() => { setMobileMenuOpen(false); onNavigate('PRICING'); }}
-                className="text-2xl font-serif italic hover:text-luxury-gold transition-colors text-left"
-              >
-                Membership & Pricing
-              </button>
-            <div className="border-t border-gray-100 pt-6 mt-2">
-              <button 
-                onClick={() => { setMobileMenuOpen(false); onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH'); }}
-                className="text-2xl font-serif italic hover:text-luxury-gold transition-colors"
-              >
-                Sign In / Register
-              </button>
-            </div>
-          </div>
-        )}
-      </nav>
+            <div className="h-px bg-gray-100 my-4" />
+            
+            {isLoggedIn ? (
+                <>
+                    <button onClick={() => { handleDashboardClick(); setMobileMenuOpen(false); }} className="text-sm font-bold uppercase tracking-widest text-left block w-full mb-4">
+                        My Dashboard
+                    </button>
+                    <button onClick={() => { onLogout(); setMobileMenuOpen(false); }} className="text-sm font-bold uppercase tracking-widest text-left block w-full text-red-500">
+                        Logout
+                    </button>
+                </>
+            ) : (
+                <button onClick={() => { onNavigate('AUTH'); setMobileMenuOpen(false); }} className="text-sm font-bold uppercase tracking-widest text-left">
+                    Sign In / Register
+                </button>
+            )}
+          </nav>
+        </div>
+      )}
 
       {/* Cart Drawer */}
-      <div 
-        className={`fixed inset-0 z-[60] transition-visibility duration-500 ${isCartOpen ? 'visible' : 'invisible'}`}
-      >
-        <div 
-          className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-500 ${isCartOpen ? 'opacity-100' : 'opacity-0'}`}
-          onClick={() => setIsCartOpen(false)}
-        />
-        <div 
-          className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl transform transition-transform duration-500 ease-out flex flex-col ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}
-        >
-          {/* Drawer Header */}
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10">
-             <div className="flex items-center gap-3">
-                 {checkoutStep === 'PAYMENT' && !orderComplete && (
-                     <button onClick={() => setCheckoutStep('CART')} className="hover:text-luxury-gold transition-colors">
-                         <ArrowLeft size={20} />
-                     </button>
-                 )}
-                 <h2 className="text-xl font-serif italic">{checkoutStep === 'PAYMENT' ? 'Secure Payment' : 'Your Selection'}</h2>
-             </div>
-             <button onClick={() => setIsCartOpen(false)} className="hover:rotate-90 transition-transform duration-300">
-               <X size={24} />
-             </button>
-          </div>
+      {isCartOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setIsCartOpen(false)}
+          />
+          <div className="relative w-full max-w-md bg-white h-full shadow-2xl animate-slide-left flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10">
+              <h2 className="text-xl font-serif italic">
+                {orderComplete ? 'Order Confirmed' : (checkoutStep === 'PAYMENT' ? 'Checkout' : 'Shopping Bag')}
+              </h2>
+              <button onClick={() => setIsCartOpen(false)} className="hover:rotate-90 transition-transform">
+                <X size={20} />
+              </button>
+            </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-8">
-            {orderComplete ? (
-              <div className="h-full flex flex-col items-center justify-center text-center animate-fade-in">
-                <CheckCircle size={64} className="text-green-500 mb-6" />
-                <h3 className="text-2xl font-serif italic mb-2">Order Confirmed</h3>
-                <p className="text-gray-500 text-sm max-w-xs">Your pieces are being prepared by the atelier. You will receive a confirmation shortly.</p>
-              </div>
-            ) : cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                <ShoppingBag size={48} className="mb-4 opacity-20" />
-                <p className="text-sm uppercase tracking-widest">Your bag is empty</p>
-                <button 
-                  onClick={() => { setIsCartOpen(false); onNavigate('MARKETPLACE'); }}
-                  className="mt-6 text-xs underline hover:text-black"
-                >
-                  Start Shopping
-                </button>
-              </div>
-            ) : checkoutStep === 'CART' ? (
-              // CART VIEW
-              cart.map((item, index) => (
-                <div key={`${item.id}-${index}`} className="animate-fade-in">
-                  <div className="flex gap-4 mb-4">
-                    <div className="w-24 h-32 bg-gray-100 shrink-0">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+            <div className="flex-1 overflow-y-auto p-6">
+              {orderComplete ? (
+                 <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
+                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+                        <CheckCircle size={40} />
                     </div>
-                    <div className="flex-1 flex flex-col justify-between py-1">
-                      <div>
-                        <h3 className="text-xs font-bold uppercase tracking-widest mb-1">{item.designer}</h3>
-                        <p className="font-serif italic text-sm text-gray-600 leading-tight">{item.name}</p>
-                        <p className="text-xs text-gray-400 mt-2">Size: {item.size}</p>
-                      </div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-sm font-medium">${item.price}</span>
-                        <button 
-                          onClick={() => onRemoveFromCart(index)}
-                          className="text-gray-400 hover:text-red-600 transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                    <div>
+                        <h3 className="text-2xl font-serif italic mb-2">Thank you!</h3>
+                        <p className="text-gray-500">Your order is being processed by the atelier.</p>
                     </div>
-                  </div>
-
-                  {/* Pre-Order Custom Fit Section */}
-                  {item.isPreOrder && (
-                    <div className={`p-4 bg-gray-50 border ${measurementError && (!item.measurements || item.measurements.length < 5) ? 'border-red-300 bg-red-50' : 'border-gray-100'} rounded-sm`}>
-                      <div className="flex items-center gap-2 mb-2 text-luxury-gold">
-                        <Ruler size={14} />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Pre-Order: Custom Fit</span>
-                      </div>
-                      <p className="text-xs text-gray-500 mb-2">This piece is made-to-order. Please provide your measurements (Bust, Waist, Hips, Height).</p>
-                      <textarea
-                        value={item.measurements || ''}
-                        onChange={(e) => onUpdateCartItem(index, { measurements: e.target.value })}
-                        placeholder="e.g. Bust: 85cm, Waist: 64cm, Hips: 92cm, Height: 175cm"
-                        className="w-full text-xs p-3 border border-gray-200 outline-none focus:border-black bg-white resize-none font-sans"
-                        rows={3}
-                      />
-                      {measurementError && (!item.measurements || item.measurements.length < 5) && (
-                        <p className="text-[10px] text-red-500 mt-1">* Measurements required for checkout</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
-            ) : (
-                // PAYMENT VIEW (Paystack)
-                <div className="space-y-6 animate-fade-in">
-                    <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
-                        <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-bold uppercase text-gray-400">Total Amount</span>
-                            <span className="font-bold text-lg">${cartTotal}</span>
+                    <button 
+                        onClick={() => { setIsCartOpen(false); setOrderComplete(false); setCheckoutStep('CART'); }}
+                        className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest"
+                    >
+                        Continue Shopping
+                    </button>
+                 </div>
+              ) : checkoutStep === 'PAYMENT' ? (
+                 <div className="space-y-8">
+                    <button onClick={() => setCheckoutStep('CART')} className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-black">
+                        <ArrowLeft size={14} /> Back to Bag
+                    </button>
+                    
+                    <div className="bg-gray-50 p-6 rounded-sm border border-gray-100">
+                        <h3 className="font-bold uppercase tracking-widest text-xs mb-4">Order Summary</h3>
+                        <div className="flex justify-between text-sm mb-2">
+                            <span className="text-gray-500">Subtotal</span>
+                            <span>${cartTotal}</span>
                         </div>
-                        <div className="flex gap-2 text-xs text-gray-400">
-                           <Lock size={12} /> <span className="uppercase tracking-wider">Secured by Paystack</span>
+                        <div className="flex justify-between text-sm mb-2">
+                            <span className="text-gray-500">Shipping</span>
+                            <span>Free</span>
+                        </div>
+                        <div className="border-t border-gray-200 my-4 pt-4 flex justify-between font-bold text-lg">
+                            <span>Total</span>
+                            <span>${cartTotal}</span>
                         </div>
                     </div>
 
                     <div className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email Address</label>
-                            <div className="relative">
-                                <input 
-                                    type="email"
-                                    placeholder="your@email.com"
-                                    value={customerEmail}
-                                    onChange={(e) => setCustomerEmail(e.target.value)}
-                                    disabled={!!auth.currentUser?.email}
-                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent disabled:text-gray-500 disabled:bg-transparent"
-                                />
-                                <Mail size={16} className="absolute right-0 top-2 text-gray-400" />
-                            </div>
-                            <p className="text-[10px] text-gray-400">Receipt will be sent to this email.</p>
-                        </div>
+                        <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Contact Email</label>
+                        <input 
+                            type="email" 
+                            value={customerEmail}
+                            onChange={(e) => setCustomerEmail(e.target.value)}
+                            className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                            placeholder="Enter your email"
+                        />
                     </div>
-                    
-                    <div className="bg-blue-50 p-4 border border-blue-100 rounded-sm">
-                        <p className="text-[10px] text-blue-800 leading-relaxed">
-                            You will be redirected to Paystack to complete your secure payment. 
-                            We accept Card, Bank Transfer, and USSD.
-                        </p>
-                    </div>
-                </div>
-            )}
-          </div>
 
-          {cart.length > 0 && !orderComplete && (
-            <div className="p-6 bg-gray-50 border-t border-gray-100">
-              {checkoutStep === 'CART' ? (
-                <>
-                  <div className="flex justify-between items-center mb-6 text-sm">
-                    <span className="uppercase tracking-widest text-gray-500">Subtotal</span>
-                    <span className="font-bold text-lg">${cartTotal}</span>
-                  </div>
-                  <button 
-                    onClick={handleProceedToPayment}
-                    className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group"
-                  >
-                    Proceed to Checkout <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </>
+                    <button
+                        // @ts-ignore - Paystack hook return type inference
+                        onClick={() => initializePayment(onPaystackSuccess, () => alert("Payment cancelled"))}
+                        disabled={!customerEmail || isProcessingCheckout}
+                        className="w-full bg-luxury-gold text-white py-4 text-xs font-bold uppercase tracking-widest hover:bg-black transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        {isProcessingCheckout ? <Loader className="animate-spin" size={16}/> : <><CreditCard size={16}/> Pay Now</>}
+                    </button>
+                    <p className="text-[10px] text-center text-gray-400">Secured by Paystack</p>
+                 </div>
               ) : (
-                <button 
-                  onClick={handleFinalizeOrder}
-                  disabled={isProcessingCheckout}
-                  className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group disabled:opacity-70"
-                >
-                   {isProcessingCheckout ? (
-                       <>Processing <Loader className="animate-spin" size={14} /></>
-                   ) : (
-                       <>Pay with Paystack <Lock size={16} /></>
-                   )}
-                </button>
+                <>
+                  {cart.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                      <ShoppingBag size={48} strokeWidth={1} className="mb-4 opacity-50" />
+                      <p className="text-sm">Your bag is empty</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {cart.map((item, index) => (
+                        <div key={`${item.id}-${index}`} className="flex gap-4 animate-fade-in">
+                          <img src={item.image} alt={item.name} className="w-20 h-24 object-cover bg-gray-50" />
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start mb-1">
+                              <h3 className="font-bold text-sm">{item.designer}</h3>
+                              <button onClick={() => onRemoveFromCart(index)} className="text-gray-300 hover:text-red-500">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 mb-1">{item.name}</p>
+                            <p className="text-xs text-gray-500 mb-2">Size: {item.size}</p>
+                            
+                            {item.isPreOrder && (
+                                <div className="bg-luxury-gold/10 p-2 border border-luxury-gold/20 rounded-sm">
+                                    <p className="text-[10px] text-luxury-gold font-bold uppercase tracking-wide mb-1 flex items-center gap-1">
+                                        <Ruler size={10} /> Measurements Required
+                                    </p>
+                                    <textarea 
+                                        placeholder="Bust, Waist, Hip, Height..."
+                                        className={`w-full text-[10px] bg-transparent border-b ${measurementError && !item.measurements ? 'border-red-500' : 'border-luxury-gold/30'} focus:border-luxury-gold outline-none resize-none h-8`}
+                                        value={item.measurements}
+                                        onChange={(e) => onUpdateCartItem(index, { measurements: e.target.value })}
+                                    />
+                                </div>
+                            )}
+
+                            <div className="mt-2 text-sm font-medium">${item.price}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
-          )}
-        </div>
-      </div>
 
-      <main className="pt-20 min-h-screen">
+            {cart.length > 0 && !orderComplete && checkoutStep === 'CART' && (
+              <div className="p-6 border-t border-gray-100 bg-gray-50">
+                {measurementError && (
+                    <p className="text-xs text-red-500 mb-4 text-center font-bold">Please provide measurements for Pre-Order items.</p>
+                )}
+                <div className="flex justify-between items-center mb-6">
+                  <span className="text-sm font-bold uppercase tracking-widest">Total</span>
+                  <span className="text-xl font-serif italic">${cartTotal}</span>
+                </div>
+                <button 
+                    onClick={handleProceedToPayment}
+                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex justify-center items-center gap-2"
+                >
+                  Proceed to Checkout <ArrowRight size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className={`pt-0 min-h-screen ${currentView !== 'LANDING' ? 'bg-luxury-cream' : ''}`}>
         {children}
       </main>
 
-      <footer className="bg-luxury-black text-luxury-cream py-20 px-6 mt-20">
+      {/* Footer */}
+      <footer className="bg-luxury-black text-white py-16 px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-          <div>
-            <h3 className="text-2xl font-serif font-bold tracking-widest mb-6">MyFitStore</h3>
-            <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
-              Redefining luxury digital commerce through curation, technology, and sustainable innovation.
+          <div className="space-y-6">
+            <h3 className="text-2xl font-serif italic">MyFitStore</h3>
+            <p className="text-gray-400 text-sm font-light leading-relaxed">
+              Curating the future of African fashion through digital innovation and artisanal heritage.
             </p>
           </div>
+          
           <div>
-            <h4 className="uppercase text-xs font-bold tracking-widest mb-6 text-white">Client Services</h4>
-            <ul className="space-y-4 text-sm text-gray-400">
-              <li>FAQ</li>
-              <li>Shipping & Returns</li>
-              <li>Size Guide</li>
-              <li>Track Order</li>
+            <h4 className="text-xs font-bold uppercase tracking-widest mb-6 text-gray-500">Explore</h4>
+            <ul className="space-y-4 text-sm font-light">
+              <li><button onClick={() => onNavigate('MARKETPLACE')} className="hover:text-luxury-gold transition-colors">Collection</button></li>
+              <li><button onClick={() => onNavigate('DESIGNERS')} className="hover:text-luxury-gold transition-colors">Designers</button></li>
+              <li><button onClick={() => onNavigate('ABOUT')} className="hover:text-luxury-gold transition-colors">The Maison</button></li>
+              <li><button onClick={() => onNavigate('PRICING')} className="hover:text-luxury-gold transition-colors">Membership</button></li>
             </ul>
           </div>
+
           <div>
-            <h4 className="uppercase text-xs font-bold tracking-widest mb-6 text-white">The Company</h4>
-            <ul className="space-y-4 text-sm text-gray-400">
-              <li className="cursor-pointer hover:text-luxury-gold transition-colors" onClick={() => onNavigate('ABOUT')}>About Us</li>
-              <li>Careers</li>
-              <li className="cursor-pointer hover:text-luxury-gold transition-colors" onClick={() => onNavigate('PRICING')}>Membership & Pricing</li>
-              <li>Sustainability</li>
+            <h4 className="text-xs font-bold uppercase tracking-widest mb-6 text-gray-500">Legal</h4>
+            <ul className="space-y-4 text-sm font-light">
+              <li><a href="#" className="hover:text-luxury-gold transition-colors">Terms of Service</a></li>
+              <li><a href="#" className="hover:text-luxury-gold transition-colors">Privacy Policy</a></li>
+              <li><a href="#" className="hover:text-luxury-gold transition-colors">Shipping & Returns</a></li>
+              <li><a href="#" className="hover:text-luxury-gold transition-colors">Cookie Policy</a></li>
             </ul>
           </div>
+
           <div>
-            <h4 className="uppercase text-xs font-bold tracking-widest mb-6 text-white">Newsletter</h4>
-            <div className="flex border-b border-gray-600 pb-2">
-              <input type="email" placeholder="EMAIL ADDRESS" className="bg-transparent w-full outline-none text-white placeholder-gray-600 text-sm" />
-              <button className="text-xs uppercase hover:text-luxury-gold">Join</button>
+            <h4 className="text-xs font-bold uppercase tracking-widest mb-6 text-gray-500">Newsletter</h4>
+            <p className="text-gray-400 text-sm font-light mb-4">Join the vanguard. Receive exclusive drops and editorial content.</p>
+            <div className="flex border-b border-gray-700 pb-2">
+              <input type="email" placeholder="Email Address" className="bg-transparent w-full outline-none text-sm placeholder-gray-600" />
+              <button className="text-xs font-bold uppercase hover:text-luxury-gold">Join</button>
             </div>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-gray-900 flex justify-between items-center text-xs text-gray-600">
-          <div>© 2024 MyFitStore. ALL RIGHTS RESERVED.</div>
-          <div className="flex gap-4">
-             <Globe size={14} /> <span>US / USD</span>
+        
+        <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center text-xs text-gray-600 gap-4">
+          <p>© 2024 MyFitStore. All rights reserved.</p>
+          <div className="flex items-center gap-6">
+             <Globe size={14} />
+             <span>Paris • Lagos • Tokyo</span>
           </div>
         </div>
       </footer>
