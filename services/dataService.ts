@@ -1,6 +1,6 @@
 
 import { pool } from './db.ts';
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus, Follower } from '../types.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus, Follower, AppNotification } from '../types.ts';
 
 // --- MOCK DATA FOR SEEDING ---
 
@@ -272,6 +272,16 @@ const initSchema = async () => {
             style TEXT,
             vendorId TEXT
         )`,
+        `CREATE TABLE IF NOT EXISTS notifications (
+            id TEXT PRIMARY KEY,
+            userId TEXT,
+            title TEXT,
+            message TEXT,
+            read BOOLEAN,
+            date TEXT,
+            type TEXT,
+            link TEXT
+        )`,
         // Real-time Authentication Table
         `CREATE TABLE IF NOT EXISTS auth_accounts (
             email TEXT PRIMARY KEY,
@@ -372,6 +382,12 @@ export const seedDatabase = async () => {
                 );
             }
 
+            // Seed Notifications (Welcome)
+            await pool.query(
+                `INSERT INTO notifications (id, userId, title, message, read, date, type, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
+                ['notif_init', 'all', 'Welcome to MyFitStore', 'Explore our new collection of avant-garde digital fashion.', false, new Date().toISOString(), 'SYSTEM', 'MARKETPLACE']
+            );
+
             // Seed CMS
             await pool.query(
                 `INSERT INTO cms (id, content) VALUES ($1, $2)`,
@@ -460,6 +476,19 @@ export const fetchVendorFollowers = async (vendorId: string): Promise<Follower[]
         return rows as Follower[];
     } catch (e) {
         console.error(e);
+        return [];
+    }
+};
+
+export const fetchNotifications = async (userId?: string): Promise<AppNotification[]> => {
+    try {
+        let query = 'SELECT * FROM notifications WHERE userId = $1 OR userId = $2 ORDER BY date DESC LIMIT 20';
+        let values = ['all', userId || 'guest'];
+        
+        const { rows } = await pool.query(query, values);
+        return rows as AppNotification[];
+    } catch (e) {
+        console.error("Error fetching notifications", e);
         return [];
     }
 };
@@ -562,6 +591,28 @@ export const addFollowerToDb = async (follower: Follower) => {
         );
     } catch (e) {
         console.error("Add Follower Failed", e);
+    }
+};
+
+// --- WRITE OPERATIONS (NOTIFICATIONS) ---
+
+export const createNotificationInDb = async (notif: AppNotification) => {
+    try {
+        await pool.query(
+            `INSERT INTO notifications (id, userId, title, message, read, date, type, link)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [notif.id, notif.userId || 'all', notif.title, notif.message, notif.read, notif.date, notif.type, notif.link || '']
+        );
+    } catch (e) {
+        console.error("Create Notification Failed", e);
+    }
+};
+
+export const markNotificationRead = async (id: string) => {
+    try {
+        await pool.query("UPDATE notifications SET read = true WHERE id = $1", [id]);
+    } catch (e) {
+        console.error("Mark Read Failed", e);
     }
 };
 

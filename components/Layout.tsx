@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail, Home, Store } from 'lucide-react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
-import { UserRole, ViewState, CartItem, Order } from '../types.ts';
+import { UserRole, ViewState, CartItem, Order, AppNotification } from '../types.ts';
 import { auth } from '../services/firebase.ts';
+import { fetchNotifications, markNotificationRead, createNotificationInDb } from '../services/dataService.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -47,6 +48,12 @@ export const Layout: React.FC<LayoutProps> = ({
   const [measurementError, setMeasurementError] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  
+  // Notification State
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const notifDropdownRef = useRef<HTMLDivElement>(null);
   
   // Checkout State
   const [checkoutStep, setCheckoutStep] = useState<'CART' | 'PAYMENT'>('CART');
@@ -92,6 +99,88 @@ export const Layout: React.FC<LayoutProps> = ({
         setTimeout(() => setCheckoutStep('CART'), 500);
     }
   }, [isCartOpen]);
+
+  // Click outside listener for notification dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // --- REAL-TIME NOTIFICATION LOGIC ---
+  
+  // 1. Fetch initial notifications
+  const loadNotifications = async () => {
+      // Use user ID if logged in, otherwise 'all'
+      const userId = auth.currentUser?.uid;
+      const data = await fetchNotifications(userId);
+      setNotifications(data);
+  };
+
+  useEffect(() => {
+      loadNotifications();
+      // Poll every 30 seconds for updates
+      const interval = setInterval(loadNotifications, 30000);
+      return () => clearInterval(interval);
+  }, [auth.currentUser]); // Reload when user changes
+
+  // 2. Simulate Active Real-Time Events (Fake Push Notifications)
+  useEffect(() => {
+      // Occasional random notification generator to demonstrate "Active Real-time"
+      const randomNotificationInterval = setInterval(async () => {
+          if (Math.random() > 0.7) { // 30% chance every 45s
+              const titles = ["Flash Sale Alert", "Order Update", "New Arrival", "Price Drop"];
+              const messages = [
+                  "Limited time offer on winter collection.",
+                  "Your shipment is being prepared.",
+                  "Check out the new drops from Noir Et Blanc.",
+                  "An item in your wishlist has reduced in price."
+              ];
+              const idx = Math.floor(Math.random() * titles.length);
+              
+              const newNotif: AppNotification = {
+                  id: `mock_${Date.now()}`,
+                  userId: auth.currentUser?.uid || 'all',
+                  title: titles[idx],
+                  message: messages[idx],
+                  read: false,
+                  date: new Date().toISOString(),
+                  type: idx === 1 ? 'ORDER' : 'PROMO'
+              };
+              
+              // Optimistic UI update
+              setNotifications(prev => [newNotif, ...prev]);
+              // Persist (optional, but good for demo consistency)
+              await createNotificationInDb(newNotif);
+          }
+      }, 45000);
+
+      return () => clearInterval(randomNotificationInterval);
+  }, []);
+
+  const handleNotificationClick = async (notif: AppNotification) => {
+      if (!notif.read) {
+          await markNotificationRead(notif.id);
+          // Update local state
+          setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+      }
+      if (notif.link) {
+          onNavigate(notif.link as ViewState);
+          setShowNotifications(false);
+      }
+  };
+
+  const markAllRead = async () => {
+      const unread = notifications.filter(n => !n.read);
+      for (const n of unread) {
+          await markNotificationRead(n.id);
+      }
+      setNotifications(prev => prev.map(n => ({...n, read: true})));
+  };
 
   const handleDashboardClick = () => {
     if (role === UserRole.ADMIN) onNavigate('ADMIN_PANEL');
@@ -241,6 +330,59 @@ export const Layout: React.FC<LayoutProps> = ({
 
             <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
             
+            {/* Notification Bell */}
+            <div className="relative" ref={notifDropdownRef}>
+                <button 
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="relative hover:text-luxury-gold transition-colors"
+                >
+                    <Bell size={20} />
+                    {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold w-3 h-3 rounded-full flex items-center justify-center animate-pulse">
+                            {unreadCount}
+                        </span>
+                    )}
+                </button>
+
+                {/* Dropdown */}
+                {showNotifications && (
+                    <div className="absolute right-0 top-full mt-4 w-80 bg-white border border-gray-100 shadow-xl rounded-sm z-50 animate-slide-up">
+                        <div className="p-4 border-b border-gray-50 flex justify-between items-center">
+                            <h4 className="text-xs font-bold uppercase tracking-widest">Notifications</h4>
+                            {unreadCount > 0 && (
+                                <button onClick={markAllRead} className="text-[10px] text-luxury-gold hover:underline">Mark all read</button>
+                            )}
+                        </div>
+                        <div className="max-h-80 overflow-y-auto">
+                            {notifications.length === 0 ? (
+                                <div className="p-8 text-center text-gray-400">
+                                    <p className="text-xs">No updates yet.</p>
+                                </div>
+                            ) : (
+                                notifications.map(notif => (
+                                    <div 
+                                        key={notif.id} 
+                                        onClick={() => handleNotificationClick(notif)}
+                                        className={`p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${!notif.read ? 'bg-luxury-cream/30' : ''}`}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${!notif.read ? 'bg-luxury-gold' : 'bg-gray-200'}`} />
+                                            <div>
+                                                <p className={`text-xs mb-1 ${!notif.read ? 'font-bold' : 'font-medium'}`}>{notif.title}</p>
+                                                <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{notif.message}</p>
+                                                <span className="text-[9px] text-gray-400 mt-2 block uppercase tracking-widest">
+                                                    {new Date(notif.date).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* User / Auth Menu (Desktop) */}
             <div className="relative group hidden md:block">
               {isLoggedIn ? (

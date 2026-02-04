@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -969,7 +968,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4 block">Visual Theme</label>
                   <div className="flex gap-4">
-                      {['MINIMALIST', 'DARK', 'GOLD'].map(theme => (
+                      {(['MINIMALIST', 'DARK', 'GOLD'] as const).map(theme => (
                           <button 
                              key={theme} 
                              onClick={() => setProfileForm({...profileForm, visualTheme: theme})}

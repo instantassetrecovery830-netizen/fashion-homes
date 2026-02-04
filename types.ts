@@ -33,6 +33,17 @@ export interface User {
   };
 }
 
+export interface AppNotification {
+  id: string;
+  userId?: string; // 'all' or specific user ID
+  title: string;
+  message: string;
+  read: boolean;
+  date: string; // ISO string
+  type: 'ORDER' | 'SYSTEM' | 'PROMO' | 'ALERT';
+  link?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
