@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Send, Sparkles, Loader, User } from 'lucide-react';
-import { ChatMessage, Product } from '../types';
-import { createConciergeChat } from '../services/geminiService';
+import { ChatMessage, Product } from '../types.ts';
+import { createConciergeChat } from '../services/geminiService.ts';
 import { Chat } from '@google/genai';
 
 interface AiConciergeProps {
@@ -85,10 +85,10 @@ export const AiConcierge: React.FC<AiConciergeProps> = ({ products }) => {
   if (!chatSession.current) return null; // Don't render until ready
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4 animate-fade-in">
+    <div className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 flex flex-col items-end gap-4 animate-fade-in">
       {/* Chat Window */}
       {isOpen && (
-        <div className="w-[350px] md:w-[400px] h-[500px] bg-white shadow-2xl border border-gray-100 flex flex-col rounded-sm overflow-hidden animate-slide-up origin-bottom-right">
+        <div className="w-[300px] sm:w-[350px] md:w-[400px] h-[400px] md:h-[500px] bg-white shadow-2xl border border-gray-100 flex flex-col rounded-sm overflow-hidden animate-slide-up origin-bottom-right">
           {/* Header */}
           <div className="bg-luxury-black text-white p-4 flex justify-between items-center">
             <div className="flex items-center gap-2">

@@ -462,8 +462,8 @@ const App: React.FC = () => {
     >
       {renderView()}
       
-      {/* AI Concierge - Rendered globally but passed active products context */}
-      <AiConcierge products={activeProducts} />
+      {/* AI Concierge - Rendered globally but passed active products context. Hidden on AUTH view. */}
+      {currentView !== 'AUTH' && <AiConcierge products={activeProducts} />}
     </Layout>
   );
 };

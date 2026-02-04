@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler } from 'lucide-react';
-import { Product, Vendor } from '../types';
-import { getStyleMatch } from '../services/geminiService';
+import { Product, Vendor } from '../types.ts';
+import { getStyleMatch } from '../services/geminiService.ts';
 
 interface ProductDetailProps {
   product: Product;
@@ -83,7 +84,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   };
 
   return (
-    <div className="min-h-screen bg-white animate-fade-in">
+    <div className="min-h-screen bg-white animate-fade-in pb-20 md:pb-0">
       <div className="max-w-7xl mx-auto px-6 py-12">
         <button onClick={onBack} className="text-xs uppercase font-bold tracking-widest mb-8 hover:text-luxury-gold transition-colors">
           ← Back to Marketplace
@@ -228,7 +229,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
 
             <button 
               onClick={handleAddToCartClick}
-              className="w-full bg-black text-white py-5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
+              className="hidden md:block w-full bg-black text-white py-5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
             >
               {product.isPreOrder ? 'Pre-Order Now' : 'Add to Bag'}
             </button>
@@ -311,6 +312,20 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
             </div>
           </div>
         )}
+      </div>
+
+      {/* Sticky Bottom Bar for Mobile */}
+      <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-100 p-4 md:hidden z-40 flex items-center gap-4 mb-[env(safe-area-inset-bottom)]">
+         <div className="flex-1">
+            <p className="text-xs font-bold uppercase line-clamp-1">{product.name}</p>
+            <p className="text-sm">${product.price}</p>
+         </div>
+         <button 
+            onClick={handleAddToCartClick}
+            className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest shadow-lg hover:bg-luxury-gold transition-colors"
+         >
+            Add to Bag
+         </button>
       </div>
     </div>
   );

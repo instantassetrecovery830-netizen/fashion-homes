@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail } from 'lucide-react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail, Home, Store } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
 import { UserRole, ViewState, CartItem, Order } from '../types.ts';
@@ -193,7 +193,7 @@ export const Layout: React.FC<LayoutProps> = ({
       >
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Button (Hidden if Bottom Nav is preferred, but kept for secondary links) */}
           <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
@@ -222,7 +222,7 @@ export const Layout: React.FC<LayoutProps> = ({
           {/* Icons */}
           <div className="flex items-center gap-4 md:gap-6">
             {/* Visual Search */}
-            <div className="relative group">
+            <div className="relative group hidden md:block">
                 <button 
                     onClick={handleCameraClick}
                     className="hover:text-luxury-gold transition-colors relative"
@@ -241,8 +241,8 @@ export const Layout: React.FC<LayoutProps> = ({
 
             <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
             
-            {/* User / Auth Menu */}
-            <div className="relative group">
+            {/* User / Auth Menu (Desktop) */}
+            <div className="relative group hidden md:block">
               {isLoggedIn ? (
                 <>
                   <User 
@@ -290,7 +290,7 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
 
             <div 
-              className="relative cursor-pointer hover:text-luxury-gold transition-colors" 
+              className="relative cursor-pointer hover:text-luxury-gold transition-colors hidden md:block" 
               onClick={() => setIsCartOpen(true)}
             >
               <ShoppingBag size={20} />
@@ -303,9 +303,9 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
         </div>
 
-        {/* Mobile Menu Overlay */}
+        {/* Mobile Menu Overlay (Secondary Links) */}
         {mobileMenuOpen && (
-          <div className="fixed inset-0 top-0 left-0 w-full h-full bg-white z-40 overflow-y-auto pt-24 pb-10 px-6 flex flex-col gap-6 animate-fade-in">
+          <div className="fixed inset-0 top-0 left-0 w-full h-full bg-white z-40 overflow-y-auto pt-24 pb-10 px-6 flex flex-col gap-6 animate-fade-in md:hidden">
              {NAV_LINKS.map((link) => (
               <a 
                 key={link.label} 
@@ -326,8 +326,16 @@ export const Layout: React.FC<LayoutProps> = ({
                 onClick={() => { setMobileMenuOpen(false); onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH'); }}
                 className="text-2xl font-serif italic hover:text-luxury-gold transition-colors"
               >
-                Sign In / Register
+                {isLoggedIn ? 'Account Settings' : 'Sign In / Register'}
               </button>
+              {isLoggedIn && (
+                  <button 
+                    onClick={() => { setMobileMenuOpen(false); onLogout(); }}
+                    className="text-xl font-serif italic text-red-500 hover:text-red-600 transition-colors mt-4 block"
+                  >
+                    Log Out
+                  </button>
+              )}
             </div>
           </div>
         )}
@@ -499,11 +507,61 @@ export const Layout: React.FC<LayoutProps> = ({
         </div>
       </div>
 
-      <main className="pt-20 min-h-screen">
+      <main className="pt-20 pb-24 md:pb-0 min-h-screen">
         {children}
       </main>
 
-      <footer className="bg-luxury-black text-luxury-cream py-20 px-6 mt-20">
+      {/* Mobile Bottom Navigation */}
+      {!['PRODUCT_DETAIL', 'AUTH'].includes(currentView) && (
+        <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 z-50 md:hidden flex justify-between items-center px-6 py-4 pb-safe">
+          <button onClick={() => onNavigate('LANDING')} className={`flex flex-col items-center gap-1 ${currentView === 'LANDING' ? 'text-luxury-gold' : 'text-gray-400'}`}>
+            <Home size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-widest">Home</span>
+          </button>
+          
+          <button onClick={() => onNavigate('MARKETPLACE')} className={`flex flex-col items-center gap-1 ${currentView === 'MARKETPLACE' ? 'text-luxury-gold' : 'text-gray-400'}`}>
+            <Store size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-widest">Shop</span>
+          </button>
+
+          <div className="relative -top-5">
+            <button 
+              onClick={handleCameraClick}
+              className="w-14 h-14 bg-black text-white rounded-full shadow-lg flex items-center justify-center hover:bg-luxury-gold transition-all"
+            >
+              {isSearching ? <Loader size={20} className="animate-spin" /> : <Camera size={24} />}
+            </button>
+          </div>
+
+          <button onClick={() => setIsCartOpen(true)} className={`flex flex-col items-center gap-1 ${isCartOpen ? 'text-luxury-gold' : 'text-gray-400'}`}>
+            <div className="relative">
+              <ShoppingBag size={20} />
+              {cart.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-luxury-gold text-white text-[8px] w-3 h-3 flex items-center justify-center rounded-full">
+                  {cart.length}
+                </span>
+              )}
+            </div>
+            <span className="text-[9px] font-bold uppercase tracking-widest">Bag</span>
+          </button>
+
+          <button 
+            onClick={() => {
+              if (!isLoggedIn) {
+                onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH');
+              } else {
+                handleDashboardClick();
+              }
+            }} 
+            className={`flex flex-col items-center gap-1 ${['VENDOR_DASHBOARD', 'BUYER_DASHBOARD', 'ADMIN_PANEL', 'PROFILE_SETTINGS'].includes(currentView) ? 'text-luxury-gold' : 'text-gray-400'}`}
+          >
+            <User size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-widest">{isLoggedIn ? 'Profile' : 'Login'}</span>
+          </button>
+        </div>
+      )}
+
+      <footer className="bg-luxury-black text-luxury-cream py-20 px-6 mt-20 hidden md:block">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
           <div>
             <h3 className="text-2xl font-serif font-bold tracking-widest mb-6">MyFitStore</h3>

@@ -797,42 +797,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <h3 className="text-lg font-serif italic mb-4">Messages & Inquiries</h3>
           {contactSubmissions && contactSubmissions.length > 0 ? (
               <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
-                  <table className="w-full text-left text-sm">
-                      <thead className="bg-gray-50 border-b border-gray-100">
-                          <tr>
-                              <th className="p-4 font-bold uppercase text-xs text-gray-500">Sender</th>
-                              <th className="p-4 font-bold uppercase text-xs text-gray-500">Subject</th>
-                              <th className="p-4 font-bold uppercase text-xs text-gray-500">Date</th>
-                              <th className="p-4 font-bold uppercase text-xs text-gray-500">Status</th>
-                              <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Action</th>
-                          </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                          {contactSubmissions.map((msg) => (
-                              <tr key={msg.id} className="hover:bg-gray-50/50">
-                                  <td className="p-4">
-                                      <p className="font-bold text-sm">{msg.name}</p>
-                                      <p className="text-xs text-gray-400">{msg.email}</p>
-                                  </td>
-                                  <td className="p-4">
-                                      <p className="font-medium text-sm">{msg.subject}</p>
-                                      <p className="text-xs text-gray-500 line-clamp-1">{msg.message}</p>
-                                  </td>
-                                  <td className="p-4 text-xs text-gray-500">
-                                      {new Date(msg.date).toLocaleDateString()}
-                                  </td>
-                                  <td className="p-4">
-                                      <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${msg.status === 'NEW' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
-                                          {msg.status}
-                                      </span>
-                                  </td>
-                                  <td className="p-4 text-right">
-                                      <button className="text-xs font-bold underline hover:text-luxury-gold">View</button>
-                                  </td>
-                              </tr>
-                          ))}
-                      </tbody>
-                  </table>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                        <thead className="bg-gray-50 border-b border-gray-100">
+                            <tr>
+                                <th className="p-4 font-bold uppercase text-xs text-gray-500">Sender</th>
+                                <th className="p-4 font-bold uppercase text-xs text-gray-500">Subject</th>
+                                <th className="p-4 font-bold uppercase text-xs text-gray-500">Date</th>
+                                <th className="p-4 font-bold uppercase text-xs text-gray-500">Status</th>
+                                <th className="p-4 font-bold uppercase text-xs text-gray-500 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {contactSubmissions.map((msg) => (
+                                <tr key={msg.id} className="hover:bg-gray-50/50">
+                                    <td className="p-4">
+                                        <p className="font-bold text-sm">{msg.name}</p>
+                                        <p className="text-xs text-gray-400">{msg.email}</p>
+                                    </td>
+                                    <td className="p-4">
+                                        <p className="font-medium text-sm">{msg.subject}</p>
+                                        <p className="text-xs text-gray-500 line-clamp-1">{msg.message}</p>
+                                    </td>
+                                    <td className="p-4 text-xs text-gray-500">
+                                        {new Date(msg.date).toLocaleDateString()}
+                                    </td>
+                                    <td className="p-4">
+                                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${msg.status === 'NEW' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+                                            {msg.status}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <button className="text-xs font-bold underline hover:text-luxury-gold">View</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                  </div>
               </div>
           ) : (
               <div className="p-12 text-center border border-dashed border-gray-200 text-gray-400">
@@ -1226,38 +1228,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   {vendorOrders.length === 0 ? (
                       <div className="p-8 text-center text-gray-400 italic">No transactions recorded yet.</div>
                   ) : (
-                      <table className="w-full text-left text-sm">
-                          <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-                              <tr>
-                                  <th className="p-4">Date</th>
-                                  <th className="p-4">Description</th>
-                                  <th className="p-4">Type</th>
-                                  <th className="p-4 text-right">Amount</th>
-                                  <th className="p-4 text-right">Status</th>
-                              </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                              {vendorOrders.slice(0, 10).map(order => {
-                                   const vendorItems = order.items.filter(i => i.designer === currentVendor?.name);
-                                   const total = vendorItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-                                   const net = total * 0.85;
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                                <tr>
+                                    <th className="p-4">Date</th>
+                                    <th className="p-4">Description</th>
+                                    <th className="p-4">Type</th>
+                                    <th className="p-4 text-right">Amount</th>
+                                    <th className="p-4 text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {vendorOrders.slice(0, 10).map(order => {
+                                    const vendorItems = order.items.filter(i => i.designer === currentVendor?.name);
+                                    const total = vendorItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                                    const net = total * 0.85;
 
-                                  return (
-                                      <tr key={order.id}>
-                                          <td className="p-4 text-gray-500">{order.date}</td>
-                                          <td className="p-4 font-medium">Order #{order.id} Revenue</td>
-                                          <td className="p-4"><span className="bg-green-50 text-green-700 px-2 py-1 text-[10px] font-bold uppercase rounded-sm">Sale</span></td>
-                                          <td className="p-4 text-right font-mono">+${net.toFixed(2)}</td>
-                                          <td className="p-4 text-right">
-                                              <span className={`text-[10px] font-bold uppercase px-2 py-1 ${order.status === 'Delivered' ? 'text-gray-500' : 'text-orange-500'}`}>
-                                                  {order.status === 'Delivered' ? 'Cleared' : 'Pending'}
-                                              </span>
-                                          </td>
-                                      </tr>
-                                  );
-                              })}
-                          </tbody>
-                      </table>
+                                    return (
+                                        <tr key={order.id}>
+                                            <td className="p-4 text-gray-500">{order.date}</td>
+                                            <td className="p-4 font-medium">Order #{order.id} Revenue</td>
+                                            <td className="p-4"><span className="bg-green-50 text-green-700 px-2 py-1 text-[10px] font-bold uppercase rounded-sm">Sale</span></td>
+                                            <td className="p-4 text-right font-mono">+${net.toFixed(2)}</td>
+                                            <td className="p-4 text-right">
+                                                <span className={`text-[10px] font-bold uppercase px-2 py-1 ${order.status === 'Delivered' ? 'text-gray-500' : 'text-orange-500'}`}>
+                                                    {order.status === 'Delivered' ? 'Cleared' : 'Pending'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                      </div>
                   )}
               </div>
           </div>
@@ -2255,7 +2259,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                </div>
            </div>
 
-           <main className="flex-1 overflow-y-auto p-6 md:p-12">
+           <main className="flex-1 overflow-y-auto p-6 md:p-12 pb-24 md:pb-12">
                {renderContent()}
            </main>
        </div>
