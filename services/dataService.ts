@@ -238,7 +238,8 @@ const initSchema = async () => {
             status TEXT,
             spend TEXT,
             location TEXT,
-            verificationStatus TEXT
+            verificationStatus TEXT,
+            profileData JSONB
         )`,
         `CREATE TABLE IF NOT EXISTS orders (
             id TEXT PRIMARY KEY,
@@ -305,6 +306,7 @@ const initSchema = async () => {
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS joined TEXT`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS profileData JSONB`,
 
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS isPreOrder BOOLEAN`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER`,
@@ -442,7 +444,9 @@ export const fetchUsers = async (): Promise<User[]> => {
         const { rows } = await pool.query('SELECT * FROM users');
         return rows.map(row => ({
             ...row,
-            verificationStatus: row.verificationstatus
+            verificationStatus: row.verificationstatus,
+            // Flatten profileData into user object
+            ...(row.profiledata || {})
         })) as User[];
     } catch (e) {
         console.error(e);
@@ -580,9 +584,16 @@ export const createUserInDb = async (user: { id: string, name: string, email: st
 
 export const updateUserInDb = async (user: User) => {
     try {
+        // Construct profileData object from user properties
+        const profileData = {
+            phone: user.phone,
+            shippingAddress: user.shippingAddress,
+            measurements: user.measurements
+        };
+
         await pool.query(
-            `UPDATE users SET role=$1, status=$2, verificationStatus=$3 WHERE id=$4`,
-            [user.role, user.status, user.verificationStatus, user.id]
+            `UPDATE users SET role=$1, status=$2, verificationStatus=$3, profileData=$4, name=$5, avatar=$6 WHERE id=$7`,
+            [user.role, user.status, user.verificationStatus, JSON.stringify(profileData), user.name, user.avatar, user.id]
         );
     } catch (e) {
         console.error("Update User Failed", e);

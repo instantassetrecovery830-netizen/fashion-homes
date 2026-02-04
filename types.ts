@@ -16,6 +16,21 @@ export interface User {
   spend?: string;
   location?: string;
   verificationStatus?: VerificationStatus;
+  phone?: string;
+  shippingAddress?: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
+  measurements?: {
+    bust: string;
+    waist: string;
+    hips: string;
+    height: string;
+    shoeSize: string;
+  };
 }
 
 export interface Product {
