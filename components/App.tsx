@@ -1,26 +1,34 @@
 
-import React, { useState, useEffect } from 'react';
-import { Layout } from './components/Layout.tsx';
-import { LandingView } from './components/LandingView.tsx';
-import { MarketplaceView } from './components/MarketplaceView.tsx';
-import { NewArrivalsView } from './components/NewArrivalsView.tsx';
-import { DesignersView } from './components/DesignersView.tsx';
-import { VendorProfileView } from './components/VendorProfileView.tsx';
-import { ProductDetail } from './components/ProductDetail.tsx';
-import { Dashboard } from './components/Dashboard.tsx';
-import { AuthView } from './components/AuthView.tsx';
-import { PricingView } from './components/PricingView.tsx';
-import { AboutView } from './components/AboutView.tsx';
-import { AiConcierge } from './components/AiConcierge.tsx';
-import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission } from './types.ts';
+import React, { useState, useEffect, Suspense } from 'react';
+import { Layout } from './Layout.tsx';
+import { LandingView } from './LandingView.tsx';
+import { Loader } from 'lucide-react';
+import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission, AppNotification } from '../types.ts';
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
-  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb
-} from './services/dataService.ts';
-import { searchProductsByImage } from './services/geminiService.ts';
-import { Loader } from 'lucide-react';
-import { auth, onAuthStateChanged, signOut } from './services/firebase.ts';
+  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb
+} from '../services/dataService.ts';
+import { searchProductsByImage } from '../services/geminiService.ts';
+import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
+
+// Lazy Load Heavy Components for Performance
+const MarketplaceView = React.lazy(() => import('./MarketplaceView.tsx').then(m => ({ default: m.MarketplaceView })));
+const NewArrivalsView = React.lazy(() => import('./NewArrivalsView.tsx').then(m => ({ default: m.NewArrivalsView })));
+const DesignersView = React.lazy(() => import('./DesignersView.tsx').then(m => ({ default: m.DesignersView })));
+const VendorProfileView = React.lazy(() => import('./VendorProfileView.tsx').then(m => ({ default: m.VendorProfileView })));
+const ProductDetail = React.lazy(() => import('./ProductDetail.tsx').then(m => ({ default: m.ProductDetail })));
+const Dashboard = React.lazy(() => import('./Dashboard.tsx').then(m => ({ default: m.Dashboard })));
+const AuthView = React.lazy(() => import('./AuthView.tsx').then(m => ({ default: m.AuthView })));
+const PricingView = React.lazy(() => import('./PricingView.tsx').then(m => ({ default: m.PricingView })));
+const AboutView = React.lazy(() => import('./AboutView.tsx').then(m => ({ default: m.AboutView })));
+const AiConcierge = React.lazy(() => import('./AiConcierge.tsx').then(m => ({ default: m.AiConcierge })));
+
+const LoadingFallback = () => (
+  <div className="h-[50vh] flex items-center justify-center">
+    <Loader className="animate-spin text-luxury-gold" size={24} />
+  </div>
+);
 
 const App: React.FC = () => {
   // State
@@ -44,46 +52,108 @@ const App: React.FC = () => {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [contactSubmissions, setContactSubmissions] = useState<ContactSubmission[]>([]);
   const [cmsContent, setCmsContent] = useState<LandingPageContent | undefined>(undefined);
-  const [isLoadingData, setIsLoadingData] = useState(true);
+  // Removed blocking isLoadingData state
 
   // Visual Search State
   const [visualSearchResults, setVisualSearchResults] = useState<Product[] | null>(null);
 
-  // Initialize DB and Fetch Data
+  // Initialize DB and Fetch Data - Non-blocking
   const refreshData = async () => {
     try {
-      const [dbVendors, dbProducts, dbOrders, dbUsers, dbContent, dbContacts] = await Promise.all([
+      // Prioritize content visible on landing
+      const [dbContent, dbVendors, dbProducts] = await Promise.all([
+        fetchLandingContent(),
         fetchVendors(), 
         fetchProducts(),
-        fetchOrders(),
-        fetchUsers(),
-        fetchLandingContent(),
-        fetchContactSubmissions()
       ]);
+      
+      setCmsContent(dbContent);
       setVendors(dbVendors);
       setProducts(dbProducts);
-      setOrders(dbOrders);
-      setAllUsers(dbUsers);
-      setCmsContent(dbContent);
-      setContactSubmissions(dbContacts);
+
+      // Load heavy user/admin data in background or second pass
+      Promise.all([
+        fetchOrders(),
+        fetchUsers(),
+        fetchContactSubmissions()
+      ]).then(([dbOrders, dbUsers, dbContacts]) => {
+        setOrders(dbOrders);
+        setAllUsers(dbUsers);
+        setContactSubmissions(dbContacts);
+      });
+
     } catch (error) {
       console.error("Failed to refresh data", error);
     }
   };
 
   useEffect(() => {
+    // Initial Load
     const initData = async () => {
       try {
         await seedDatabase();
         await refreshData();
       } catch (error) {
         console.error("Database initialization failed.", error);
-      } finally {
-        setIsLoadingData(false);
       }
     };
     initData();
+
+    // Real-time: Poll for general data updates every 30 seconds
+    const pollInterval = setInterval(() => {
+        refreshData();
+    }, 30000);
+
+    return () => clearInterval(pollInterval);
   }, []);
+
+  // Simulate Live Transactions (Demo Mode: Real-time Revenue & Orders)
+  useEffect(() => {
+      // Check every 60 seconds if we should generate a random order
+      const simulateLiveTraffic = setInterval(async () => {
+          // 50% chance to generate a random order every minute to simulate store activity
+          if (Math.random() > 0.5 && products.length > 0) {
+              const randomProduct = products[Math.floor(Math.random() * products.length)];
+              const mockOrder: Order = {
+                  id: `live_${Date.now()}`,
+                  customerName: `Guest_${Math.floor(Math.random() * 1000)}`,
+                  date: new Date().toISOString(), // Use ISO for proper sorting
+                  total: randomProduct.price,
+                  status: 'Processing',
+                  items: [{
+                      ...randomProduct,
+                      quantity: 1,
+                      size: randomProduct.sizes?.[0] || 'M',
+                      stock: randomProduct.stock
+                  }]
+              };
+              
+              // Create associated notification for dashboard users
+              const notif: AppNotification = {
+                  id: `notif_${mockOrder.id}`,
+                  userId: 'all', // visible to admin/vendors
+                  title: 'New Order Received',
+                  message: `Order #${mockOrder.id.slice(-6)} placed by ${mockOrder.customerName} for $${mockOrder.total}.`,
+                  read: false,
+                  date: new Date().toISOString(),
+                  type: 'ORDER',
+                  link: 'FULFILLMENT'
+              };
+
+              // Insert into DB and refresh immediately to update Dashboard stats
+              try {
+                  await createOrderInDb(mockOrder);
+                  await createNotificationInDb(notif);
+                  await refreshData();
+                  console.log("Simulated live order created:", mockOrder.id);
+              } catch (e) {
+                  console.warn("Simulation skipped", e);
+              }
+          }
+      }, 60000);
+
+      return () => clearInterval(simulateLiveTraffic);
+  }, [products]);
 
   // Listen for Auth State Changes
   useEffect(() => {
@@ -97,14 +167,22 @@ const App: React.FC = () => {
               setUserRole(UserRole.ADMIN);
           } else {
               // Check if user has an assigned role in the Users table
-              const currentUsers = await fetchUsers();
+              // We might need to fetch users if not yet loaded in the background
+              let currentUsers = allUsers;
+              if (currentUsers.length === 0) {
+                 currentUsers = await fetchUsers();
+              }
+              
               const dbUser = currentUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
 
               if (dbUser && dbUser.role) {
                   setUserRole(dbUser.role);
               } else {
                   // Fallback to Vendor check
-                  const currentVendors = await fetchVendors();
+                  let currentVendors = vendors;
+                  if (currentVendors.length === 0) {
+                      currentVendors = await fetchVendors();
+                  }
                   const matchingVendor = currentVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
                   
                   if (matchingVendor) {
@@ -127,7 +205,7 @@ const App: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [allUsers, vendors]); // Depend on data to ensure correct role assignment
 
   // Derived State: Active Products (only from active vendors)
   const activeProducts = products.filter(product => {
@@ -300,13 +378,15 @@ const App: React.FC = () => {
   const renderView = () => {
     if (currentView === 'AUTH') {
       return (
-        <AuthView 
-          onLogin={handleLogin} 
-          onNavigate={handleNavigate} 
-          cmsContent={cmsContent}
-          initialMode={authInitialMode}
-          initialRole={authInitialRole}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <AuthView 
+            onLogin={handleLogin} 
+            onNavigate={handleNavigate} 
+            cmsContent={cmsContent}
+            initialMode={authInitialMode}
+            initialRole={authInitialRole}
+          />
+        </Suspense>
       );
     }
 
@@ -322,6 +402,7 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'LANDING':
         return (
+          // Landing View is NOT suspended to ensure instant load
           <LandingView 
             onNavigate={handleNavigate} 
             isLoggedIn={isLoggedIn} 
@@ -335,113 +416,144 @@ const App: React.FC = () => {
         );
       case 'MARKETPLACE':
         return (
-          <MarketplaceView 
-            onNavigate={handleNavigate} 
-            onProductSelect={handleProductSelect} 
-            initialDesigner={selectedDesignerFilter}
-            products={visualSearchResults || activeProducts}
-            vendors={vendors}
-            customTitle={visualSearchResults ? "Visual Search Results" : null}
-            onClearFilter={handleClearVisualSearch}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <MarketplaceView 
+              onNavigate={handleNavigate} 
+              onProductSelect={handleProductSelect} 
+              initialDesigner={selectedDesignerFilter}
+              products={visualSearchResults || activeProducts}
+              vendors={vendors}
+              customTitle={visualSearchResults ? "Visual Search Results" : null}
+              onClearFilter={handleClearVisualSearch}
+            />
+          </Suspense>
         );
       case 'NEW_ARRIVALS':
-        return <NewArrivalsView onProductSelect={handleProductSelect} products={activeProducts} />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <NewArrivalsView onProductSelect={handleProductSelect} products={activeProducts} />
+          </Suspense>
+        );
       case 'DESIGNERS':
-        return <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />
+          </Suspense>
+        );
       case 'VENDOR_PROFILE':
-        return selectedVendor ? (
-          <VendorProfileView 
-            vendor={selectedVendor} 
-            onProductSelect={handleProductSelect}
-            onNavigate={handleNavigate}
-            products={activeProducts}
-          />
-        ) : <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            {selectedVendor ? (
+              <VendorProfileView 
+                vendor={selectedVendor} 
+                onProductSelect={handleProductSelect}
+                onNavigate={handleNavigate}
+                products={activeProducts}
+              />
+            ) : <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />}
+          </Suspense>
+        );
       case 'PRODUCT_DETAIL':
         const associatedVendor = vendors.find(v => v.name === selectedProduct?.designer);
-        return selectedProduct ? (
-          <ProductDetail 
-            product={selectedProduct}
-            vendor={associatedVendor}
-            onAddToCart={handleAddToCart} 
-            onBack={() => handleNavigate('MARKETPLACE')}
-            onViewDesigner={() => associatedVendor && handleDesignerSelect(associatedVendor.name)}
-            featureFlags={featureFlags}
-          />
-        ) : (
-            <MarketplaceView 
-                onNavigate={handleNavigate} 
-                onProductSelect={handleProductSelect} 
-                products={activeProducts}
-                vendors={vendors}
-            />
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            {selectedProduct ? (
+              <ProductDetail 
+                product={selectedProduct}
+                vendor={associatedVendor}
+                onAddToCart={handleAddToCart} 
+                onBack={() => handleNavigate('MARKETPLACE')}
+                onViewDesigner={() => associatedVendor && handleDesignerSelect(associatedVendor.name)}
+                featureFlags={featureFlags}
+              />
+            ) : (
+                <MarketplaceView 
+                    onNavigate={handleNavigate} 
+                    onProductSelect={handleProductSelect} 
+                    products={activeProducts}
+                    vendors={vendors}
+                />
+            )}
+          </Suspense>
         );
       case 'VENDOR_DASHBOARD':
       case 'ADMIN_PANEL':
       case 'BUYER_DASHBOARD':
         return (
-          <Dashboard 
-            role={userRole} 
-            featureFlags={featureFlags} 
-            toggleFeatureFlag={toggleFeatureFlag}
-            onNavigate={handleNavigate}
-            vendors={vendors}
-            setVendors={handleSetVendors}
-            orders={orders}
-            onUpdateOrderStatus={handleUpdateOrderStatus}
-            products={products}
-            users={allUsers}
-            onAddProduct={handleAddProduct}
-            onUpdateProduct={handleUpdateProduct}
-            onDeleteProduct={handleDeleteProduct}
-            onProductSelect={handleProductSelect}
-            onUpdateUser={handleUpdateUser}
-            cmsContent={cmsContent}
-            onUpdateCMSContent={handleUpdateCMSContent}
-            contactSubmissions={contactSubmissions}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <Dashboard 
+              role={userRole} 
+              featureFlags={featureFlags} 
+              toggleFeatureFlag={toggleFeatureFlag}
+              onNavigate={handleNavigate}
+              vendors={vendors}
+              setVendors={handleSetVendors}
+              orders={orders}
+              onUpdateOrderStatus={handleUpdateOrderStatus}
+              products={products}
+              users={allUsers}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
+              onProductSelect={handleProductSelect}
+              onUpdateUser={handleUpdateUser}
+              cmsContent={cmsContent}
+              onUpdateCMSContent={handleUpdateCMSContent}
+              contactSubmissions={contactSubmissions}
+            />
+          </Suspense>
         );
       case 'PROFILE_SETTINGS':
         return (
-          <Dashboard 
-            role={userRole} 
-            featureFlags={featureFlags} 
-            toggleFeatureFlag={toggleFeatureFlag}
-            onNavigate={handleNavigate}
-            initialTab="PROFILE"
-            vendors={vendors}
-            setVendors={handleSetVendors}
-            products={products}
-            users={allUsers}
-            onAddProduct={handleAddProduct}
-            onUpdateProduct={handleUpdateProduct}
-            onDeleteProduct={handleDeleteProduct}
-            onProductSelect={handleProductSelect}
-            onUpdateUser={handleUpdateUser}
-            cmsContent={cmsContent}
-            onUpdateCMSContent={handleUpdateCMSContent}
-            contactSubmissions={contactSubmissions}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <Dashboard 
+              role={userRole} 
+              featureFlags={featureFlags} 
+              toggleFeatureFlag={toggleFeatureFlag}
+              onNavigate={handleNavigate}
+              initialTab="PROFILE"
+              vendors={vendors}
+              setVendors={handleSetVendors}
+              products={products}
+              users={allUsers}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
+              onProductSelect={handleProductSelect}
+              onUpdateUser={handleUpdateUser}
+              cmsContent={cmsContent}
+              onUpdateCMSContent={handleUpdateCMSContent}
+              contactSubmissions={contactSubmissions}
+            />
+          </Suspense>
         );
       case 'PRICING':
-        return <PricingView onNavigate={handleNavigate} onRegister={() => handleAuthNavigation('REGISTER', UserRole.VENDOR)} />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <PricingView onNavigate={handleNavigate} onRegister={() => handleAuthNavigation('REGISTER', UserRole.VENDOR)} />
+          </Suspense>
+        );
       case 'ABOUT':
-        return <AboutView onNavigate={handleNavigate} cmsContent={cmsContent} />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <AboutView onNavigate={handleNavigate} cmsContent={cmsContent} />
+          </Suspense>
+        );
       default:
-        return <LandingView onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} vendors={vendors} products={activeProducts} onDesignerClick={handleDesignerSelect} cmsContent={cmsContent} onAuthRequest={handleAuthNavigation} />;
+        return (
+          <LandingView 
+            onNavigate={handleNavigate} 
+            isLoggedIn={isLoggedIn} 
+            userRole={userRole} 
+            vendors={vendors} 
+            products={activeProducts} 
+            onDesignerClick={handleDesignerSelect} 
+            cmsContent={cmsContent} 
+            onAuthRequest={handleAuthNavigation} 
+          />
+        );
     }
   };
-
-  if (isLoadingData) {
-    return (
-      <div className="min-h-screen bg-luxury-cream flex flex-col items-center justify-center animate-fade-in">
-        <h1 className="text-3xl font-serif font-bold tracking-widest mb-6">MyFitStore</h1>
-        <Loader className="animate-spin text-luxury-gold" size={24} />
-        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-gray-400">Loading Archives...</p>
-      </div>
-    );
-  }
 
   return (
     <Layout 
@@ -462,8 +574,12 @@ const App: React.FC = () => {
     >
       {renderView()}
       
-      {/* AI Concierge - Rendered globally but passed active products context. Hidden on AUTH view. */}
-      {currentView !== 'AUTH' && <AiConcierge products={activeProducts} />}
+      {/* AI Concierge - Rendered globally but passed active products context. Hidden on AUTH view. Lazy loaded. */}
+      {currentView !== 'AUTH' && (
+        <Suspense fallback={null}>
+          <AiConcierge products={activeProducts} />
+        </Suspense>
+      )}
     </Layout>
   );
 };

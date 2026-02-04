@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -69,6 +70,22 @@ const SUBSCRIPTION_PLANS = [
     features: ["0% Commission Rate", "Dedicated Account Manager", "Custom Brand Experience"]
   }
 ];
+
+// --- Live Clock Component ---
+const LiveClock = () => {
+  const [time, setTime] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <div className="flex items-center gap-2 text-xs font-mono text-gray-400 border-l border-gray-200 pl-4 ml-4">
+      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+      <span>{time.toLocaleTimeString()}</span>
+      <span className="hidden sm:inline font-bold tracking-widest text-[10px]">| SYSTEM LIVE</span>
+    </div>
+  );
+};
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
   role, 
@@ -508,9 +525,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="space-y-8 animate-fade-in">
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-serif italic">Dashboard Overview</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
             <span className="text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 px-3 py-1 rounded-full">{role} Account</span>
             {currentVendor?.subscriptionPlan && <span className="text-xs font-bold uppercase tracking-widest bg-black text-white px-3 py-1 rounded-full">{currentVendor.subscriptionPlan} Plan</span>}
+            <LiveClock />
         </div>
       </div>
       
@@ -658,7 +676,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             {finalOrders.map(order => (
                                 <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                                     <td className="p-4 font-mono text-xs">{order.id}</td>
-                                    <td className="p-4 text-gray-500">{order.date}</td>
+                                    <td className="p-4 text-gray-500">{new Date(order.date).toLocaleDateString()}</td>
                                     <td className="p-4">{order.customerName}</td>
                                     <td className="p-4">
                                         <div className="flex flex-col gap-1">

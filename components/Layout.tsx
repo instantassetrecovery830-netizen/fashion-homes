@@ -52,8 +52,12 @@ export const Layout: React.FC<LayoutProps> = ({
   // Notification State
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [activeToast, setActiveToast] = useState<AppNotification | null>(null);
   const unreadCount = notifications.filter(n => !n.read).length;
   const notifDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Track the latest notification ID to detect new ones
+  const latestNotificationIdRef = useRef<string | null>(null);
   
   // Checkout State
   const [checkoutStep, setCheckoutStep] = useState<'CART' | 'PAYMENT'>('CART');
@@ -113,51 +117,58 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // --- REAL-TIME NOTIFICATION LOGIC ---
   
-  // 1. Fetch initial notifications
+  // 1. Fetch initial notifications & Poll
   const loadNotifications = async () => {
       // Use user ID if logged in, otherwise 'all'
       const userId = auth.currentUser?.uid;
       const data = await fetchNotifications(userId);
+      
+      if (data.length > 0) {
+          const newest = data[0];
+          // If we have a new notification that is different from the last one we saw
+          if (latestNotificationIdRef.current && newest.id !== latestNotificationIdRef.current) {
+              // It is a new activity! Pop it up.
+              // Only pop up if it's reasonably recent (created in last 2 mins)
+              const timeDiff = new Date().getTime() - new Date(newest.date).getTime();
+              if (timeDiff < 120000) { 
+                  setActiveToast(newest);
+                  setTimeout(() => setActiveToast(null), 6000);
+              }
+          }
+          // Update ref
+          latestNotificationIdRef.current = newest.id;
+      }
+
       setNotifications(data);
   };
 
   useEffect(() => {
       loadNotifications();
-      // Poll every 30 seconds for updates
-      const interval = setInterval(loadNotifications, 30000);
+      // Poll every 10 seconds for updates to catch real-time events faster
+      const interval = setInterval(loadNotifications, 10000);
       return () => clearInterval(interval);
   }, [auth.currentUser]); // Reload when user changes
 
-  // 2. Simulate Active Real-Time Events (Fake Push Notifications)
+  // 2. Simulate Active "Marketing" Events (Optional, separate from Order events)
   useEffect(() => {
-      // Occasional random notification generator to demonstrate "Active Real-time"
       const randomNotificationInterval = setInterval(async () => {
-          if (Math.random() > 0.7) { // 30% chance every 45s
-              const titles = ["Flash Sale Alert", "Order Update", "New Arrival", "Price Drop"];
-              const messages = [
-                  "Limited time offer on winter collection.",
-                  "Your shipment is being prepared.",
-                  "Check out the new drops from Noir Et Blanc.",
-                  "An item in your wishlist has reduced in price."
-              ];
-              const idx = Math.floor(Math.random() * titles.length);
-              
+          // Low chance for random marketing blasts
+          if (Math.random() > 0.8) { 
               const newNotif: AppNotification = {
-                  id: `mock_${Date.now()}`,
-                  userId: auth.currentUser?.uid || 'all',
-                  title: titles[idx],
-                  message: messages[idx],
+                  id: `promo_${Date.now()}`,
+                  userId: 'all',
+                  title: "Flash Sale Alert",
+                  message: "20% off selected items for the next hour.",
                   read: false,
                   date: new Date().toISOString(),
-                  type: idx === 1 ? 'ORDER' : 'PROMO'
+                  type: 'PROMO'
               };
               
-              // Optimistic UI update
-              setNotifications(prev => [newNotif, ...prev]);
-              // Persist (optional, but good for demo consistency)
               await createNotificationInDb(newNotif);
+              // Force reload immediately so the polling logic above picks it up and toasts it
+              loadNotifications();
           }
-      }, 45000);
+      }, 45000); 
 
       return () => clearInterval(randomNotificationInterval);
   }, []);
@@ -168,6 +179,7 @@ export const Layout: React.FC<LayoutProps> = ({
           // Update local state
           setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
       }
+      setActiveToast(null); // Dismiss toast if clicked
       if (notif.link) {
           onNavigate(notif.link as ViewState);
           setShowNotifications(false);
@@ -273,7 +285,30 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-luxury-cream text-luxury-black font-sans selection:bg-luxury-gold selection:text-white transition-colors duration-500">
+    <div className="min-h-screen bg-luxury-cream text-luxury-black font-sans selection:bg-luxury-gold selection:text-white transition-colors duration-500 relative">
+      
+      {/* Toast Notification */}
+      {activeToast && (
+        <div 
+            onClick={() => handleNotificationClick(activeToast)}
+            className="fixed top-24 right-6 z-[60] bg-white border border-luxury-gold/30 shadow-2xl p-4 max-w-sm w-full animate-slide-up flex gap-4 items-start rounded-sm cursor-pointer hover:bg-gray-50 transition-colors"
+        >
+            <div className="w-8 h-8 rounded-full bg-luxury-black text-luxury-gold flex items-center justify-center shrink-0">
+                <Bell size={14} />
+            </div>
+            <div className="flex-1">
+                <div className="flex justify-between items-start">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-luxury-black mb-1">New Notification</h4>
+                    <button onClick={(e) => { e.stopPropagation(); setActiveToast(null); }} className="text-gray-400 hover:text-black">
+                        <X size={14} />
+                    </button>
+                </div>
+                <p className="text-sm font-serif italic text-luxury-black mb-1">{activeToast.title}</p>
+                <p className="text-xs text-gray-500 leading-relaxed">{activeToast.message}</p>
+            </div>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav 
         className={`fixed top-0 w-full z-50 transition-all duration-300 border-b border-transparent ${
