@@ -307,6 +307,8 @@ const initSchema = async () => {
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS website TEXT`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS instagram TEXT`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS twitter TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS facebook TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS tiktok TEXT`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS paymentMethods JSONB`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS kycDocuments JSONB`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS visualTheme TEXT`,
@@ -414,7 +416,9 @@ export const fetchVendors = async (): Promise<Vendor[]> => {
             subscriptionStatus: row.subscriptionstatus,
             coverImage: row.coverimage,
             subscriptionPlan: row.subscriptionplan,
-            visualTheme: row.visualtheme
+            visualTheme: row.visualtheme,
+            facebook: row.facebook,
+            tiktok: row.tiktok
         })) as Vendor[];
     } catch (e) {
         console.error(e);
@@ -555,11 +559,13 @@ export const updateVendorInDb = async (vendor: Vendor) => {
             `UPDATE vendors SET 
                 name=$1, bio=$2, avatar=$3, verificationStatus=$4, subscriptionStatus=$5, 
                 location=$6, coverImage=$7, email=$8, subscriptionPlan=$9, 
-                website=$10, instagram=$11, twitter=$12, kycDocuments=$13, visualTheme=$14 
-             WHERE id=$15`,
+                website=$10, instagram=$11, twitter=$12, kycDocuments=$13, visualTheme=$14,
+                facebook=$15, tiktok=$16
+             WHERE id=$17`,
             [vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus,
              vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan,
-             vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.kycDocuments), vendor.visualTheme, vendor.id]
+             vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.kycDocuments), vendor.visualTheme,
+             vendor.facebook, vendor.tiktok, vendor.id]
         );
     } catch (e) {
         console.error("Update Vendor Failed", e);

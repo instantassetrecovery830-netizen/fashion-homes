@@ -12,7 +12,7 @@ import {
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, CreditCard,
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, ShieldAlert, Shield, BadgeCheck,
   Power, Lock, MessageSquare, Flag, Store, Grid, Columns, ChevronDown, Loader, Star, Ruler, Save, Video, Menu, Wallet, Banknote, Bitcoin, ArrowLeft, Inbox,
-  Phone, Clock, Calendar, FileCheck, ArrowDownLeft, ArrowUpRight as ArrowUpRightIcon, User as UserIcon
+  Phone, Clock, Calendar, FileCheck, ArrowDownLeft, ArrowUpRight as ArrowUpRightIcon, User as UserIcon, ToggleLeft, Filter, Search, Send, Facebook
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, SubscriptionStatus, VerificationStatus, User, LandingPageContent, PaymentMethod, ContactSubmission, KycDocuments, Follower } from '../types.ts';
 import { updateUserPassword, auth } from '../services/firebase.ts';
@@ -126,6 +126,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [selectedFollower, setSelectedFollower] = useState<Follower | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationModalOpen, setVerificationModalOpen] = useState<Vendor | null>(null);
+  const [showKycModal, setShowKycModal] = useState(false);
+
+  // Messaging State
+  const [composeRecipient, setComposeRecipient] = useState<Follower | null>(null);
+  const [messageBody, setMessageBody] = useState('');
 
   // File Input Refs for Uploads
   const productFileInputRef = useRef<HTMLInputElement>(null);
@@ -143,6 +148,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     website: currentVendor?.website || '',
     instagram: currentVendor?.instagram || '',
     twitter: currentVendor?.twitter || '',
+    facebook: currentVendor?.facebook || '',
+    tiktok: currentVendor?.tiktok || '',
     bio: currentVendor?.bio || '',
     coverImage: currentVendor?.coverImage || '',
     visualTheme: currentVendor?.visualTheme || 'MINIMALIST'
@@ -244,7 +251,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     : products; // Admin sees all
 
   // --- DYNAMIC CHART DATA GENERATION ---
-  // ... (Sales chart logic remains the same)
+  // ... (Sales chart logic)
   const salesChartData = useMemo(() => {
      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
      const today = new Date();
@@ -305,7 +312,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [orders, isVendor, currentVendor]);
 
   // Admin Specific Stats Calculation
-  // ... (Admin stats logic remains the same)
   const adminStats = useMemo(() => {
     if (!isAdmin) return null;
     const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
@@ -338,6 +344,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         website: currentVendor.website || '',
         instagram: currentVendor.instagram || '',
         twitter: currentVendor.twitter || '',
+        facebook: currentVendor.facebook || '',
+        tiktok: currentVendor.tiktok || '',
         bio: currentVendor.bio || '',
         coverImage: currentVendor.coverImage || '',
         visualTheme: currentVendor.visualTheme || 'MINIMALIST'
@@ -347,9 +355,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
           idBack: currentVendor.kycDocuments?.idBack || '',
           proofOfAddress: currentVendor.kycDocuments?.proofOfAddress || ''
       });
+      
+      // Initial Fetch
       fetchVendorFollowers(currentVendor.id).then(data => setFollowers(data));
     }
   }, [currentVendor]);
+
+  // Real-time follower polling
+  useEffect(() => {
+      let pollInterval: ReturnType<typeof setInterval>;
+      if (activeTab === 'FOLLOWERS' && currentVendor) {
+          pollInterval = setInterval(() => {
+              fetchVendorFollowers(currentVendor.id).then(data => {
+                  setFollowers(prev => {
+                      if (JSON.stringify(prev) !== JSON.stringify(data)) return data;
+                      return prev;
+                  });
+              });
+          }, 3000); // Check every 3 seconds for new followers
+      }
+      return () => {
+          if (pollInterval) clearInterval(pollInterval);
+      };
+  }, [activeTab, currentVendor]);
 
   // Sync Buyer form when currentBuyer changes
   useEffect(() => {
@@ -424,7 +452,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (currentVendor && setVendors) {
       setIsSubmitting(true);
       try {
-        const updatedVendors = vendors.map(v => v.id === currentVendor.id ? { ...v, name: profileForm.name, email: profileForm.email, avatar: profileForm.avatar, website: profileForm.website, instagram: profileForm.instagram, twitter: profileForm.twitter, bio: profileForm.bio, coverImage: profileForm.coverImage, visualTheme: profileForm.visualTheme as any } : v);
+        const updatedVendors = vendors.map(v => v.id === currentVendor.id ? { 
+            ...v, 
+            name: profileForm.name, 
+            email: profileForm.email, 
+            avatar: profileForm.avatar, 
+            website: profileForm.website, 
+            instagram: profileForm.instagram, 
+            twitter: profileForm.twitter, 
+            facebook: profileForm.facebook,
+            tiktok: profileForm.tiktok,
+            bio: profileForm.bio, 
+            coverImage: profileForm.coverImage, 
+            visualTheme: profileForm.visualTheme as any 
+        } : v);
         await setVendors(updatedVendors);
         alert("Profile and store settings updated successfully.");
       } catch (err) { console.error("Save failed", err); alert("Failed to save updates."); } finally { setIsSubmitting(false); }
@@ -466,11 +507,409 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
   
   const handleUpdatePassword = async (e: React.FormEvent) => { e.preventDefault(); if (passwords.new !== passwords.confirm) { setPasswordStatus({ loading: false, success: false, error: 'Passwords do not match' }); return; } setPasswordStatus({ loading: true, success: false, error: '' }); try { if (auth.currentUser) { await updateUserPassword(auth.currentUser, passwords.new); setPasswordStatus({ loading: false, success: true, error: '' }); setPasswords({ new: '', confirm: '' }); setTimeout(() => setPasswordStatus({ loading: false, success: false, error: '' }), 3000); } else { setPasswordStatus({ loading: false, success: false, error: 'User session invalid.' }); } } catch (err) { setPasswordStatus({ loading: false, success: false, error: 'Failed to update password.' }); } };
-  const handleKycSubmit = async (e: React.FormEvent) => { e.preventDefault(); if (!kycFiles.idFront || !kycFiles.proofOfAddress) { setKycStatus({ loading: false, success: false, error: 'Please upload ID and Proof of Address.' }); return; } setKycStatus({ loading: true, success: false, error: '' }); if (currentVendor && setVendors) { const updatedVendors = vendors.map(v => v.id === currentVendor.id ? { ...v, kycDocuments: { ...kycFiles, submittedAt: new Date().toISOString() }, verificationStatus: 'PENDING' as VerificationStatus } : v); await setVendors(updatedVendors); setKycStatus({ loading: false, success: true, error: '' }); } };
+  const handleKycSubmit = async (e: React.FormEvent) => { 
+      e.preventDefault(); 
+      if (!kycFiles.idFront || !kycFiles.idBack || !kycFiles.proofOfAddress) { 
+          setKycStatus({ loading: false, success: false, error: 'Please upload Front ID, Back ID, and Proof of Address.' }); 
+          return; 
+      } 
+      setKycStatus({ loading: true, success: false, error: '' }); 
+      if (currentVendor && setVendors) { 
+          const updatedVendors = vendors.map(v => v.id === currentVendor.id ? { ...v, kycDocuments: { ...kycFiles, submittedAt: new Date().toISOString() }, verificationStatus: 'PENDING' as VerificationStatus } : v); 
+          await setVendors(updatedVendors); 
+          setKycStatus({ loading: false, success: true, error: '' }); 
+          setShowKycModal(false);
+      } 
+  };
   const initiatePlanUpgrade = (planName: string) => { setSelectedPlanForUpgrade(planName); if (planName === "Atelier") { performPlanUpgrade(planName); } else { setShowSubscriptionPayment(true); } };
   const performPlanUpgrade = async (planName: string) => { if (currentVendor && setVendors) { const updatedVendors = vendors.map(v => { if (v.id === currentVendor.id) { return { ...v, subscriptionPlan: planName as any, subscriptionStatus: 'ACTIVE' } as Vendor; } return v; }); await setVendors(updatedVendors); setShowSubscriptionPayment(false); setSubPaymentDetails({cardName: '', cardNumber: '', expiry: '', cvc: ''}); alert(`Plan switched to ${planName} and subscription activated.`); } };
   const handleAddPaymentMethod = async (e: React.FormEvent) => { e.preventDefault(); if (!currentVendor || !setVendors) return; setIsSubmitting(true); const method: PaymentMethod = { id: `pm_${Date.now()}`, type: newPaymentMethod.type, details: newPaymentMethod.type === 'BANK' ? { bankName: newPaymentMethod.bankName, accountName: newPaymentMethod.accountName, accountNumber: newPaymentMethod.accountNumber, routingNumber: newPaymentMethod.routingNumber } : { walletAddress: newPaymentMethod.walletAddress, network: newPaymentMethod.network } }; try { const updatedMethods = [...(currentVendor.paymentMethods || []), method]; const updatedVendors = vendors.map(v => v.id === currentVendor.id ? { ...v, paymentMethods: updatedMethods } : v); await setVendors(updatedVendors); setShowAddMethodModal(false); setNewPaymentMethod({ type: 'BANK', bankName: '', accountName: '', accountNumber: '', routingNumber: '', walletAddress: '', network: 'BTC' }); } catch (err) { console.error("Failed to add payment method", err); alert("Failed to save payment method."); } finally { setIsSubmitting(false); } };
   const handleDeletePaymentMethod = async (id: string) => { if (!currentVendor || !setVendors) return; if (!confirm("Are you sure you want to delete this payment method?")) return; try { const updatedMethods = (currentVendor.paymentMethods || []).filter(m => m.id !== id); const updatedVendors = vendors.map(v => v.id === currentVendor.id ? { ...v, paymentMethods: updatedMethods } : v); await setVendors(updatedVendors); } catch (err) { console.error("Failed to delete", err); } };
+
+  const handleMessageFollower = (follower: Follower) => {
+      setComposeRecipient(follower);
+      setActiveTab('INBOX');
+  };
+
+  const renderAdminVerification = () => {
+    const pendingVendors = vendors.filter(v => v.verificationStatus === 'PENDING');
+    
+    const handleVerify = async (vendor: Vendor, status: VerificationStatus) => {
+        if (!setVendors) return;
+        const updatedVendors = vendors.map(v => v.id === vendor.id ? { ...v, verificationStatus: status } : v);
+        await setVendors(updatedVendors);
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in">
+             <h2 className="text-2xl font-serif italic mb-6">Vendor Verification Requests</h2>
+             {pendingVendors.length === 0 ? (
+                 <div className="bg-white p-12 text-center border border-gray-100 text-gray-400">
+                     <ShieldCheck size={48} className="mx-auto mb-4 opacity-20"/>
+                     <p>No pending verifications.</p>
+                 </div>
+             ) : (
+                 <div className="grid grid-cols-1 gap-6">
+                     {pendingVendors.map(v => (
+                         <div key={v.id} className="bg-white p-6 border border-gray-100 shadow-sm">
+                             <div className="flex justify-between items-start mb-6">
+                                 <div className="flex items-center gap-4">
+                                     <img src={v.avatar} className="w-16 h-16 rounded-full object-cover border border-gray-100"/>
+                                     <div>
+                                         <h3 className="font-bold text-lg">{v.name}</h3>
+                                         <p className="text-gray-500 text-sm">{v.email}</p>
+                                         <p className="text-xs text-gray-400 mt-1">{v.location}</p>
+                                     </div>
+                                 </div>
+                                 <div className="flex gap-2">
+                                     <button onClick={() => handleVerify(v, 'REJECTED')} className="px-4 py-2 border border-red-200 text-red-600 text-xs font-bold uppercase hover:bg-red-50">Reject</button>
+                                     <button onClick={() => handleVerify(v, 'VERIFIED')} className="px-4 py-2 bg-black text-white text-xs font-bold uppercase hover:bg-luxury-gold">Approve</button>
+                                 </div>
+                             </div>
+                             
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-sm">
+                                 {v.kycDocuments?.idFront && (
+                                     <div>
+                                         <p className="text-[10px] font-bold uppercase text-gray-400 mb-2">ID Front</p>
+                                         <a href={v.kycDocuments.idFront} target="_blank" rel="noreferrer" className="block h-32 bg-gray-200 overflow-hidden relative group">
+                                             <img src={v.kycDocuments.idFront} className="w-full h-full object-cover"/>
+                                             <div className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center text-white text-xs font-bold uppercase">View</div>
+                                         </a>
+                                     </div>
+                                 )}
+                                 {v.kycDocuments?.idBack && (
+                                     <div>
+                                         <p className="text-[10px] font-bold uppercase text-gray-400 mb-2">ID Back</p>
+                                         <a href={v.kycDocuments.idBack} target="_blank" rel="noreferrer" className="block h-32 bg-gray-200 overflow-hidden relative group">
+                                             <img src={v.kycDocuments.idBack} className="w-full h-full object-cover"/>
+                                              <div className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center text-white text-xs font-bold uppercase">View</div>
+                                         </a>
+                                     </div>
+                                 )}
+                                 {v.kycDocuments?.proofOfAddress && (
+                                     <div>
+                                         <p className="text-[10px] font-bold uppercase text-gray-400 mb-2">Proof of Address</p>
+                                         <a href={v.kycDocuments.proofOfAddress} target="_blank" rel="noreferrer" className="block h-32 bg-gray-200 overflow-hidden relative group">
+                                             <img src={v.kycDocuments.proofOfAddress} className="w-full h-full object-cover"/>
+                                              <div className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center text-white text-xs font-bold uppercase">View</div>
+                                         </a>
+                                     </div>
+                                 )}
+                             </div>
+                         </div>
+                     ))}
+                 </div>
+             )}
+        </div>
+    );
+};
+
+const renderStoreDesign = () => (
+    <div className="max-w-4xl animate-fade-in space-y-8">
+        <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-serif italic">Design Your Atelier</h2>
+            <button 
+                type="button" 
+                onClick={handleSaveProfile} 
+                disabled={isSubmitting} 
+                className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+                {isSubmitting ? <Loader className="animate-spin" size={14} /> : <Save size={14} />}
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </button>
+        </div>
+        
+        <form className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column: Visuals */}
+            <div className="lg:col-span-2 space-y-8">
+                {/* Cover & Brand Identity */}
+                <div className="bg-white p-8 border border-gray-100 shadow-sm relative overflow-hidden">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">Visual Identity</h3>
+                    
+                    {/* Cover Image */}
+                    <div className="mb-8">
+                        <label className="block text-[10px] font-bold uppercase mb-2">Store Cover Image</label>
+                        <div 
+                            className="relative w-full h-48 bg-gray-50 border border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer group hover:border-black transition-colors overflow-hidden"
+                            onClick={() => coverFileInputRef.current?.click()}
+                        >
+                            {profileForm.coverImage ? (
+                                <>
+                                    <img src={profileForm.coverImage} className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity" />
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="bg-black/70 text-white px-4 py-2 text-xs font-bold uppercase flex items-center gap-2">
+                                            <Edit2 size={12} /> Change Cover
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <ImageIcon className="text-gray-300 mb-2 group-hover:text-black transition-colors" size={32} />
+                                    <span className="text-xs text-gray-400 font-bold uppercase">Upload Cover Image</span>
+                                    <span className="text-[10px] text-gray-400 mt-1">Recommended 1200x400px</span>
+                                </>
+                            )}
+                            <input type="file" ref={coverFileInputRef} className="hidden" accept="image/*" onChange={e => handleFileUpload(e, (b64) => setProfileForm({...profileForm, coverImage: b64}))} />
+                        </div>
+                    </div>
+
+                    {/* Avatar & Name */}
+                    <div className="flex items-start gap-6">
+                        <div className="relative">
+                            <div className="w-24 h-24 rounded-full bg-gray-100 border-4 border-white shadow-md overflow-hidden relative group cursor-pointer" onClick={() => avatarFileInputRef.current?.click()}>
+                                <img src={profileForm.avatar || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                    <Camera className="text-white" size={20} />
+                                </div>
+                            </div>
+                            <input type="file" ref={avatarFileInputRef} className="hidden" accept="image/*" onChange={e => handleFileUpload(e, (b64) => setProfileForm({...profileForm, avatar: b64}))} />
+                        </div>
+                        
+                        <div className="flex-1 space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase mb-2">Brand Name</label>
+                                <input 
+                                    value={profileForm.name} 
+                                    onChange={e => setProfileForm({...profileForm, name: e.target.value})} 
+                                    className="w-full text-2xl font-serif italic border-b border-gray-200 py-2 focus:border-black outline-none bg-transparent placeholder-gray-300"
+                                    placeholder="Enter your brand name"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase mb-2">Short Bio</label>
+                                <textarea 
+                                    value={profileForm.bio} 
+                                    onChange={e => setProfileForm({...profileForm, bio: e.target.value})} 
+                                    className="w-full text-sm border border-gray-200 p-3 focus:border-black outline-none h-24 resize-none placeholder-gray-400"
+                                    placeholder="Tell your story..."
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Social Media Links */}
+                <div className="bg-white p-8 border border-gray-100 shadow-sm">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">Social Presence</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <div className="relative">
+                            <Globe size={16} className="absolute left-0 top-3 text-gray-400" />
+                            <input 
+                                placeholder="Website URL" 
+                                value={profileForm.website} 
+                                onChange={e => setProfileForm({...profileForm, website: e.target.value})} 
+                                className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                        <div className="relative">
+                            <Instagram size={16} className="absolute left-0 top-3 text-gray-400" />
+                            <input 
+                                placeholder="Instagram Handle" 
+                                value={profileForm.instagram} 
+                                onChange={e => setProfileForm({...profileForm, instagram: e.target.value})} 
+                                className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                        <div className="relative">
+                            <Twitter size={16} className="absolute left-0 top-3 text-gray-400" />
+                            <input 
+                                placeholder="Twitter Handle" 
+                                value={profileForm.twitter} 
+                                onChange={e => setProfileForm({...profileForm, twitter: e.target.value})} 
+                                className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                        <div className="relative">
+                            <Facebook size={16} className="absolute left-0 top-3 text-gray-400" />
+                            <input 
+                                placeholder="Facebook Page" 
+                                value={profileForm.facebook} 
+                                onChange={e => setProfileForm({...profileForm, facebook: e.target.value})} 
+                                className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                        <div className="relative">
+                            <Video size={16} className="absolute left-0 top-3 text-gray-400" />
+                            <input 
+                                placeholder="TikTok Handle" 
+                                value={profileForm.tiktok} 
+                                onChange={e => setProfileForm({...profileForm, tiktok: e.target.value})} 
+                                className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                        <div className="relative">
+                            <Mail size={16} className="absolute left-0 top-3 text-gray-400" />
+                            <input 
+                                placeholder="Support Email" 
+                                value={profileForm.email} 
+                                onChange={e => setProfileForm({...profileForm, email: e.target.value})} 
+                                className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Column: Theme & Preview */}
+            <div className="space-y-8">
+                <div className="bg-white p-8 border border-gray-100 shadow-sm">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">Store Theme</h3>
+                    
+                    <div className="space-y-4">
+                        <button 
+                            type="button"
+                            onClick={() => setProfileForm({...profileForm, visualTheme: 'MINIMALIST'})}
+                            className={`w-full p-4 border text-left group transition-all relative overflow-hidden ${profileForm.visualTheme === 'MINIMALIST' ? 'border-black ring-1 ring-black' : 'border-gray-200 hover:border-gray-400'}`}
+                        >
+                            <div className="absolute right-0 top-0 bg-gray-100 w-16 h-full -skew-x-12 translate-x-8" />
+                            <span className="text-sm font-bold uppercase relative z-10">Minimalist</span>
+                            <p className="text-[10px] text-gray-500 mt-1 relative z-10">Clean lines, white space, modern typography.</p>
+                            {profileForm.visualTheme === 'MINIMALIST' && <CheckCircle size={16} className="absolute top-4 right-4 text-black z-10" />}
+                        </button>
+
+                        <button 
+                            type="button"
+                            onClick={() => setProfileForm({...profileForm, visualTheme: 'DARK'})}
+                            className={`w-full p-4 border text-left group transition-all relative overflow-hidden ${profileForm.visualTheme === 'DARK' ? 'border-black ring-1 ring-black' : 'border-gray-200 hover:border-gray-400'}`}
+                        >
+                            <div className="absolute inset-0 bg-zinc-900 opacity-90" />
+                            <span className="text-sm font-bold uppercase text-white relative z-10">Dark Mode</span>
+                            <p className="text-[10px] text-gray-400 mt-1 relative z-10">High contrast, cinematic, bold aesthetic.</p>
+                            {profileForm.visualTheme === 'DARK' && <CheckCircle size={16} className="absolute top-4 right-4 text-white z-10" />}
+                        </button>
+
+                        <button 
+                            type="button"
+                            onClick={() => setProfileForm({...profileForm, visualTheme: 'GOLD'})}
+                            className={`w-full p-4 border text-left group transition-all relative overflow-hidden ${profileForm.visualTheme === 'GOLD' ? 'border-black ring-1 ring-black' : 'border-gray-200 hover:border-gray-400'}`}
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-yellow-50 to-amber-100 opacity-50" />
+                            <span className="text-sm font-bold uppercase text-amber-900 relative z-10">Luxury Gold</span>
+                            <p className="text-[10px] text-amber-800 mt-1 relative z-10">Warm tones, elegant, sophisticated feel.</p>
+                            {profileForm.visualTheme === 'GOLD' && <CheckCircle size={16} className="absolute top-4 right-4 text-amber-900 z-10" />}
+                        </button>
+                    </div>
+                </div>
+
+                <div className="bg-gray-50 p-6 border border-gray-200 text-center">
+                    <p className="text-xs text-gray-500 mb-4">Preview your store as a visitor</p>
+                    <button 
+                        type="button" 
+                        onClick={() => setActiveTab('STORE_PREVIEW')} 
+                        className="w-full bg-white border border-gray-200 py-3 text-xs font-bold uppercase tracking-widest hover:border-black transition-colors"
+                    >
+                        View Live Preview
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+);
+
+const renderStorePreview = () => {
+    if (!currentVendor) return <div>No vendor data</div>;
+    return (
+        <div className="border border-gray-200 shadow-lg rounded-sm overflow-hidden h-[80vh] overflow-y-auto">
+            <div className="bg-black text-white text-xs p-2 text-center uppercase font-bold flex justify-between items-center px-4">
+                <span>Live Store Preview</span>
+                <button onClick={() => setActiveTab('STORE_DESIGN')} className="hover:text-gray-300">Edit Design</button>
+            </div>
+            {/* Pass transient form state to preview so user sees changes before saving */}
+            <VendorProfileView 
+                vendor={{
+                    ...currentVendor,
+                    name: profileForm.name || currentVendor.name,
+                    bio: profileForm.bio || currentVendor.bio,
+                    avatar: profileForm.avatar || currentVendor.avatar,
+                    coverImage: profileForm.coverImage || currentVendor.coverImage,
+                    visualTheme: profileForm.visualTheme as any,
+                    website: profileForm.website,
+                    instagram: profileForm.instagram,
+                    twitter: profileForm.twitter,
+                    facebook: profileForm.facebook,
+                    tiktok: profileForm.tiktok
+                }}
+                onProductSelect={() => {}}
+                onNavigate={() => {}}
+                products={vendorProducts}
+            />
+        </div>
+    );
+};
+
+const renderBuyerProfile = () => (
+    <div className="max-w-3xl animate-fade-in space-y-8">
+        <h2 className="text-2xl font-serif italic mb-6">My Profile</h2>
+        
+        <div className="bg-white p-8 border border-gray-100 shadow-sm">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">Personal Details</h3>
+             <div className="flex items-center gap-6 mb-8">
+                <img src={buyerForm.avatar || 'https://via.placeholder.com/100'} className="w-20 h-20 rounded-full object-cover border border-gray-200"/>
+                <div>
+                    <button type="button" onClick={() => avatarFileInputRef.current?.click()} className="text-xs font-bold uppercase underline hover:text-luxury-gold">Change Photo</button>
+                    <input type="file" ref={avatarFileInputRef} className="hidden" accept="image/*" onChange={e => handleFileUpload(e, (b64) => setBuyerForm({...buyerForm, avatar: b64}))} />
+                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div>
+                    <label className="block text-[10px] font-bold uppercase mb-2">Full Name</label>
+                    <input value={buyerForm.name} onChange={e => setBuyerForm({...buyerForm, name: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"/>
+                 </div>
+                 <div>
+                    <label className="block text-[10px] font-bold uppercase mb-2">Phone</label>
+                    <input value={buyerForm.phone} onChange={e => setBuyerForm({...buyerForm, phone: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"/>
+                 </div>
+            </div>
+        </div>
+
+        <div className="bg-white p-8 border border-gray-100 shadow-sm">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">Shipping Address</h3>
+            <div className="space-y-4">
+                 <input placeholder="Street Address" value={buyerForm.street} onChange={e => setBuyerForm({...buyerForm, street: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"/>
+                 <div className="grid grid-cols-2 gap-6">
+                    <input placeholder="City" value={buyerForm.city} onChange={e => setBuyerForm({...buyerForm, city: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"/>
+                    <input placeholder="State / Province" value={buyerForm.state} onChange={e => setBuyerForm({...buyerForm, state: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"/>
+                 </div>
+                 <div className="grid grid-cols-2 gap-6">
+                    <input placeholder="Zip / Postal Code" value={buyerForm.zip} onChange={e => setBuyerForm({...buyerForm, zip: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"/>
+                    <input placeholder="Country" value={buyerForm.country} onChange={e => setBuyerForm({...buyerForm, country: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"/>
+                 </div>
+            </div>
+        </div>
+
+        <div className="bg-white p-8 border border-gray-100 shadow-sm">
+             <div className="flex items-center gap-2 mb-6 text-luxury-gold">
+                <Ruler size={16} />
+                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">My Measurements</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <input placeholder="Bust" value={buyerForm.bust} onChange={e => setBuyerForm({...buyerForm, bust: e.target.value})} className="border border-gray-200 p-2 text-sm text-center"/>
+                <input placeholder="Waist" value={buyerForm.waist} onChange={e => setBuyerForm({...buyerForm, waist: e.target.value})} className="border border-gray-200 p-2 text-sm text-center"/>
+                <input placeholder="Hips" value={buyerForm.hips} onChange={e => setBuyerForm({...buyerForm, hips: e.target.value})} className="border border-gray-200 p-2 text-sm text-center"/>
+                <input placeholder="Height" value={buyerForm.height} onChange={e => setBuyerForm({...buyerForm, height: e.target.value})} className="border border-gray-200 p-2 text-sm text-center"/>
+            </div>
+        </div>
+
+        <div className="bg-white p-8 border border-gray-100 shadow-sm">
+             <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">Security</h3>
+             <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <div className="grid grid-cols-2 gap-6">
+                    <input type="password" placeholder="New Password" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"/>
+                    <input type="password" placeholder="Confirm Password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"/>
+                </div>
+                {passwordStatus.error && <p className="text-red-500 text-xs">{passwordStatus.error}</p>}
+                {passwordStatus.success && <p className="text-green-500 text-xs">Password updated successfully.</p>}
+                <button type="submit" disabled={passwordStatus.loading || !passwords.new} className="bg-gray-100 text-black px-6 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors disabled:opacity-50">
+                    {passwordStatus.loading ? 'Updating...' : 'Update Password'}
+                </button>
+             </form>
+        </div>
+
+        <button type="button" onClick={handleSaveBuyerProfile} disabled={isSubmitting} className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50">
+            {isSubmitting ? 'Saving...' : 'Save Profile'}
+        </button>
+    </div>
+);
 
   const getSidebarItems = () => {
     if (isBuyer) {
@@ -482,9 +921,32 @@ export const Dashboard: React.FC<DashboardProps> = ({
         { id: 'PROFILE', label: 'Profile', icon: Settings },
       ];
     }
-    const items: { id: string; label: string; icon: any; action?: () => void }[] = [ { id: 'OVERVIEW', label: 'Overview', icon: LayoutDashboard }, { id: 'PRODUCTS', label: 'My Collection', icon: Shirt }, { id: 'UPLOAD', label: 'Add New Piece', icon: Plus }, ];
-    if (isVendor) { items.push({ id: 'STORE_PREVIEW', label: 'View Live Store', icon: Store }); items.push({ id: 'FULFILLMENT', label: 'Client Orders', icon: Truck }); items.push({ id: 'ORDERS', label: 'My Purchases', icon: ShoppingBag }); items.push({ id: 'PAYOUTS', label: 'Payouts & Wallet', icon: Wallet }); items.push({ id: 'FOLLOWERS', label: 'Followers', icon: Users }); items.push({ id: 'STORE_DESIGN', label: 'Design Store', icon: Palette }); items.push({ id: 'SUBSCRIPTION_PLAN', label: 'My Subscription', icon: Diamond }); items.push({ id: 'VERIFICATION', label: 'Identity Verification', icon: ShieldCheck }); items.push({ id: 'MARKETPLACE', label: 'View Storefront', icon: Eye, action: () => onNavigate('DESIGNERS') }); items.push({ id: 'PROFILE', label: 'Profile Settings', icon: Settings }); }
-    if (isAdmin) { items.push({ id: 'CMS', label: 'Content Management', icon: Layout }); items.push({ id: 'INBOX', label: 'Inbox', icon: Inbox }); items.push({ id: 'ORDERS', label: 'All Orders', icon: Package }); items.push({ id: 'VERIFICATION', label: 'Vendor Verification', icon: ShieldCheck }); items.push({ id: 'SUBSCRIPTIONS', label: 'Subscriptions', icon: Users }); items.push({ id: 'USERS', label: 'User Management', icon: Users }); items.push({ id: 'REVIEWS', label: 'Content Moderation', icon: MessageSquare }); items.push({ id: 'TRANSACTIONS', label: 'Transactions', icon: CreditCard }); items.push({ id: 'SETTINGS', label: 'Platform Settings', icon: Settings }); }
+    const items: { id: string; label: string; icon: any; action?: () => void }[] = [ { id: 'OVERVIEW', label: 'Overview', icon: LayoutDashboard } ];
+    if (isVendor) { 
+        items.push({ id: 'PRODUCTS', label: 'My Collection', icon: Shirt }); 
+        items.push({ id: 'UPLOAD', label: 'Add New Piece', icon: Plus }); 
+        items.push({ id: 'STORE_PREVIEW', label: 'View Live Store', icon: Store }); 
+        items.push({ id: 'FULFILLMENT', label: 'Client Orders', icon: Truck }); 
+        items.push({ id: 'ORDERS', label: 'My Purchases', icon: ShoppingBag }); 
+        items.push({ id: 'PAYOUTS', label: 'Payouts & Wallet', icon: Wallet }); 
+        items.push({ id: 'FOLLOWERS', label: 'Followers', icon: Users }); 
+        items.push({ id: 'STORE_DESIGN', label: 'Design Store', icon: Palette }); 
+        items.push({ id: 'SUBSCRIPTION_PLAN', label: 'My Subscription', icon: Diamond }); 
+        items.push({ id: 'VERIFICATION', label: 'Identity Verification', icon: ShieldCheck }); 
+        items.push({ id: 'MARKETPLACE', label: 'View Storefront', icon: Eye, action: () => onNavigate('DESIGNERS') }); 
+        items.push({ id: 'PROFILE', label: 'Profile Settings', icon: Settings }); 
+    }
+    if (isAdmin) { 
+        items.push({ id: 'CMS', label: 'Content Management', icon: Layout }); 
+        items.push({ id: 'INBOX', label: 'Inbox', icon: Inbox }); 
+        items.push({ id: 'ORDERS', label: 'All Orders', icon: Package }); 
+        items.push({ id: 'VERIFICATION', label: 'Vendor Verification', icon: ShieldCheck }); 
+        items.push({ id: 'SUBSCRIPTIONS', label: 'Subscriptions', icon: Diamond }); 
+        items.push({ id: 'USERS', label: 'User Management', icon: Users }); 
+        items.push({ id: 'REVIEWS', label: 'Content Moderation', icon: MessageSquare }); 
+        items.push({ id: 'TRANSACTIONS', label: 'Transactions', icon: CreditCard }); 
+        items.push({ id: 'SETTINGS', label: 'Platform Settings', icon: Settings }); 
+    }
     return items;
   };
 
@@ -600,10 +1062,268 @@ export const Dashboard: React.FC<DashboardProps> = ({
     </div>
   );
 
+  const renderAdminSubscriptions = () => (
+      <div className="space-y-6 animate-fade-in">
+          <h2 className="text-2xl font-serif italic mb-6">Vendor Subscriptions</h2>
+          <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Vendor</th>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Current Plan</th>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Status</th>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Revenue</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {vendors.map(v => (
+                          <tr key={v.id} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="p-4 font-bold">{v.name} <div className="text-xs text-gray-400 font-normal">{v.email}</div></td>
+                              <td className="p-4">
+                                  <span className="bg-gray-100 px-2 py-1 rounded text-xs uppercase font-bold">{v.subscriptionPlan || 'None'}</span>
+                              </td>
+                              <td className="p-4">
+                                  <span className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${v.subscriptionStatus === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                      {v.subscriptionStatus}
+                                  </span>
+                              </td>
+                              <td className="p-4 font-mono text-gray-600">
+                                  {v.subscriptionPlan === 'Maison' ? '$299.00' : v.subscriptionPlan === 'Couture' ? 'Custom' : 'Free'}
+                              </td>
+                          </tr>
+                      ))}
+                  </tbody>
+              </table>
+          </div>
+      </div>
+  );
+
+  const renderUserManagement = () => {
+      // Combine Buyers and Vendors into one list for Admin view
+      const allAccounts = [
+          ...vendors.map(v => ({...v, role: 'VENDOR', id: v.id})),
+          ...users.map(u => ({...u, role: 'BUYER', id: u.id}))
+      ];
+
+      return (
+          <div className="space-y-6 animate-fade-in">
+              <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-serif italic">User Management</h2>
+                  <div className="flex gap-2">
+                      <div className="relative">
+                          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                          <input placeholder="Search users..." className="pl-10 pr-4 py-2 border border-gray-200 text-sm focus:border-black outline-none rounded-sm" />
+                      </div>
+                  </div>
+              </div>
+              
+              <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
+                  <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-100">
+                          <tr>
+                              <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">User</th>
+                              <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Role</th>
+                              <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Location</th>
+                              <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Status</th>
+                              <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Actions</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {allAccounts.map((account: any, idx) => (
+                              <tr key={`${account.role}-${account.id}-${idx}`} className="border-b border-gray-100 hover:bg-gray-50">
+                                  <td className="p-4">
+                                      <div className="flex items-center gap-3">
+                                          <img src={account.avatar || "https://via.placeholder.com/40"} className="w-8 h-8 rounded-full object-cover" />
+                                          <div>
+                                              <p className="font-bold">{account.name}</p>
+                                              <p className="text-xs text-gray-400">{account.email}</p>
+                                          </div>
+                                      </div>
+                                  </td>
+                                  <td className="p-4"><span className="text-xs font-bold uppercase">{account.role}</span></td>
+                                  <td className="p-4 text-gray-500">{account.location || (account.shippingAddress?.country) || 'N/A'}</td>
+                                  <td className="p-4">
+                                      {/* Mock status logic since not all types have status field consistent */}
+                                      <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold uppercase rounded">Active</span>
+                                  </td>
+                                  <td className="p-4">
+                                      <button className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors" title="Suspend User">
+                                          <Ban size={16} />
+                                      </button>
+                                  </td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      );
+  };
+
+  const renderContentModeration = () => (
+      <div className="space-y-8 animate-fade-in">
+          <h2 className="text-2xl font-serif italic mb-6">Content Moderation</h2>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Flagged Products (Mock) */}
+              <div className="bg-white p-6 border border-gray-100 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 text-red-500">
+                      <Flag size={20} />
+                      <h3 className="text-xs font-bold uppercase tracking-widest">Flagged Products</h3>
+                  </div>
+                  <div className="space-y-4">
+                      <p className="text-sm text-gray-400 italic">No products currently flagged for review.</p>
+                  </div>
+              </div>
+
+              {/* Recent Reviews (Mock) */}
+              <div className="bg-white p-6 border border-gray-100 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 text-luxury-gold">
+                      <MessageCircle size={20} />
+                      <h3 className="text-xs font-bold uppercase tracking-widest">Recent Reviews</h3>
+                  </div>
+                  <div className="space-y-4">
+                      {/* Mock Data for visual purposes */}
+                      <div className="border-b border-gray-100 pb-4">
+                          <div className="flex justify-between mb-1">
+                              <span className="font-bold text-sm">Elena K.</span>
+                              <div className="flex text-yellow-400"><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/></div>
+                          </div>
+                          <p className="text-xs text-gray-600 mb-2">"The fabric quality is unmatched. Fits perfectly."</p>
+                          <div className="flex gap-2">
+                              <button className="text-[10px] font-bold uppercase text-green-600 hover:underline">Approve</button>
+                              <button className="text-[10px] font-bold uppercase text-red-600 hover:underline">Remove</button>
+                          </div>
+                      </div>
+                      <div className="border-b border-gray-100 pb-4">
+                          <div className="flex justify-between mb-1">
+                              <span className="font-bold text-sm">Marc D.</span>
+                              <div className="flex text-yellow-400"><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12} fill="currentColor"/><Star size={12}/></div>
+                          </div>
+                          <p className="text-xs text-gray-600 mb-2">"Stunning silhouette, though the sleeves are slightly long."</p>
+                          <div className="flex gap-2">
+                              <button className="text-[10px] font-bold uppercase text-green-600 hover:underline">Approve</button>
+                              <button className="text-[10px] font-bold uppercase text-red-600 hover:underline">Remove</button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+  );
+
+  const renderTransactions = () => (
+      <div className="space-y-6 animate-fade-in">
+          <h2 className="text-2xl font-serif italic mb-6">Platform Transactions</h2>
+          <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Order ID</th>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Date</th>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Customer</th>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Total</th>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Platform Fee (15%)</th>
+                          <th className="p-4 text-left font-bold uppercase tracking-widest text-xs text-gray-400">Net Vendor Payout</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {orders.map(order => (
+                          <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="p-4 font-mono text-xs">{order.id}</td>
+                              <td className="p-4 text-gray-500">{new Date(order.date).toLocaleDateString()}</td>
+                              <td className="p-4">{order.customerName}</td>
+                              <td className="p-4 font-bold">${order.total.toFixed(2)}</td>
+                              <td className="p-4 text-green-600 font-mono">+${(order.total * 0.15).toFixed(2)}</td>
+                              <td className="p-4 text-gray-500 font-mono">${(order.total * 0.85).toFixed(2)}</td>
+                          </tr>
+                      ))}
+                  </tbody>
+              </table>
+          </div>
+      </div>
+  );
+
+  const renderPlatformSettings = () => (
+      <div className="max-w-2xl animate-fade-in bg-white p-8 border border-gray-100 shadow-sm">
+          <h2 className="text-2xl font-serif italic mb-8">Platform Settings</h2>
+          
+          <div className="space-y-8">
+              <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Feature Flags</h3>
+                  <div className="space-y-4">
+                      <div className="flex justify-between items-center p-4 bg-gray-50 border border-gray-200 rounded-sm">
+                          <div>
+                              <span className="font-bold text-sm block">Marketplace Enabled</span>
+                              <span className="text-xs text-gray-500">Allow users to browse and purchase items.</span>
+                          </div>
+                          <button onClick={() => toggleFeatureFlag('enableMarketplace')} className={`text-2xl transition-colors ${featureFlags.enableMarketplace ? 'text-green-500' : 'text-gray-300'}`}>
+                              {featureFlags.enableMarketplace ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+                          </button>
+                      </div>
+                      <div className="flex justify-between items-center p-4 bg-gray-50 border border-gray-200 rounded-sm">
+                          <div>
+                              <span className="font-bold text-sm block">Maintenance Mode</span>
+                              <span className="text-xs text-gray-500">Disable access for non-admin users.</span>
+                          </div>
+                          <button onClick={() => toggleFeatureFlag('maintenanceMode')} className={`text-2xl transition-colors ${featureFlags.maintenanceMode ? 'text-green-500' : 'text-gray-300'}`}>
+                              {featureFlags.maintenanceMode ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+                          </button>
+                      </div>
+                      <div className="flex justify-between items-center p-4 bg-gray-50 border border-gray-200 rounded-sm">
+                          <div>
+                              <span className="font-bold text-sm block">AI Style Match</span>
+                              <span className="text-xs text-gray-500">Enable Gemini-powered styling suggestions.</span>
+                          </div>
+                          <button onClick={() => toggleFeatureFlag('enableAiStyleMatch')} className={`text-2xl transition-colors ${featureFlags.enableAiStyleMatch ? 'text-green-500' : 'text-gray-300'}`}>
+                              {featureFlags.enableAiStyleMatch ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+                          </button>
+                      </div>
+                  </div>
+              </div>
+
+              <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Commission Configuration</h3>
+                  <div className="flex items-center gap-4">
+                      <label className="text-sm font-bold">Standard Commission Rate (%)</label>
+                      <input type="number" defaultValue="15" className="border border-gray-200 p-2 w-20 text-center font-mono" />
+                      <button className="bg-black text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold">Update</button>
+                  </div>
+              </div>
+          </div>
+      </div>
+  );
+
   const renderInbox = () => (
     <div className="space-y-6 animate-fade-in">
         <h2 className="text-2xl font-serif italic mb-6">Inbox</h2>
-        {isAdmin ? (
+        {composeRecipient ? (
+            <div className="max-w-2xl bg-white p-8 border border-gray-100 shadow-sm">
+                <button onClick={() => setComposeRecipient(null)} className="mb-6 flex items-center gap-2 text-xs font-bold uppercase text-gray-400 hover:text-black">
+                    <ArrowLeft size={16}/> Back to Inbox
+                </button>
+                <h2 className="text-xl font-serif italic mb-6">Secure Message</h2>
+                <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-sm border border-gray-100">
+                    <img src={composeRecipient.avatar} className="w-12 h-12 rounded-full object-cover"/>
+                    <div>
+                        <p className="font-bold text-sm">{composeRecipient.name}</p>
+                        <p className="text-xs text-gray-500">Valued Client • {composeRecipient.location}</p>
+                    </div>
+                </div>
+                <textarea 
+                    value={messageBody}
+                    onChange={e => setMessageBody(e.target.value)}
+                    placeholder="Type your message..."
+                    className="w-full h-40 p-4 border border-gray-200 text-sm focus:border-black outline-none resize-none mb-4"
+                />
+                <button 
+                    onClick={() => { alert('Message sent securely.'); setComposeRecipient(null); setMessageBody(''); }} 
+                    className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2"
+                >
+                    Send Encrypted Message <Send size={14} />
+                </button>
+            </div>
+        ) : isAdmin ? (
             <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
                 {contactSubmissions.length === 0 ? (
                     <div className="p-8 text-center text-gray-400">No messages found.</div>
@@ -634,6 +1354,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex flex-col items-center justify-center h-64 border border-dashed border-gray-200 rounded-sm">
                 <Mail size={32} className="text-gray-300 mb-2" />
                 <p className="text-gray-400 text-sm">No new messages.</p>
+                <p className="text-gray-400 text-xs mt-2">Start a conversation from your followers list.</p>
             </div>
         )}
     </div>
@@ -796,7 +1517,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const renderFollowers = () => (
       <div className="space-y-6 animate-fade-in">
-          <h2 className="text-2xl font-serif italic mb-6">Followers & Community</h2>
+          <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-serif italic">Followers & Community</h2>
+              <div className="flex items-center gap-2 text-xs text-green-600 font-bold uppercase tracking-widest animate-pulse">
+                  <div className="w-2 h-2 bg-green-600 rounded-full" /> Live Updates Active
+              </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {followers.length === 0 ? (
                   <div className="col-span-full py-12 text-center text-gray-400">
@@ -805,12 +1531,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
               ) : (
                   followers.map(f => (
-                      <div key={f.id} className="bg-white p-6 border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedFollower(f)}>
-                          <img src={f.avatar} className="w-12 h-12 rounded-full object-cover"/>
-                          <div>
-                              <h4 className="font-bold text-sm">{f.name}</h4>
-                              <p className="text-xs text-gray-500">{f.location} • Joined {f.joined}</p>
+                      <div key={f.id} className="bg-white p-6 border border-gray-100 flex items-center justify-between gap-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-center gap-4 cursor-pointer" onClick={() => setSelectedFollower(f)}>
+                              <img src={f.avatar} className="w-12 h-12 rounded-full object-cover"/>
+                              <div>
+                                  <h4 className="font-bold text-sm">{f.name}</h4>
+                                  <p className="text-xs text-gray-500">{f.location} • Joined {f.joined}</p>
+                              </div>
                           </div>
+                          <button 
+                              onClick={() => handleMessageFollower(f)}
+                              className="text-xs font-bold uppercase tracking-widest bg-gray-50 hover:bg-black hover:text-white px-3 py-2 transition-colors border border-gray-200"
+                          >
+                              Message
+                          </button>
                       </div>
                   ))
               )}
@@ -819,431 +1553,124 @@ export const Dashboard: React.FC<DashboardProps> = ({
   );
 
   const renderVendorVerification = () => (
-      <div className="max-w-2xl animate-fade-in bg-white p-8 border border-gray-100">
-          <div className="flex items-center gap-3 mb-6">
-              <ShieldCheck size={24} className="text-luxury-gold" />
-              <h2 className="text-2xl font-serif italic">Identity Verification</h2>
-          </div>
-          {currentVendor?.verificationStatus === 'VERIFIED' ? (
-              <div className="bg-green-50 p-6 border border-green-100 flex flex-col items-center text-center">
-                  <CheckCircle size={48} className="text-green-500 mb-4" />
-                  <h3 className="text-lg font-bold text-green-700 mb-2">Verification Complete</h3>
-                  <p className="text-green-600 text-sm">Your atelier identity has been verified. You have full access to the marketplace.</p>
+      <div className="max-w-2xl animate-fade-in space-y-6">
+          <div className="bg-white p-8 border border-gray-100">
+              <div className="flex items-center gap-3 mb-6">
+                  <ShieldCheck size={24} className="text-luxury-gold" />
+                  <h2 className="text-2xl font-serif italic">Identity Verification</h2>
               </div>
-          ) : (
-              <form onSubmit={handleKycSubmit} className="space-y-6">
-                  <p className="text-sm text-gray-500">To maintain the exclusivity and security of our marketplace, we require all designers to verify their identity.</p>
-                  <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Government ID (Front)</label>
-                      <div className="border border-gray-200 p-4 bg-gray-50 flex items-center justify-between">
-                          <span className="text-xs text-gray-500 truncate">{kycFiles.idFront ? 'File selected' : 'No file chosen'}</span>
-                          <input type="file" ref={kycIdFrontRef} onChange={e => handleFileUpload(e, (b64) => setKycFiles({...kycFiles, idFront: b64}))} className="hidden" />
-                          <button type="button" onClick={() => kycIdFrontRef.current?.click()} className="text-xs font-bold underline">Upload</button>
-                      </div>
+              
+              {currentVendor?.verificationStatus === 'VERIFIED' ? (
+                  <div className="bg-green-50 p-6 border border-green-100 flex flex-col items-center text-center">
+                      <CheckCircle size={48} className="text-green-500 mb-4" />
+                      <h3 className="text-lg font-bold text-green-700 mb-2">Verification Complete</h3>
+                      <p className="text-green-600 text-sm">Your atelier identity has been verified. You have full access to the marketplace.</p>
                   </div>
-                  <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Government ID (Back)</label>
-                      <div className="border border-gray-200 p-4 bg-gray-50 flex items-center justify-between">
-                          <span className="text-xs text-gray-500 truncate">{kycFiles.idBack ? 'File selected' : 'No file chosen'}</span>
-                          <input type="file" ref={kycIdBackRef} onChange={e => handleFileUpload(e, (b64) => setKycFiles({...kycFiles, idBack: b64}))} className="hidden" />
-                          <button type="button" onClick={() => kycIdBackRef.current?.click()} className="text-xs font-bold underline">Upload</button>
-                      </div>
+              ) : currentVendor?.verificationStatus === 'PENDING' ? (
+                  <div className="bg-blue-50 p-6 border border-blue-100 flex flex-col items-center text-center">
+                      <Clock size={48} className="text-blue-500 mb-4" />
+                      <h3 className="text-lg font-bold text-blue-700 mb-2">Under Review</h3>
+                      <p className="text-blue-600 text-sm mb-4">Your documents have been submitted and are currently being reviewed by our curation team.</p>
                   </div>
-                  <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Proof of Address (Utility Bill)</label>
-                      <div className="border border-gray-200 p-4 bg-gray-50 flex items-center justify-between">
-                          <span className="text-xs text-gray-500 truncate">{kycFiles.proofOfAddress ? 'File selected' : 'No file chosen'}</span>
-                          <input type="file" ref={kycProofRef} onChange={e => handleFileUpload(e, (b64) => setKycFiles({...kycFiles, proofOfAddress: b64}))} className="hidden" />
-                          <button type="button" onClick={() => kycProofRef.current?.click()} className="text-xs font-bold underline">Upload</button>
-                      </div>
-                  </div>
-                  {kycStatus.error && <p className="text-red-500 text-xs">{kycStatus.error}</p>}
-                  {kycStatus.success && <p className="text-green-500 text-xs">Documents submitted successfully. Pending review.</p>}
-                  <button type="submit" disabled={kycStatus.loading || currentVendor?.verificationStatus === 'PENDING'} className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold disabled:opacity-50">
-                      {kycStatus.loading ? 'Submitting...' : currentVendor?.verificationStatus === 'PENDING' ? 'Under Review' : 'Submit for Verification'}
-                  </button>
-              </form>
-          )}
-      </div>
-  );
-
-  const renderAdminVerification = () => (
-      <div className="space-y-6 animate-fade-in">
-          <h2 className="text-2xl font-serif italic mb-6">Pending Verifications</h2>
-          <div className="space-y-4">
-              {vendors.filter(v => v.verificationStatus === 'PENDING').length === 0 ? (
-                  <p className="text-gray-400">No pending verifications.</p>
               ) : (
-                  vendors.filter(v => v.verificationStatus === 'PENDING').map(v => (
-                      <div key={v.id} className="bg-white p-6 border border-gray-100 flex justify-between items-center shadow-sm">
-                          <div className="flex items-center gap-4">
-                              <img src={v.avatar} className="w-12 h-12 rounded-full object-cover" />
-                              <div>
-                                  <h3 className="font-bold text-sm">{v.name}</h3>
-                                  <p className="text-xs text-gray-500">{v.email}</p>
-                              </div>
+                  <div>
+                      <p className="text-sm text-gray-500 mb-6">To maintain the exclusivity and security of our marketplace, we require all designers to verify their identity before publishing collections.</p>
+                      {currentVendor?.verificationStatus === 'REJECTED' && (
+                          <div className="bg-red-50 p-4 border border-red-100 text-red-600 text-sm mb-6 flex items-center gap-2">
+                              <AlertCircle size={16} /> Previous verification was rejected. Please review requirements and try again.
                           </div>
-                          <div className="flex gap-2">
-                              <button onClick={() => setVerificationModalOpen(v)} className="bg-black text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold">Review Docs</button>
-                          </div>
-                      </div>
-                  ))
+                      )}
+                      <button 
+                          onClick={() => setShowKycModal(true)} 
+                          className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2"
+                      >
+                          Submit Documents <ArrowUpRight size={14} />
+                      </button>
+                  </div>
               )}
           </div>
-          {/* Modal for Admin to see docs would go here, simplified for now to auto-approve logic if implemented */}
-          {verificationModalOpen && (
-              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                  <div className="bg-white p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                      <h3 className="text-xl font-bold mb-4">Review Documents: {verificationModalOpen.name}</h3>
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                           <div>
-                               <p className="text-xs font-bold mb-2">ID Front</p>
-                               <img src={verificationModalOpen.kycDocuments?.idFront} className="w-full border" />
-                           </div>
-                           <div>
-                               <p className="text-xs font-bold mb-2">ID Back</p>
-                               <img src={verificationModalOpen.kycDocuments?.idBack} className="w-full border" />
-                           </div>
-                      </div>
-                      <div className="flex gap-4">
+
+          {/* KYC Modal */}
+          {showKycModal && (
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
+                  <div className="bg-white w-full max-w-lg p-8 shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
+                      <button onClick={() => setShowKycModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black">
+                          <X size={20} />
+                      </button>
+                      
+                      <h3 className="text-xl font-serif italic mb-2">Submit Verification Documents</h3>
+                      <p className="text-xs text-gray-500 mb-6 uppercase tracking-widest">Secure Upload</p>
+
+                      <form onSubmit={handleKycSubmit} className="space-y-6">
+                          <div>
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Government ID (Front)</label>
+                              <div className="border border-dashed border-gray-300 p-6 bg-gray-50 flex flex-col items-center justify-center gap-2 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => kycIdFrontRef.current?.click()}>
+                                  {kycFiles.idFront ? (
+                                      <div className="text-center">
+                                          <FileCheck className="mx-auto text-green-500 mb-2" size={24} />
+                                          <span className="text-xs font-bold text-green-600">Front ID Selected</span>
+                                      </div>
+                                  ) : (
+                                      <>
+                                          <UploadCloud className="text-gray-400" size={24} />
+                                          <span className="text-xs text-gray-500">Click to upload Front ID</span>
+                                      </>
+                                  )}
+                                  <input type="file" ref={kycIdFrontRef} onChange={e => handleFileUpload(e, (b64) => setKycFiles({...kycFiles, idFront: b64}))} className="hidden" accept="image/*" />
+                              </div>
+                          </div>
+
+                          <div>
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Government ID (Back)</label>
+                              <div className="border border-dashed border-gray-300 p-6 bg-gray-50 flex flex-col items-center justify-center gap-2 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => kycIdBackRef.current?.click()}>
+                                  {kycFiles.idBack ? (
+                                      <div className="text-center">
+                                          <FileCheck className="mx-auto text-green-500 mb-2" size={24} />
+                                          <span className="text-xs font-bold text-green-600">Back ID Selected</span>
+                                      </div>
+                                  ) : (
+                                      <>
+                                          <UploadCloud className="text-gray-400" size={24} />
+                                          <span className="text-xs text-gray-500">Click to upload Back ID</span>
+                                      </>
+                                  )}
+                                  <input type="file" ref={kycIdBackRef} onChange={e => handleFileUpload(e, (b64) => setKycFiles({...kycFiles, idBack: b64}))} className="hidden" accept="image/*" />
+                              </div>
+                          </div>
+
+                          <div>
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Proof of Address</label>
+                              <div className="border border-dashed border-gray-300 p-6 bg-gray-50 flex flex-col items-center justify-center gap-2 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => kycProofRef.current?.click()}>
+                                  {kycFiles.proofOfAddress ? (
+                                      <div className="text-center">
+                                          <FileCheck className="mx-auto text-green-500 mb-2" size={24} />
+                                          <span className="text-xs font-bold text-green-600">Document Selected</span>
+                                      </div>
+                                  ) : (
+                                      <>
+                                          <FileText className="text-gray-400" size={24} />
+                                          <span className="text-xs text-gray-500">Upload Utility Bill / Bank Statement</span>
+                                      </>
+                                  )}
+                                  <input type="file" ref={kycProofRef} onChange={e => handleFileUpload(e, (b64) => setKycFiles({...kycFiles, proofOfAddress: b64}))} className="hidden" accept="image/*" />
+                              </div>
+                          </div>
+
+                          {kycStatus.error && <p className="text-red-500 text-xs flex items-center gap-1"><AlertCircle size={12}/> {kycStatus.error}</p>}
+                          
                           <button 
-                             onClick={async () => {
-                                 const updated = vendors.map(v => v.id === verificationModalOpen.id ? {...v, verificationStatus: 'VERIFIED'} : v);
-                                 if (setVendors) await setVendors(updated as Vendor[]);
-                                 setVerificationModalOpen(null);
-                             }} 
-                             className="flex-1 bg-green-600 text-white py-3 text-xs font-bold uppercase"
+                              type="submit" 
+                              disabled={kycStatus.loading} 
+                              className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                           >
-                              Approve
+                              {kycStatus.loading ? <Loader className="animate-spin" size={16} /> : 'Submit for Review'}
                           </button>
-                          <button 
-                             onClick={async () => {
-                                 const updated = vendors.map(v => v.id === verificationModalOpen.id ? {...v, verificationStatus: 'REJECTED'} : v);
-                                 if (setVendors) await setVendors(updated as Vendor[]);
-                                 setVerificationModalOpen(null);
-                             }} 
-                             className="flex-1 bg-red-600 text-white py-3 text-xs font-bold uppercase"
-                          >
-                              Reject
-                          </button>
-                           <button onClick={() => setVerificationModalOpen(null)} className="px-6 py-3 border border-gray-200">Close</button>
-                      </div>
+                      </form>
                   </div>
               </div>
           )}
       </div>
   );
-
-  const renderStoreDesign = () => (
-      <div className="max-w-3xl animate-fade-in bg-white p-8 border border-gray-100 shadow-sm">
-          <h2 className="text-2xl font-serif italic mb-8">Store Appearance</h2>
-          <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                       <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">Avatar</label>
-                       <div className="w-32 h-32 bg-gray-50 border border-gray-200 relative overflow-hidden group cursor-pointer">
-                           <img src={profileForm.avatar} className="w-full h-full object-cover" />
-                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                               <UploadCloud className="text-white" />
-                           </div>
-                           <input type="file" onChange={e => handleFileUpload(e, (b64) => setProfileForm({...profileForm, avatar: b64}))} className="absolute inset-0 opacity-0 cursor-pointer" />
-                       </div>
-                  </div>
-                  <div className="space-y-4">
-                       <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">Cover Image</label>
-                       <div className="w-full h-32 bg-gray-50 border border-gray-200 relative overflow-hidden group cursor-pointer">
-                           <img src={profileForm.coverImage} className="w-full h-full object-cover" />
-                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                               <UploadCloud className="text-white" />
-                           </div>
-                           <input type="file" onChange={e => handleFileUpload(e, (b64) => setProfileForm({...profileForm, coverImage: b64}))} className="absolute inset-0 opacity-0 cursor-pointer" />
-                       </div>
-                  </div>
-              </div>
-
-              <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Brand Name</label>
-                  <input value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" />
-              </div>
-               <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Bio / Philosophy</label>
-                  <textarea value={profileForm.bio} onChange={e => setProfileForm({...profileForm, bio: e.target.value})} className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-24 resize-none" />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                   <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Website</label>
-                      <input value={profileForm.website} onChange={e => setProfileForm({...profileForm, website: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" placeholder="https://" />
-                   </div>
-                   <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Instagram</label>
-                      <input value={profileForm.instagram} onChange={e => setProfileForm({...profileForm, instagram: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" placeholder="@" />
-                   </div>
-                   <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Twitter</label>
-                      <input value={profileForm.twitter} onChange={e => setProfileForm({...profileForm, twitter: e.target.value})} className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" placeholder="@" />
-                   </div>
-              </div>
-               <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4 block">Visual Theme</label>
-                  <div className="flex gap-4">
-                      {(['MINIMALIST', 'DARK', 'GOLD'] as const).map(theme => (
-                          <button 
-                             key={theme} 
-                             onClick={() => setProfileForm({...profileForm, visualTheme: theme})}
-                             className={`flex-1 py-4 border text-xs font-bold uppercase tracking-widest transition-all ${profileForm.visualTheme === theme ? 'border-black bg-black text-white' : 'border-gray-200 hover:border-black'}`}
-                          >
-                              {theme}
-                          </button>
-                      ))}
-                  </div>
-              </div>
-              <button onClick={handleSaveProfile} disabled={isSubmitting} className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50">
-                  {isSubmitting ? 'Saving...' : 'Save Changes'}
-              </button>
-          </div>
-      </div>
-  );
-
-  const renderStorePreview = () => (
-      <div className="animate-fade-in border border-gray-200 shadow-xl overflow-hidden bg-white">
-          <div className="bg-gray-100 p-2 text-center text-xs text-gray-500 border-b border-gray-200">Live Preview</div>
-          {currentVendor ? (
-            <div className="h-[800px] overflow-y-auto">
-               <VendorProfileView 
-                  vendor={currentVendor} 
-                  onProductSelect={onProductSelect || (() => {})} 
-                  onNavigate={onNavigate}
-                  products={vendorProducts}
-                />
-            </div>
-          ) : <p className="p-8 text-center text-gray-400">Profile data unavailable.</p>}
-      </div>
-  );
-
-  const renderBuyerProfile = () => {
-      return (
-          <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-20">
-              <div className="flex justify-between items-end mb-6">
-                  <div>
-                      <h2 className="text-3xl font-serif italic mb-2">My Profile & Fit</h2>
-                      <p className="text-gray-500 text-sm">Manage your personal details and measurements for a curated experience.</p>
-                  </div>
-                  <button 
-                      onClick={handleSaveBuyerProfile}
-                      disabled={isSubmitting}
-                      className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2 disabled:opacity-70"
-                  >
-                      {isSubmitting ? <Loader className="animate-spin" size={16} /> : <Save size={16} />} Save Changes
-                  </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {/* Left Column: Identity & Security */}
-                  <div className="space-y-8">
-                      {/* Identity Card */}
-                      <div className="bg-white p-6 border border-gray-100 shadow-sm">
-                          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">Identity</h3>
-                          <div className="flex flex-col items-center mb-6">
-                              <div className="relative w-24 h-24 rounded-full bg-gray-50 border border-gray-200 overflow-hidden group cursor-pointer">
-                                  <img 
-                                      src={buyerForm.avatar || "https://via.placeholder.com/150"} 
-                                      className="w-full h-full object-cover" 
-                                  />
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                      <Camera className="text-white" size={20} />
-                                  </div>
-                                  <input 
-                                      type="file" 
-                                      ref={avatarFileInputRef} 
-                                      className="absolute inset-0 opacity-0 cursor-pointer"
-                                      accept="image/*"
-                                      onChange={(e) => handleFileUpload(e, (b64) => setBuyerForm({...buyerForm, avatar: b64}))}
-                                  />
-                              </div>
-                          </div>
-                          
-                          <div className="space-y-4">
-                              <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 block">Full Name</label>
-                                  <input 
-                                      value={buyerForm.name} 
-                                      onChange={e => setBuyerForm({...buyerForm, name: e.target.value})} 
-                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" 
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 block">Email Address</label>
-                                  <input 
-                                      value={currentBuyer?.email} 
-                                      disabled 
-                                      className="w-full border-b border-gray-200 py-2 text-sm text-gray-400 bg-transparent cursor-not-allowed" 
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 block">Phone Number</label>
-                                  <input 
-                                      value={buyerForm.phone} 
-                                      onChange={e => setBuyerForm({...buyerForm, phone: e.target.value})} 
-                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" 
-                                      placeholder="+1 (555) 000-0000"
-                                  />
-                              </div>
-                          </div>
-                      </div>
-
-                      {/* Security Card */}
-                      <div className="bg-white p-6 border border-gray-100 shadow-sm">
-                          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">Security</h3>
-                          <div className="space-y-4">
-                              <input 
-                                  type="password" 
-                                  placeholder="New Password" 
-                                  value={passwords.new} 
-                                  onChange={e => setPasswords({...passwords, new: e.target.value})}
-                                  className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" 
-                              />
-                              <input 
-                                  type="password" 
-                                  placeholder="Confirm Password" 
-                                  value={passwords.confirm} 
-                                  onChange={e => setPasswords({...passwords, confirm: e.target.value})}
-                                  className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" 
-                              />
-                              {passwordStatus.error && <p className="text-red-500 text-xs">{passwordStatus.error}</p>}
-                              {passwordStatus.success && <p className="text-green-500 text-xs">Password updated.</p>}
-                              <button onClick={handleUpdatePassword} disabled={passwordStatus.loading} className="w-full bg-gray-50 border border-gray-200 text-black py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors disabled:opacity-50 mt-2">
-                                  {passwordStatus.loading ? 'Updating...' : 'Update Password'}
-                              </button>
-                          </div>
-                      </div>
-                  </div>
-
-                  {/* Right Column: Measurements & Address */}
-                  <div className="md:col-span-2 space-y-8">
-                      {/* Measurements */}
-                      <div className="bg-white p-8 border border-gray-100 shadow-sm">
-                          <div className="flex items-center gap-3 mb-6">
-                              <Ruler className="text-luxury-gold" size={20} />
-                              <h3 className="text-lg font-serif italic">The Perfect Fit</h3>
-                          </div>
-                          <p className="text-sm text-gray-500 mb-8 max-w-lg">
-                              Provide your measurements to unlock AI-powered sizing recommendations for made-to-order pieces.
-                          </p>
-                          
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                              <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Height (cm)</label>
-                                  <input 
-                                      type="number"
-                                      value={buyerForm.height}
-                                      onChange={e => setBuyerForm({...buyerForm, height: e.target.value})}
-                                      className="w-full bg-transparent text-xl font-serif italic focus:outline-none"
-                                      placeholder="175"
-                                  />
-                              </div>
-                              <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Bust (cm)</label>
-                                  <input 
-                                      type="number"
-                                      value={buyerForm.bust}
-                                      onChange={e => setBuyerForm({...buyerForm, bust: e.target.value})}
-                                      className="w-full bg-transparent text-xl font-serif italic focus:outline-none"
-                                      placeholder="88"
-                                  />
-                              </div>
-                              <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Waist (cm)</label>
-                                  <input 
-                                      type="number"
-                                      value={buyerForm.waist}
-                                      onChange={e => setBuyerForm({...buyerForm, waist: e.target.value})}
-                                      className="w-full bg-transparent text-xl font-serif italic focus:outline-none"
-                                      placeholder="64"
-                                  />
-                              </div>
-                              <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Hips (cm)</label>
-                                  <input 
-                                      type="number"
-                                      value={buyerForm.hips}
-                                      onChange={e => setBuyerForm({...buyerForm, hips: e.target.value})}
-                                      className="w-full bg-transparent text-xl font-serif italic focus:outline-none"
-                                      placeholder="92"
-                                  />
-                              </div>
-                              <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Shoe Size (EU)</label>
-                                  <input 
-                                      type="number"
-                                      value={buyerForm.shoeSize}
-                                      onChange={e => setBuyerForm({...buyerForm, shoeSize: e.target.value})}
-                                      className="w-full bg-transparent text-xl font-serif italic focus:outline-none"
-                                      placeholder="39"
-                                  />
-                              </div>
-                          </div>
-                      </div>
-
-                      {/* Shipping Address */}
-                      <div className="bg-white p-8 border border-gray-100 shadow-sm">
-                          <div className="flex items-center gap-3 mb-6">
-                              <MapPin className="text-luxury-gold" size={20} />
-                              <h3 className="text-lg font-serif italic">Shipping Address</h3>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div className="md:col-span-2">
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 block">Street Address</label>
-                                  <input 
-                                      value={buyerForm.street} 
-                                      onChange={e => setBuyerForm({...buyerForm, street: e.target.value})} 
-                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" 
-                                      placeholder="123 Fashion Ave"
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 block">City</label>
-                                  <input 
-                                      value={buyerForm.city} 
-                                      onChange={e => setBuyerForm({...buyerForm, city: e.target.value})} 
-                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" 
-                                      placeholder="New York"
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 block">State / Province</label>
-                                  <input 
-                                      value={buyerForm.state} 
-                                      onChange={e => setBuyerForm({...buyerForm, state: e.target.value})} 
-                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" 
-                                      placeholder="NY"
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 block">Postal Code</label>
-                                  <input 
-                                      value={buyerForm.zip} 
-                                      onChange={e => setBuyerForm({...buyerForm, zip: e.target.value})} 
-                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" 
-                                      placeholder="10001"
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 block">Country</label>
-                                  <input 
-                                      value={buyerForm.country} 
-                                      onChange={e => setBuyerForm({...buyerForm, country: e.target.value})} 
-                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none" 
-                                      placeholder="United States"
-                                  />
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      );
-  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -1255,6 +1682,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       case 'VERIFICATION': return isAdmin ? renderAdminVerification() : renderVendorVerification();
       case 'STORE_DESIGN': return renderStoreDesign();
       case 'STORE_PREVIEW': return renderStorePreview();
+      case 'SUBSCRIPTIONS': return renderAdminSubscriptions();
+      case 'USERS': return renderUserManagement();
+      case 'REVIEWS': return renderContentModeration();
+      case 'TRANSACTIONS': return renderTransactions();
+      case 'SETTINGS': return renderPlatformSettings();
       case 'SUBSCRIPTION_PLAN': 
         // ... (Subscription plan render logic)
         return (
@@ -1398,11 +1830,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         if (isBuyer) return renderInbox(); // Buyer order history fallback to inbox for now if separate component not ready, or implement buyer orders
         return renderFulfillment(); // Reuse Fulfillment for vendor
       case 'SAVED':
-      case 'SETTINGS':
-      case 'SUBSCRIPTIONS':
-      case 'USERS':
-      case 'REVIEWS':
-      case 'TRANSACTIONS':
       case 'PROFILE':
           if (activeTab === 'PROFILE') {
               if (isVendor) return renderStoreDesign();

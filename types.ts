@@ -98,6 +98,8 @@ export interface Vendor {
   website?: string;
   instagram?: string;
   twitter?: string;
+  facebook?: string;
+  tiktok?: string;
   paymentMethods?: PaymentMethod[];
   kycDocuments?: KycDocuments;
   visualTheme?: 'MINIMALIST' | 'DARK' | 'GOLD';
