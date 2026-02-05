@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle } from 'lucide-react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
 import { UserRole, ViewState, CartItem, Order, AppNotification } from '../types.ts';
 import { auth } from '../services/firebase.ts';
-import { fetchNotifications, markNotificationRead, createNotificationInDb } from '../services/dataService.ts';
+import { markNotificationRead } from '../services/dataService.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,6 +23,8 @@ interface LayoutProps {
   onPlaceOrder?: (order: Order) => Promise<void>;
   onVisualSearch?: (file: File) => Promise<void>;
   onAuthRequest?: (mode: 'LOGIN' | 'REGISTER', role: UserRole) => void;
+  notifications?: AppNotification[];
+  onRefreshNotifications?: () => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -40,7 +42,9 @@ export const Layout: React.FC<LayoutProps> = ({
   onLogout,
   onPlaceOrder,
   onVisualSearch,
-  onAuthRequest
+  onAuthRequest,
+  notifications = [],
+  onRefreshNotifications
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -50,7 +54,6 @@ export const Layout: React.FC<LayoutProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   
   // Notification State
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeToast, setActiveToast] = useState<AppNotification | null>(null);
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -58,13 +61,13 @@ export const Layout: React.FC<LayoutProps> = ({
   
   // Track the latest notification ID to detect new ones
   const latestNotificationIdRef = useRef<string | null>(null);
+  const initializedRef = useRef(false);
   
   // Checkout State
   const [checkoutStep, setCheckoutStep] = useState<'CART' | 'PAYMENT'>('CART');
   const [customerEmail, setCustomerEmail] = useState('');
   
   // --- PAYSTACK CONFIGURATION ---
-  // Replace with your public key from Paystack Dashboard
   const PAYSTACK_PUBLIC_KEY = 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; 
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
@@ -115,69 +118,33 @@ export const Layout: React.FC<LayoutProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- REAL-TIME NOTIFICATION LOGIC ---
-  
-  // 1. Fetch initial notifications & Poll
-  const loadNotifications = async () => {
-      // Use user ID if logged in, otherwise 'all'
-      const userId = auth.currentUser?.uid;
-      const data = await fetchNotifications(userId);
-      
-      if (data.length > 0) {
-          const newest = data[0];
-          // If we have a new notification that is different from the last one we saw
-          if (latestNotificationIdRef.current && newest.id !== latestNotificationIdRef.current) {
-              // It is a new activity! Pop it up.
-              // Only pop up if it's reasonably recent (created in last 2 mins)
-              const timeDiff = new Date().getTime() - new Date(newest.date).getTime();
-              if (timeDiff < 120000) { 
+  // --- NOTIFICATION TOAST LOGIC ---
+  useEffect(() => {
+      if (notifications.length > 0) {
+          const newest = notifications[0];
+          
+          // Determine if we should show toast
+          const isNew = newest.id !== latestNotificationIdRef.current;
+          const isRelevant = !newest.read; // Only show unread as toasts
+          const isRecent = (new Date().getTime() - new Date(newest.date).getTime()) < 60000; // Created in last minute
+
+          // Handle first load vs updates
+          if (isNew) {
+              if (initializedRef.current && isRelevant && isRecent) {
                   setActiveToast(newest);
                   setTimeout(() => setActiveToast(null), 6000);
               }
+              // Update ref
+              latestNotificationIdRef.current = newest.id;
           }
-          // Update ref
-          latestNotificationIdRef.current = newest.id;
+          initializedRef.current = true;
       }
-
-      setNotifications(data);
-  };
-
-  useEffect(() => {
-      loadNotifications();
-      // Poll every 10 seconds for updates to catch real-time events faster
-      const interval = setInterval(loadNotifications, 10000);
-      return () => clearInterval(interval);
-  }, [auth.currentUser]); // Reload when user changes
-
-  // 2. Simulate Active "Marketing" Events (Optional, separate from Order events)
-  useEffect(() => {
-      const randomNotificationInterval = setInterval(async () => {
-          // Low chance for random marketing blasts
-          if (Math.random() > 0.8) { 
-              const newNotif: AppNotification = {
-                  id: `promo_${Date.now()}`,
-                  userId: 'all',
-                  title: "Flash Sale Alert",
-                  message: "20% off selected items for the next hour.",
-                  read: false,
-                  date: new Date().toISOString(),
-                  type: 'PROMO'
-              };
-              
-              await createNotificationInDb(newNotif);
-              // Force reload immediately so the polling logic above picks it up and toasts it
-              loadNotifications();
-          }
-      }, 45000); 
-
-      return () => clearInterval(randomNotificationInterval);
-  }, []);
+  }, [notifications]);
 
   const handleNotificationClick = async (notif: AppNotification) => {
       if (!notif.read) {
           await markNotificationRead(notif.id);
-          // Update local state
-          setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+          if (onRefreshNotifications) onRefreshNotifications();
       }
       setActiveToast(null); // Dismiss toast if clicked
       if (notif.link) {
@@ -191,7 +158,7 @@ export const Layout: React.FC<LayoutProps> = ({
       for (const n of unread) {
           await markNotificationRead(n.id);
       }
-      setNotifications(prev => prev.map(n => ({...n, read: true})));
+      if (onRefreshNotifications) onRefreshNotifications();
   };
 
   const handleDashboardClick = () => {
@@ -317,9 +284,9 @@ export const Layout: React.FC<LayoutProps> = ({
       >
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           
-          {/* Mobile Menu Button (Hidden if Bottom Nav is preferred, but kept for secondary links) */}
-          <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          {/* Mobile Menu Button */}
+          <button className="md:hidden p-2 -ml-2" onClick={() => setMobileMenuOpen(true)}>
+            <Menu size={24} />
           </button>
 
           {/* Logo */}
@@ -480,42 +447,104 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
         </div>
 
-        {/* Mobile Menu Overlay (Secondary Links) */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 top-0 left-0 w-full h-full bg-white z-40 overflow-y-auto pt-24 pb-10 px-6 flex flex-col gap-6 animate-fade-in md:hidden">
-             {NAV_LINKS.map((link) => (
-              <a 
-                key={link.label} 
-                onClick={() => { setMobileMenuOpen(false); onNavigate(link.view); }}
-                className="text-2xl font-serif italic hover:text-luxury-gold transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
-             <button 
-                onClick={() => { setMobileMenuOpen(false); onNavigate('PRICING'); }}
-                className="text-2xl font-serif italic hover:text-luxury-gold transition-colors text-left"
-              >
-                Membership & Pricing
-              </button>
-            <div className="border-t border-gray-100 pt-6 mt-2">
-              <button 
-                onClick={() => { setMobileMenuOpen(false); onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH'); }}
-                className="text-2xl font-serif italic hover:text-luxury-gold transition-colors"
-              >
-                {isLoggedIn ? 'Account Settings' : 'Sign In / Register'}
-              </button>
-              {isLoggedIn && (
-                  <button 
-                    onClick={() => { setMobileMenuOpen(false); onLogout(); }}
-                    className="text-xl font-serif italic text-red-500 hover:text-red-600 transition-colors mt-4 block"
-                  >
-                    Log Out
-                  </button>
-              )}
+        {/* Mobile Menu Drawer - Side Slide */}
+        <div className={`fixed inset-0 z-[60] md:hidden transition-opacity duration-300 ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+            <div className={`absolute top-0 left-0 w-[85%] max-w-sm h-full bg-white shadow-2xl transition-transform duration-300 ease-out flex flex-col ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                
+                {/* Menu Header */}
+                <div className="p-6 flex justify-between items-center border-b border-gray-50">
+                    <span className="text-xl font-serif font-bold italic tracking-wide" onClick={() => { setMobileMenuOpen(false); onNavigate('LANDING'); }}>MyFitStore</span>
+                    <button onClick={() => setMobileMenuOpen(false)} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {/* Menu Content */}
+                <div className="flex-1 overflow-y-auto py-6 px-6 space-y-8">
+                    
+                    {/* Search in Menu */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input 
+                            type="text" 
+                            placeholder="Search collections..." 
+                            className="w-full bg-gray-50 border border-gray-100 py-3 pl-10 pr-4 text-sm focus:border-black outline-none rounded-sm transition-colors"
+                        />
+                    </div>
+
+                    {/* Primary Navigation */}
+                    <div className="space-y-6">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Explore</p>
+                        <nav className="flex flex-col gap-4">
+                            {NAV_LINKS.map((link) => (
+                                <button
+                                    key={link.label}
+                                    onClick={() => { setMobileMenuOpen(false); onNavigate(link.view); }}
+                                    className={`text-lg font-serif text-left flex justify-between items-center group ${currentView === link.view ? 'italic font-bold text-black' : 'text-gray-600'}`}
+                                >
+                                    {link.label}
+                                    <ChevronRight size={16} className={`opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0 ${currentView === link.view ? 'opacity-100 translate-x-0' : ''}`} />
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => { setMobileMenuOpen(false); onNavigate('PRICING'); }}
+                                className="text-lg font-serif text-left text-gray-600 hover:text-luxury-gold transition-colors"
+                            >
+                                Membership
+                            </button>
+                        </nav>
+                    </div>
+
+                    {/* Account Section */}
+                    <div className="space-y-6 pt-6 border-t border-gray-50">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Account</p>
+                        {isLoggedIn ? (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 mb-2 bg-gray-50 p-3 rounded-sm">
+                                    <div className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-sm">
+                                        <User size={18} />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold">{role === 'VENDOR' ? 'Vendor Account' : 'Member Account'}</p>
+                                        <p className="text-[10px] text-green-600 uppercase tracking-wide font-bold">Active</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => { setMobileMenuOpen(false); handleDashboardClick(); }} className="w-full text-left text-sm py-2 hover:text-luxury-gold flex items-center gap-2"><Settings size={14}/> Dashboard</button>
+                                <button onClick={() => { setMobileMenuOpen(false); onNavigate('PROFILE_SETTINGS'); }} className="w-full text-left text-sm py-2 hover:text-luxury-gold flex items-center gap-2"><User size={14}/> Profile</button>
+                                <button onClick={() => { setMobileMenuOpen(false); onLogout(); }} className="w-full text-left text-sm py-2 text-red-500 hover:text-red-600 flex items-center gap-2"><LogOut size={14}/> Log Out</button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-4">
+                                <button 
+                                    onClick={() => { setMobileMenuOpen(false); if (onAuthRequest) onAuthRequest('LOGIN', UserRole.BUYER); else onNavigate('AUTH'); }} 
+                                    className="py-3 text-xs font-bold uppercase border border-gray-200 text-center hover:border-black transition-colors"
+                                >
+                                    Sign In
+                                </button>
+                                <button 
+                                    onClick={() => { setMobileMenuOpen(false); if (onAuthRequest) onAuthRequest('REGISTER', UserRole.BUYER); else onNavigate('AUTH'); }} 
+                                    className="py-3 text-xs font-bold uppercase bg-black text-white text-center hover:bg-luxury-gold transition-colors"
+                                >
+                                    Join
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Menu Footer */}
+                <div className="p-6 bg-gray-50 border-t border-gray-100">
+                    <div className="flex justify-between items-center text-xs text-gray-500">
+                        <span>© 2024 MyFitStore</span>
+                        <div className="flex gap-4">
+                            <Globe size={14} />
+                            <span>US / USD</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-        )}
+        </div>
       </nav>
 
       {/* Cart Drawer */}
@@ -690,31 +719,31 @@ export const Layout: React.FC<LayoutProps> = ({
 
       {/* Mobile Bottom Navigation */}
       {!['PRODUCT_DETAIL', 'AUTH'].includes(currentView) && (
-        <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 z-50 md:hidden flex justify-between items-center px-6 py-4 pb-safe">
-          <button onClick={() => onNavigate('LANDING')} className={`flex flex-col items-center gap-1 ${currentView === 'LANDING' ? 'text-luxury-gold' : 'text-gray-400'}`}>
+        <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 z-50 md:hidden flex justify-around items-end px-2 pt-3 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+          <button onClick={() => onNavigate('LANDING')} className={`flex flex-col items-center gap-1 p-2 ${currentView === 'LANDING' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}>
             <Home size={20} />
             <span className="text-[9px] font-bold uppercase tracking-widest">Home</span>
           </button>
           
-          <button onClick={() => onNavigate('MARKETPLACE')} className={`flex flex-col items-center gap-1 ${currentView === 'MARKETPLACE' ? 'text-luxury-gold' : 'text-gray-400'}`}>
+          <button onClick={() => onNavigate('MARKETPLACE')} className={`flex flex-col items-center gap-1 p-2 ${currentView === 'MARKETPLACE' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}>
             <Store size={20} />
             <span className="text-[9px] font-bold uppercase tracking-widest">Shop</span>
           </button>
 
-          <div className="relative -top-5">
+          <div className="relative -top-6">
             <button 
               onClick={handleCameraClick}
-              className="w-14 h-14 bg-black text-white rounded-full shadow-lg flex items-center justify-center hover:bg-luxury-gold transition-all"
+              className="w-14 h-14 bg-black text-white rounded-full shadow-xl flex items-center justify-center hover:bg-luxury-gold transition-all transform hover:scale-105"
             >
               {isSearching ? <Loader size={20} className="animate-spin" /> : <Camera size={24} />}
             </button>
           </div>
 
-          <button onClick={() => setIsCartOpen(true)} className={`flex flex-col items-center gap-1 ${isCartOpen ? 'text-luxury-gold' : 'text-gray-400'}`}>
+          <button onClick={() => setIsCartOpen(true)} className={`flex flex-col items-center gap-1 p-2 ${isCartOpen ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}>
             <div className="relative">
               <ShoppingBag size={20} />
               {cart.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-luxury-gold text-white text-[8px] w-3 h-3 flex items-center justify-center rounded-full">
+                <span className="absolute -top-1 -right-1 bg-luxury-gold text-white text-[8px] w-3 h-3 flex items-center justify-center rounded-full border border-white">
                   {cart.length}
                 </span>
               )}
@@ -730,7 +759,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 handleDashboardClick();
               }
             }} 
-            className={`flex flex-col items-center gap-1 ${['VENDOR_DASHBOARD', 'BUYER_DASHBOARD', 'ADMIN_PANEL', 'PROFILE_SETTINGS'].includes(currentView) ? 'text-luxury-gold' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 p-2 ${['VENDOR_DASHBOARD', 'BUYER_DASHBOARD', 'ADMIN_PANEL', 'PROFILE_SETTINGS'].includes(currentView) ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
           >
             <User size={20} />
             <span className="text-[9px] font-bold uppercase tracking-widest">{isLoggedIn ? 'Profile' : 'Login'}</span>

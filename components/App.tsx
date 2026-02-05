@@ -7,7 +7,7 @@ import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, Us
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
-  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb
+  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications
 } from '../services/dataService.ts';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
@@ -50,6 +50,7 @@ const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [contactSubmissions, setContactSubmissions] = useState<ContactSubmission[]>([]);
   const [cmsContent, setCmsContent] = useState<LandingPageContent | undefined>(undefined);
   // Removed blocking isLoadingData state
@@ -71,16 +72,21 @@ const App: React.FC = () => {
       setVendors(dbVendors);
       setProducts(dbProducts);
 
-      // Load heavy user/admin data in background or second pass
-      Promise.all([
+      // Fetch user-specific data (Notifications, Orders)
+      const currentUserId = auth.currentUser?.uid;
+      
+      // Load heavy data in parallel
+      const [dbOrders, dbUsers, dbContacts, dbNotifications] = await Promise.all([
         fetchOrders(),
         fetchUsers(),
-        fetchContactSubmissions()
-      ]).then(([dbOrders, dbUsers, dbContacts]) => {
-        setOrders(dbOrders);
-        setAllUsers(dbUsers);
-        setContactSubmissions(dbContacts);
-      });
+        fetchContactSubmissions(),
+        fetchNotifications(currentUserId)
+      ]);
+
+      setOrders(dbOrders);
+      setAllUsers(dbUsers);
+      setContactSubmissions(dbContacts);
+      setNotifications(dbNotifications);
 
     } catch (error) {
       console.error("Failed to refresh data", error);
@@ -107,53 +113,120 @@ const App: React.FC = () => {
     return () => clearInterval(pollInterval);
   }, []);
 
-  // Simulate Live Transactions (Demo Mode: Real-time Revenue & Orders)
+  // Simulate Live Transactions (Context-Aware)
   useEffect(() => {
-      // Check every 60 seconds if we should generate a random order
       const simulateLiveTraffic = setInterval(async () => {
-          // 50% chance to generate a random order every minute to simulate store activity
-          if (Math.random() > 0.5 && products.length > 0) {
-              const randomProduct = products[Math.floor(Math.random() * products.length)];
+          // Guard: Need data to simulate
+          if (products.length === 0 || vendors.length === 0) return;
+
+          const currentUser = auth.currentUser;
+          const currentUserId = currentUser?.uid;
+          const currentUserEmail = currentUser?.email;
+
+          // --- 1. BUYER SCENARIO: Order Status Updates ---
+          // If logged in as a buyer, randomly update their existing orders to 'Shipped' or 'Delivered'
+          if (userRole === UserRole.BUYER && currentUserEmail) {
+              const myOrders = orders.filter(o => o.customerName.toLowerCase() === currentUserEmail.toLowerCase() && o.status !== 'Delivered');
+              
+              if (myOrders.length > 0 && Math.random() > 0.6) {
+                  const targetOrder = myOrders[Math.floor(Math.random() * myOrders.length)];
+                  const nextStatus = targetOrder.status === 'Processing' ? 'Shipped' : 'Delivered';
+                  
+                  await updateOrderStatusInDb(targetOrder.id, nextStatus);
+                  
+                  const notif: AppNotification = {
+                      id: `notif_status_${Date.now()}`,
+                      userId: currentUserId || 'guest',
+                      title: 'Order Update',
+                      message: `Your order #${targetOrder.id.slice(-6)} has been ${nextStatus}.`,
+                      read: false,
+                      date: new Date().toISOString(),
+                      type: 'ORDER',
+                      link: 'ORDERS'
+                  };
+                  await createNotificationInDb(notif);
+                  await refreshData();
+                  return; // prioritize one event per tick
+              }
+          }
+
+          // --- 2. VENDOR / ADMIN SCENARIO: New Sales ---
+          let targetProduct: Product | null = null;
+
+          if (userRole === UserRole.VENDOR && currentUserId) {
+              // Find this vendor's details to pick THEIR product
+              const myVendor = vendors.find(v => v.id === currentUserId || v.email === currentUserEmail);
+              if (myVendor) {
+                  const myProducts = products.filter(p => p.designer === myVendor.name);
+                  if (myProducts.length > 0) {
+                      targetProduct = myProducts[Math.floor(Math.random() * myProducts.length)];
+                  }
+              }
+          } else if (userRole === UserRole.ADMIN) {
+              // Admin sees random sales across platform
+              targetProduct = products[Math.floor(Math.random() * products.length)];
+          } else if (userRole === UserRole.BUYER && Math.random() > 0.8) {
+              // Rare chance for Buyer to see a "Platform Activity" notification (Social Proof)
+              targetProduct = products[Math.floor(Math.random() * products.length)];
+          }
+
+          // Execute Sale Simulation
+          if (targetProduct && Math.random() > 0.5) {
+              const vendorObj = vendors.find(v => v.name === targetProduct!.designer);
+              if (!vendorObj) return;
+
               const mockOrder: Order = {
-                  id: `live_${Date.now()}`,
-                  customerName: `Guest_${Math.floor(Math.random() * 1000)}`,
-                  date: new Date().toISOString(), // Use ISO for proper sorting
-                  total: randomProduct.price,
+                  id: `ord_live_${Date.now()}`,
+                  customerName: `Guest_${Math.floor(Math.random() * 9000) + 1000}`,
+                  date: new Date().toISOString(),
+                  total: targetProduct.price,
                   status: 'Processing',
                   items: [{
-                      ...randomProduct,
+                      ...targetProduct,
                       quantity: 1,
-                      size: randomProduct.sizes?.[0] || 'M',
-                      stock: randomProduct.stock
+                      size: targetProduct.sizes?.[0] || 'M',
+                      stock: targetProduct.stock
                   }]
               };
-              
-              // Create associated notification for dashboard users
-              const notif: AppNotification = {
-                  id: `notif_${mockOrder.id}`,
-                  userId: 'all', // visible to admin/vendors
-                  title: 'New Order Received',
-                  message: `Order #${mockOrder.id.slice(-6)} placed by ${mockOrder.customerName} for $${mockOrder.total}.`,
+
+              await createOrderInDb(mockOrder);
+
+              // Notify the Vendor (Always)
+              const vendorNotif: AppNotification = {
+                  id: `notif_sale_${mockOrder.id}`,
+                  userId: vendorObj.id,
+                  title: 'New Sale',
+                  message: `You sold 1x ${targetProduct.name} to ${mockOrder.customerName}.`,
                   read: false,
                   date: new Date().toISOString(),
                   type: 'ORDER',
                   link: 'FULFILLMENT'
               };
+              await createNotificationInDb(vendorNotif);
 
-              // Insert into DB and refresh immediately to update Dashboard stats
-              try {
-                  await createOrderInDb(mockOrder);
-                  await createNotificationInDb(notif);
-                  await refreshData();
-                  console.log("Simulated live order created:", mockOrder.id);
-              } catch (e) {
-                  console.warn("Simulation skipped", e);
+              // If currently logged in as Admin, notify them too
+              if (userRole === UserRole.ADMIN && currentUserId) {
+                   const adminNotif: AppNotification = {
+                      id: `notif_admin_${mockOrder.id}`,
+                      userId: currentUserId,
+                      title: 'Platform Sale',
+                      message: `${vendorObj.name} sold ${targetProduct.name} ($${targetProduct.price}).`,
+                      read: false,
+                      date: new Date().toISOString(),
+                      type: 'SYSTEM',
+                      link: 'TRANSACTIONS'
+                  };
+                  await createNotificationInDb(adminNotif);
               }
+
+              console.log("Simulated live order:", mockOrder.id);
+              await refreshData();
           }
-      }, 60000);
+
+      }, 15000); // Check every 15s for lively feel
 
       return () => clearInterval(simulateLiveTraffic);
-  }, [products]);
+  }, [products, vendors, userRole, orders]);
 
   // Listen for Auth State Changes
   useEffect(() => {
@@ -161,6 +234,9 @@ const App: React.FC = () => {
       if (user) {
         if (user.emailVerified) {
           setIsLoggedIn(true);
+          // Refresh data immediately on login to get user notifications
+          refreshData(); 
+          
           // Determine Role
           const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me', 'mikelarry00764@proton.me'];
           if (adminEmails.includes(user.email?.toLowerCase() || '')) {
@@ -201,6 +277,7 @@ const App: React.FC = () => {
       } else {
         setIsLoggedIn(false);
         setUserRole(UserRole.BUYER);
+        setNotifications([]); // Clear notifications on logout
       }
     });
 
@@ -571,6 +648,8 @@ const App: React.FC = () => {
       onPlaceOrder={handlePlaceOrder}
       onVisualSearch={handleVisualSearch}
       onAuthRequest={handleAuthNavigation}
+      notifications={notifications}
+      onRefreshNotifications={refreshData}
     >
       {renderView()}
       
