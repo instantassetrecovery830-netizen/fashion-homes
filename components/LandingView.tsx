@@ -85,7 +85,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative h-[90vh] w-full overflow-hidden flex items-center justify-center bg-luxury-black">
+      <section className="relative min-h-[100dvh] w-full overflow-hidden flex items-center justify-center bg-luxury-black">
         <div className="absolute inset-0 bg-black/40 z-10" />
         <video
           autoPlay
@@ -103,7 +103,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
           />
         </video>
         
-        <div className="relative z-20 text-center text-white px-6 animate-slide-up w-full max-w-4xl mx-auto flex flex-col items-center">
+        <div className="relative z-20 text-center text-white px-6 py-20 md:py-32 animate-slide-up w-full max-w-4xl mx-auto flex flex-col items-center">
           <h2 className="text-[10px] md:text-base tracking-[0.3em] uppercase mb-4 opacity-90 text-luxury-gold">{hero.subtitle}</h2>
           <h1 className="text-4xl sm:text-6xl md:text-8xl font-serif font-medium mb-8 md:mb-10 leading-tight drop-shadow-2xl">
             {hero.titleLine1} <br /> 

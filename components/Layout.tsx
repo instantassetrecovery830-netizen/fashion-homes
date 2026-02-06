@@ -251,6 +251,11 @@ export const Layout: React.FC<LayoutProps> = ({
     initializePayment(onPaystackSuccess, onPaystackClose);
   };
 
+  // Logic for Nav Appearance
+  const isNavTransparent = currentView === 'LANDING' && !isScrolled && !mobileMenuOpen;
+  const navTextColor = isNavTransparent ? 'text-white' : 'text-luxury-black';
+  const hamburgerColor = isNavTransparent ? 'bg-white' : 'bg-black';
+
   return (
     <div className="min-h-screen bg-luxury-cream text-luxury-black font-sans selection:bg-luxury-gold selection:text-white transition-colors duration-500 relative">
       
@@ -282,175 +287,192 @@ export const Layout: React.FC<LayoutProps> = ({
           isScrolled || mobileMenuOpen ? 'bg-white/95 backdrop-blur-md border-gray-100 py-3' : 'bg-transparent py-6'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          
-          {/* Custom Mobile Menu Button */}
-          <button 
-            className="md:hidden flex items-center gap-3 group focus:outline-none" 
-            onClick={() => setMobileMenuOpen(true)}
-          >
-            <div className="flex flex-col gap-1.5 w-6">
-                <span className="h-0.5 bg-black w-full transform origin-left group-hover:scale-x-75 transition-transform duration-300"></span>
-                <span className="h-0.5 bg-black w-3/4 transform origin-left group-hover:scale-x-100 transition-transform duration-300"></span>
-            </div>
-          </button>
-
-          {/* Logo */}
-          <div 
-            className="text-2xl md:text-3xl font-serif font-bold tracking-widest cursor-pointer hover:opacity-70 transition-opacity"
-            onClick={() => onNavigate('LANDING')}
-          >
-            MyFitStore
-          </div>
-
-          {/* Desktop Nav */}
-          <div className="hidden md:flex gap-8 text-xs font-medium tracking-widest uppercase">
-            {NAV_LINKS.map((link) => (
-              <a 
-                key={link.label} 
-                onClick={() => onNavigate(link.view)}
-                className={`hover:text-luxury-gold transition-colors cursor-pointer ${currentView === link.view ? 'text-luxury-gold border-b border-luxury-gold pb-0.5' : ''}`}
-              >
-                {link.label}
-              </a>
-            ))}
-          </div>
-
-          {/* Icons */}
-          <div className="flex items-center gap-4 md:gap-6">
-            {/* Visual Search */}
-            <div className="relative group hidden md:block">
-                <button 
-                    onClick={handleCameraClick}
-                    className="hover:text-luxury-gold transition-colors relative"
-                    title="Visual Search (Gemini)"
-                >
-                    {isSearching ? <Loader size={20} className="animate-spin text-luxury-gold" /> : <Camera size={20} />}
-                </button>
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    accept="image/*" 
-                    className="hidden" 
-                />
-            </div>
-
-            <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex justify-between items-center">
             
-            {/* Notification Bell */}
-            <div className="relative" ref={notifDropdownRef}>
-                <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative hover:text-luxury-gold transition-colors"
-                >
-                    <Bell size={20} />
-                    {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold w-3 h-3 rounded-full flex items-center justify-center animate-pulse">
-                            {unreadCount}
-                        </span>
-                    )}
-                </button>
-
-                {/* Dropdown */}
-                {showNotifications && (
-                    <div className="absolute right-0 top-full mt-4 w-80 bg-white border border-gray-100 shadow-xl rounded-sm z-50 animate-slide-up">
-                        <div className="p-4 border-b border-gray-50 flex justify-between items-center">
-                            <h4 className="text-xs font-bold uppercase tracking-widest">Notifications</h4>
-                            {unreadCount > 0 && (
-                                <button onClick={markAllRead} className="text-[10px] text-luxury-gold hover:underline">Mark all read</button>
-                            )}
-                        </div>
-                        <div className="max-h-80 overflow-y-auto">
-                            {notifications.length === 0 ? (
-                                <div className="p-8 text-center text-gray-400">
-                                    <p className="text-xs">No updates yet.</p>
-                                </div>
-                            ) : (
-                                notifications.map(notif => (
-                                    <div 
-                                        key={notif.id} 
-                                        onClick={() => handleNotificationClick(notif)}
-                                        className={`p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${!notif.read ? 'bg-luxury-cream/30' : ''}`}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${!notif.read ? 'bg-luxury-gold' : 'bg-gray-200'}`} />
-                                            <div>
-                                                <p className={`text-xs mb-1 ${!notif.read ? 'font-bold' : 'font-medium'}`}>{notif.title}</p>
-                                                <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{notif.message}</p>
-                                                <span className="text-[9px] text-gray-400 mt-2 block uppercase tracking-widest">
-                                                    {new Date(notif.date).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* User / Auth Menu (Desktop) */}
-            <div className="relative group hidden md:block">
-              {isLoggedIn ? (
-                <>
-                  <User 
-                    size={20} 
-                    className="cursor-pointer transition-colors text-luxury-black hover:text-luxury-gold"
-                    onClick={() => onNavigate('PROFILE_SETTINGS')}
-                  />
-                  
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-200">
-                    <div className="p-4 border-b border-gray-50">
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signed in as</p>
-                      <p className="font-bold text-sm">{role}</p>
-                    </div>
-                    
-                    <button
-                      onClick={handleDashboardClick}
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Settings size={14} /> Dashboard
-                    </button>
-
-                    <button
-                      onClick={() => onNavigate('PROFILE_SETTINGS')}
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <User size={14} /> Profile Settings
-                    </button>
-                    
-                    <button
-                      onClick={onLogout}
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-500"
-                    >
-                      <LogOut size={14} /> Sign Out
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <button 
-                  onClick={() => onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH')}
-                  className="bg-black text-white px-5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors whitespace-nowrap"
-                >
-                  Get Started
-                </button>
-              )}
-            </div>
-
-            <div 
-              className="relative cursor-pointer hover:text-luxury-gold transition-colors hidden md:block" 
-              onClick={() => setIsCartOpen(true)}
+            {/* Custom Mobile Menu Button */}
+            <button 
+              className="md:hidden flex items-center gap-3 group focus:outline-none" 
+              onClick={() => setMobileMenuOpen(true)}
             >
-              <ShoppingBag size={20} />
-              {cart.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-luxury-black text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full">
-                  {cart.length}
-                </span>
-              )}
+              <div className="flex flex-col gap-1.5 w-6">
+                  <span className={`h-0.5 ${hamburgerColor} w-full transform origin-left group-hover:scale-x-75 transition-transform duration-300`}></span>
+                  <span className={`h-0.5 ${hamburgerColor} w-3/4 transform origin-left group-hover:scale-x-100 transition-transform duration-300`}></span>
+              </div>
+            </button>
+
+            {/* Logo */}
+            <div 
+              className={`text-2xl md:text-3xl font-serif font-bold tracking-widest cursor-pointer hover:opacity-70 transition-opacity ${navTextColor}`}
+              onClick={() => onNavigate('LANDING')}
+            >
+              MyFitStore
+            </div>
+
+            {/* Desktop Nav */}
+            <div className={`hidden md:flex gap-8 text-xs font-medium tracking-widest uppercase ${navTextColor}`}>
+              {NAV_LINKS.map((link) => (
+                <a 
+                  key={link.label} 
+                  onClick={() => onNavigate(link.view)}
+                  className={`hover:text-luxury-gold transition-colors cursor-pointer ${currentView === link.view ? 'text-luxury-gold border-b border-luxury-gold pb-0.5' : ''}`}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+
+            {/* Icons */}
+            <div className={`flex items-center gap-4 md:gap-6 ${navTextColor}`}>
+              {/* Visual Search */}
+              <div className="relative group hidden md:block">
+                  <button 
+                      onClick={handleCameraClick}
+                      className="hover:text-luxury-gold transition-colors relative"
+                      title="Visual Search (Gemini)"
+                  >
+                      {isSearching ? <Loader size={20} className="animate-spin text-luxury-gold" /> : <Camera size={20} />}
+                  </button>
+                  <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleFileChange} 
+                      accept="image/*" 
+                      className="hidden" 
+                  />
+              </div>
+
+              <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
+              
+              {/* Notification Bell */}
+              <div className="relative" ref={notifDropdownRef}>
+                  <button 
+                      onClick={() => setShowNotifications(!showNotifications)}
+                      className="relative hover:text-luxury-gold transition-colors"
+                  >
+                      <Bell size={20} />
+                      {unreadCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold w-3 h-3 rounded-full flex items-center justify-center animate-pulse">
+                              {unreadCount}
+                          </span>
+                      )}
+                  </button>
+
+                  {/* Dropdown */}
+                  {showNotifications && (
+                      <div className="absolute right-0 top-full mt-4 w-80 bg-white border border-gray-100 shadow-xl rounded-sm z-50 animate-slide-up text-luxury-black">
+                          <div className="p-4 border-b border-gray-50 flex justify-between items-center">
+                              <h4 className="text-xs font-bold uppercase tracking-widest">Notifications</h4>
+                              {unreadCount > 0 && (
+                                  <button onClick={markAllRead} className="text-[10px] text-luxury-gold hover:underline">Mark all read</button>
+                              )}
+                          </div>
+                          <div className="max-h-80 overflow-y-auto">
+                              {notifications.length === 0 ? (
+                                  <div className="p-8 text-center text-gray-400">
+                                      <p className="text-xs">No updates yet.</p>
+                                  </div>
+                              ) : (
+                                  notifications.map(notif => (
+                                      <div 
+                                          key={notif.id} 
+                                          onClick={() => handleNotificationClick(notif)}
+                                          className={`p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${!notif.read ? 'bg-luxury-cream/30' : ''}`}
+                                      >
+                                          <div className="flex items-start gap-3">
+                                              <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${!notif.read ? 'bg-luxury-gold' : 'bg-gray-200'}`} />
+                                              <div>
+                                                  <p className={`text-xs mb-1 ${!notif.read ? 'font-bold' : 'font-medium'}`}>{notif.title}</p>
+                                                  <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{notif.message}</p>
+                                                  <span className="text-[9px] text-gray-400 mt-2 block uppercase tracking-widest">
+                                                      {new Date(notif.date).toLocaleDateString()}
+                                                  </span>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  ))
+                              )}
+                          </div>
+                      </div>
+                  )}
+              </div>
+
+              {/* User / Auth Menu (Desktop) */}
+              <div className="relative group hidden md:block">
+                {isLoggedIn ? (
+                  <>
+                    <User 
+                      size={20} 
+                      className="cursor-pointer transition-colors hover:text-luxury-gold"
+                      onClick={() => onNavigate('PROFILE_SETTINGS')}
+                    />
+                    
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-200 text-luxury-black">
+                      <div className="p-4 border-b border-gray-50">
+                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signed in as</p>
+                        <p className="font-bold text-sm">{role}</p>
+                      </div>
+                      
+                      <button
+                        onClick={handleDashboardClick}
+                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <Settings size={14} /> Dashboard
+                      </button>
+
+                      <button
+                        onClick={() => onNavigate('PROFILE_SETTINGS')}
+                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <User size={14} /> Profile Settings
+                      </button>
+                      
+                      <button
+                        onClick={onLogout}
+                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-500"
+                      >
+                        <LogOut size={14} /> Sign Out
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <button 
+                    onClick={() => onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH')}
+                    className="bg-black text-white px-5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors whitespace-nowrap"
+                  >
+                    Get Started
+                  </button>
+                )}
+              </div>
+
+              <div 
+                className="relative cursor-pointer hover:text-luxury-gold transition-colors hidden md:block" 
+                onClick={() => setIsCartOpen(true)}
+              >
+                <ShoppingBag size={20} />
+                {cart.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-luxury-black text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full">
+                    {cart.length}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+          
+          {/* Mobile Quick Links (Visible Horizontal Scroll) */}
+          {!mobileMenuOpen && (
+             <div className={`md:hidden flex gap-6 overflow-x-auto pb-2 mt-4 scrollbar-hide ${navTextColor} transition-colors duration-300`}>
+                {NAV_LINKS.map(link => (
+                  <button 
+                    key={link.label}
+                    onClick={() => onNavigate(link.view)}
+                    className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap opacity-90 hover:opacity-100 shrink-0"
+                  >
+                    {link.label}
+                  </button>
+                ))}
+             </div>
+          )}
         </div>
 
         {/* Mobile Full Screen Menu - Redesigned */}
@@ -470,7 +492,7 @@ export const Layout: React.FC<LayoutProps> = ({
             </button>
 
             {/* Menu Content */}
-            <div className="h-full flex flex-col justify-center px-8 relative overflow-hidden">
+            <div className="h-full flex flex-col justify-center px-8 relative overflow-hidden text-black">
                 {/* Decorative Background Text */}
                 <div className="absolute -right-20 top-1/4 text-9xl font-serif italic text-gray-50 opacity-50 pointer-events-none rotate-90 whitespace-nowrap">
                     MyFitStore
@@ -554,7 +576,7 @@ export const Layout: React.FC<LayoutProps> = ({
           className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl transform transition-transform duration-500 ease-out flex flex-col ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}
         >
           {/* Drawer Header */}
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10">
+          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10 text-black">
              <div className="flex items-center gap-3">
                  {checkoutStep === 'PAYMENT' && !orderComplete && (
                      <button onClick={() => setCheckoutStep('CART')} className="hover:text-luxury-gold transition-colors">
@@ -568,7 +590,7 @@ export const Layout: React.FC<LayoutProps> = ({
              </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          <div className="flex-1 overflow-y-auto p-6 space-y-8 text-black">
             {orderComplete ? (
               <div className="h-full flex flex-col items-center justify-center text-center animate-fade-in">
                 <CheckCircle size={64} className="text-green-500 mb-6" />
@@ -676,7 +698,7 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
 
           {cart.length > 0 && !orderComplete && (
-            <div className="p-6 bg-gray-50 border-t border-gray-100">
+            <div className="p-6 bg-gray-50 border-t border-gray-100 text-black">
               {checkoutStep === 'CART' ? (
                 <>
                   <div className="flex justify-between items-center mb-6 text-sm">
@@ -708,7 +730,7 @@ export const Layout: React.FC<LayoutProps> = ({
         </div>
       </div>
 
-      <main className="pt-20 pb-24 md:pb-0 min-h-screen">
+      <main className="pt-32 md:pt-20 pb-24 md:pb-0 min-h-screen">
         {children}
       </main>
 
