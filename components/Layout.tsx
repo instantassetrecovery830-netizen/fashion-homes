@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight } from 'lucide-react';
+import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight, Instagram, Twitter, Facebook } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
 import { UserRole, ViewState, CartItem, Order, AppNotification } from '../types.ts';
@@ -284,9 +284,15 @@ export const Layout: React.FC<LayoutProps> = ({
       >
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           
-          {/* Mobile Menu Button */}
-          <button className="md:hidden p-2 -ml-2" onClick={() => setMobileMenuOpen(true)}>
-            <Menu size={24} />
+          {/* Custom Mobile Menu Button */}
+          <button 
+            className="md:hidden flex items-center gap-3 group focus:outline-none" 
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <div className="flex flex-col gap-1.5 w-6">
+                <span className="h-0.5 bg-black w-full transform origin-left group-hover:scale-x-75 transition-transform duration-300"></span>
+                <span className="h-0.5 bg-black w-3/4 transform origin-left group-hover:scale-x-100 transition-transform duration-300"></span>
+            </div>
           </button>
 
           {/* Logo */}
@@ -447,101 +453,90 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
         </div>
 
-        {/* Mobile Menu Drawer - Side Slide */}
-        <div className={`fixed inset-0 z-[60] md:hidden transition-opacity duration-300 ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-            <div className={`absolute top-0 left-0 w-[85%] max-w-sm h-full bg-white shadow-2xl transition-transform duration-300 ease-out flex flex-col ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                
-                {/* Menu Header */}
-                <div className="p-6 flex justify-between items-center border-b border-gray-50">
-                    <span className="text-xl font-serif font-bold italic tracking-wide" onClick={() => { setMobileMenuOpen(false); onNavigate('LANDING'); }}>MyFitStore</span>
-                    <button onClick={() => setMobileMenuOpen(false)} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
-                        <X size={24} />
-                    </button>
+        {/* Mobile Full Screen Menu - Redesigned */}
+        <div 
+            className={`fixed inset-0 z-[100] bg-white transition-all duration-500 ease-in-out md:hidden ${
+                mobileMenuOpen 
+                ? 'opacity-100 translate-y-0 visible' 
+                : 'opacity-0 -translate-y-full invisible pointer-events-none'
+            }`}
+        >
+            {/* Close Button */}
+            <button 
+                onClick={() => setMobileMenuOpen(false)}
+                className="absolute top-6 right-6 p-2 hover:rotate-90 transition-transform duration-300 z-50 text-black hover:text-luxury-gold"
+            >
+                <X size={32} strokeWidth={1} />
+            </button>
+
+            {/* Menu Content */}
+            <div className="h-full flex flex-col justify-center px-8 relative overflow-hidden">
+                {/* Decorative Background Text */}
+                <div className="absolute -right-20 top-1/4 text-9xl font-serif italic text-gray-50 opacity-50 pointer-events-none rotate-90 whitespace-nowrap">
+                    MyFitStore
                 </div>
 
-                {/* Menu Content */}
-                <div className="flex-1 overflow-y-auto py-6 px-6 space-y-8">
+                <nav className="flex flex-col gap-6 relative z-10">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Explore</p>
+                    {NAV_LINKS.map((link, idx) => (
+                        <button
+                            key={link.label}
+                            onClick={() => { setMobileMenuOpen(false); onNavigate(link.view); }}
+                            className="text-4xl sm:text-5xl font-serif italic text-left text-black hover:text-luxury-gold hover:pl-4 transition-all duration-300 relative group flex items-center gap-4"
+                            style={{ transitionDelay: `${idx * 50}ms` }}
+                        >
+                            {link.label}
+                            <ArrowRight size={24} className="opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300 text-luxury-gold" strokeWidth={1} />
+                        </button>
+                    ))}
                     
-                    {/* Search in Menu */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                        <input 
-                            type="text" 
-                            placeholder="Search collections..." 
-                            className="w-full bg-gray-50 border border-gray-100 py-3 pl-10 pr-4 text-sm focus:border-black outline-none rounded-sm transition-colors"
-                        />
-                    </div>
+                    <button
+                        onClick={() => { setMobileMenuOpen(false); onNavigate('PRICING'); }}
+                        className="text-4xl sm:text-5xl font-serif italic text-left text-black hover:text-luxury-gold hover:pl-4 transition-all duration-300 relative group"
+                    >
+                        Membership
+                    </button>
+                </nav>
 
-                    {/* Primary Navigation */}
-                    <div className="space-y-6">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Explore</p>
-                        <nav className="flex flex-col gap-4">
-                            {NAV_LINKS.map((link) => (
-                                <button
-                                    key={link.label}
-                                    onClick={() => { setMobileMenuOpen(false); onNavigate(link.view); }}
-                                    className={`text-lg font-serif text-left flex justify-between items-center group ${currentView === link.view ? 'italic font-bold text-black' : 'text-gray-600'}`}
-                                >
-                                    {link.label}
-                                    <ChevronRight size={16} className={`opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0 ${currentView === link.view ? 'opacity-100 translate-x-0' : ''}`} />
-                                </button>
-                            ))}
-                            <button
-                                onClick={() => { setMobileMenuOpen(false); onNavigate('PRICING'); }}
-                                className="text-lg font-serif text-left text-gray-600 hover:text-luxury-gold transition-colors"
-                            >
-                                Membership
+                <div className="mt-12 pt-8 border-t border-gray-100 relative z-10">
+                    {isLoggedIn ? (
+                        <div className="grid grid-cols-2 gap-4">
+                            <button onClick={() => { setMobileMenuOpen(false); handleDashboardClick(); }} className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest hover:text-luxury-gold transition-colors">
+                                <Settings size={16} /> Dashboard
                             </button>
-                        </nav>
-                    </div>
-
-                    {/* Account Section */}
-                    <div className="space-y-6 pt-6 border-t border-gray-50">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Account</p>
-                        {isLoggedIn ? (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3 mb-2 bg-gray-50 p-3 rounded-sm">
-                                    <div className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-sm">
-                                        <User size={18} />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold">{role === 'VENDOR' ? 'Vendor Account' : 'Member Account'}</p>
-                                        <p className="text-[10px] text-green-600 uppercase tracking-wide font-bold">Active</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => { setMobileMenuOpen(false); handleDashboardClick(); }} className="w-full text-left text-sm py-2 hover:text-luxury-gold flex items-center gap-2"><Settings size={14}/> Dashboard</button>
-                                <button onClick={() => { setMobileMenuOpen(false); onNavigate('PROFILE_SETTINGS'); }} className="w-full text-left text-sm py-2 hover:text-luxury-gold flex items-center gap-2"><User size={14}/> Profile</button>
-                                <button onClick={() => { setMobileMenuOpen(false); onLogout(); }} className="w-full text-left text-sm py-2 text-red-500 hover:text-red-600 flex items-center gap-2"><LogOut size={14}/> Log Out</button>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-2 gap-4">
-                                <button 
-                                    onClick={() => { setMobileMenuOpen(false); if (onAuthRequest) onAuthRequest('LOGIN', UserRole.BUYER); else onNavigate('AUTH'); }} 
-                                    className="py-3 text-xs font-bold uppercase border border-gray-200 text-center hover:border-black transition-colors"
-                                >
-                                    Sign In
-                                </button>
-                                <button 
-                                    onClick={() => { setMobileMenuOpen(false); if (onAuthRequest) onAuthRequest('REGISTER', UserRole.BUYER); else onNavigate('AUTH'); }} 
-                                    className="py-3 text-xs font-bold uppercase bg-black text-white text-center hover:bg-luxury-gold transition-colors"
-                                >
-                                    Join
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                            <button onClick={() => { setMobileMenuOpen(false); onNavigate('PROFILE_SETTINGS'); }} className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest hover:text-luxury-gold transition-colors">
+                                <User size={16} /> Profile
+                            </button>
+                            <button onClick={() => { setMobileMenuOpen(false); onLogout(); }} className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-red-500 hover:text-red-600 transition-colors col-span-2 mt-4">
+                                <LogOut size={16} /> Sign Out
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex gap-4">
+                            <button 
+                                onClick={() => { setMobileMenuOpen(false); onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH'); }} 
+                                className="flex-1 py-4 border border-black text-black text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors"
+                            >
+                                Sign In
+                            </button>
+                            <button 
+                                onClick={() => { setMobileMenuOpen(false); onAuthRequest ? onAuthRequest('REGISTER', UserRole.BUYER) : onNavigate('AUTH'); }} 
+                                className="flex-1 py-4 bg-black text-white text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors"
+                            >
+                                Join
+                            </button>
+                        </div>
+                    )}
                 </div>
 
-                {/* Menu Footer */}
-                <div className="p-6 bg-gray-50 border-t border-gray-100">
-                    <div className="flex justify-between items-center text-xs text-gray-500">
-                        <span>© 2024 MyFitStore</span>
-                        <div className="flex gap-4">
-                            <Globe size={14} />
-                            <span>US / USD</span>
-                        </div>
+                {/* Social Footer */}
+                <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end">
+                    <div className="flex gap-6">
+                        <Instagram size={20} className="text-gray-400 hover:text-black cursor-pointer transition-colors" />
+                        <Twitter size={20} className="text-gray-400 hover:text-black cursor-pointer transition-colors" />
+                        <Facebook size={20} className="text-gray-400 hover:text-black cursor-pointer transition-colors" />
                     </div>
+                    <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">© 2024</p>
                 </div>
             </div>
         </div>

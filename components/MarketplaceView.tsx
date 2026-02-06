@@ -50,28 +50,28 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   return (
     <div className="min-h-screen pt-12 pb-24">
       {/* Header & Filters */}
-      <div className="max-w-7xl mx-auto px-6 mb-12 sticky top-20 z-30 bg-white/80 backdrop-blur-sm py-6 border-b border-gray-100/50 transition-all">
-        <div className="flex flex-col gap-8">
+      <div className="max-w-7xl mx-auto px-6 mb-8 md:mb-12 sticky top-20 z-30 bg-white/80 backdrop-blur-sm py-4 md:py-6 border-b border-gray-100/50 transition-all">
+        <div className="flex flex-col gap-6 md:gap-8">
           
           {/* Top Row: Title + Designer Select */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-6">
             <div className="flex items-center gap-4">
-                <h1 className="text-4xl font-serif italic">
+                <h1 className="text-3xl md:text-4xl font-serif italic">
                     {customTitle || "Ready-to-Wear"}
                 </h1>
                 {customTitle && onClearFilter && (
                     <button 
                         onClick={onClearFilter}
-                        className="bg-gray-100 hover:bg-gray-200 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors"
+                        className="bg-gray-100 hover:bg-gray-200 text-[10px] md:text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors"
                     >
-                        <X size={12} /> Clear Search
+                        <X size={12} /> Clear
                     </button>
                 )}
             </div>
             
             {/* Designer Dropdown */}
             {!customTitle && (
-            <div className="relative min-w-[240px]">
+            <div className="relative w-full md:w-auto md:min-w-[240px]">
               <label className="text-[10px] uppercase tracking-widest text-gray-400 mb-2 block font-bold">Filter by Designer</label>
               <div className="relative group">
                 <select 
@@ -91,12 +91,12 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
           
           {/* Bottom Row: Category Pills */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 overflow-x-auto w-full pb-2 scrollbar-hide">
+            <div className="flex items-center gap-2 md:gap-3 overflow-x-auto w-full pb-2 scrollbar-hide -mx-6 px-6 md:mx-0 md:px-0">
               {FILTERS.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`text-xs uppercase tracking-widest whitespace-nowrap px-6 py-2 border rounded-full transition-all duration-300 ${
+                  className={`text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap px-4 md:px-6 py-2 border rounded-full transition-all duration-300 ${
                     activeCategory === cat 
                       ? 'bg-black text-white border-black' 
                       : 'bg-transparent text-gray-500 border-gray-200 hover:border-black hover:text-black'
@@ -136,14 +136,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
              </button>
            </div>
         ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-16 animate-fade-in">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-12 md:gap-y-16 animate-fade-in">
           {filteredProducts.map((product) => (
             <div 
               key={product.id} 
               className="group cursor-pointer"
               onClick={() => onProductSelect(product)}
             >
-              <div className="relative aspect-[3/4] overflow-hidden bg-gray-100 mb-6">
+              <div className="relative aspect-[3/4] overflow-hidden bg-gray-100 mb-4 md:mb-6">
                 <img 
                   src={product.image} 
                   alt={product.name} 
@@ -164,10 +164,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest mb-1">{product.designer}</h3>
-                  <p className="font-serif text-gray-600 italic group-hover:text-black transition-colors">{product.name}</p>
+                  <h3 className="text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1">{product.designer}</h3>
+                  <p className="font-serif text-sm md:text-base text-gray-600 italic group-hover:text-black transition-colors">{product.name}</p>
                 </div>
-                <span className="text-sm font-medium">${product.price}</span>
+                <span className="text-xs md:text-sm font-medium">${product.price}</span>
               </div>
             </div>
           ))}
