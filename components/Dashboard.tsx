@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend
@@ -11,7 +11,7 @@ import {
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, 
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, BadgeCheck,
   Lock, MessageSquare, Flag, Store, Grid, ChevronDown, Loader, Star, Save, Menu, Wallet, ArrowLeft, Inbox,
-  Phone, Clock, Filter, Search, Facebook, User, ExternalLink, Image as ImageIcon, Video, Type, PieChart as PieChartIcon, LogOut
+  Phone, Clock, Filter, Search, Facebook, User, ExternalLink, Image as ImageIcon, Video, Type, PieChart as PieChartIcon, LogOut, Upload, Link
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, User as AppUser, LandingPageContent, ContactSubmission, Follower } from '../types.ts';
 import { updateUserPassword, auth } from '../services/firebase.ts';
@@ -75,10 +75,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // CMS State
   const [cmsForm, setCmsForm] = useState<LandingPageContent | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>('hero');
+
+  // Vendor Storefront State
+  const [storefrontForm, setStorefrontForm] = useState<Vendor | null>(null);
   
   // Profile State
   const [newPassword, setNewPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
+
+  // Refs for file inputs
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Update active tab if initialTab changes
   useEffect(() => {
@@ -89,6 +97,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
       if (cmsContent) setCmsForm(cmsContent);
   }, [cmsContent]);
+
+  // Init Storefront Form
+  useEffect(() => {
+    if (role === UserRole.VENDOR && vendors.length > 0 && !storefrontForm) {
+        const v = vendors.find(v => v.email === auth.currentUser?.email);
+        if (v) setStorefrontForm(v);
+    }
+  }, [vendors, role, storefrontForm]);
 
   // Force sidebar open on desktop mount
   useEffect(() => {
@@ -171,14 +187,59 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
   };
 
+  const handleStorefrontSave = async () => {
+    if (storefrontForm && setVendors) {
+        try {
+            await setVendors([storefrontForm]);
+            alert("Storefront updated successfully.");
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update storefront.");
+        }
+    }
+  };
+
+  const handleImageUpload = (file: File, type: 'AVATAR' | 'COVER' | 'GALLERY', index?: number) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+          const result = reader.result as string;
+          if (storefrontForm) {
+              if (type === 'AVATAR') {
+                  setStorefrontForm({ ...storefrontForm, avatar: result });
+              } else if (type === 'COVER') {
+                  setStorefrontForm({ ...storefrontForm, coverImage: result });
+              } else if (type === 'GALLERY') {
+                   // If index is provided, replace. If not (or -1), add.
+                   const currentGallery = [...(storefrontForm.gallery || [])];
+                   if (index !== undefined && index >= 0) {
+                       currentGallery[index] = result;
+                   } else {
+                       currentGallery.push(result);
+                   }
+                   setStorefrontForm({ ...storefrontForm, gallery: currentGallery });
+              }
+          }
+      };
+      reader.readAsDataURL(file);
+  };
+
+  const removeFromGallery = (index: number) => {
+      if (storefrontForm && storefrontForm.gallery) {
+          const newGallery = [...storefrontForm.gallery];
+          newGallery.splice(index, 1);
+          setStorefrontForm({ ...storefrontForm, gallery: newGallery });
+      }
+  };
+
   // Render Sidebar
   const renderSidebar = () => {
     const tabs = [
       { id: 'OVERVIEW', label: 'Overview', icon: LayoutDashboard, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
       { id: 'ORDERS', label: 'Orders', icon: ShoppingBag, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
       { id: 'PRODUCTS', label: 'Products', icon: Shirt, roles: [UserRole.ADMIN, UserRole.VENDOR] },
+      { id: 'STOREFRONT', label: 'Storefront', icon: Palette, roles: [UserRole.VENDOR] },
       { id: 'CUSTOMERS', label: 'Customers', icon: Users, roles: [UserRole.ADMIN] },
-      { id: 'VENDORS', label: 'Vendors', icon: Store, roles: [UserRole.ADMIN] },
+      { id: 'VENDORS', label: 'Ateliers', icon: Store, roles: [UserRole.ADMIN] },
       { id: 'MESSAGES', label: 'Messages', icon: Inbox, roles: [UserRole.ADMIN] },
       { id: 'CMS', label: 'Content', icon: FileText, roles: [UserRole.ADMIN] },
       { id: 'FOLLOWING', label: 'Following', icon: Heart, roles: [UserRole.BUYER] },
@@ -320,6 +381,234 @@ export const Dashboard: React.FC<DashboardProps> = ({
              </div>
           </div>
         );
+
+      case 'STOREFRONT':
+          if (!storefrontForm) return <div className="p-8"><Loader className="animate-spin text-luxury-gold" /></div>;
+          
+          return (
+            <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-7xl">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-3xl font-serif italic">Storefront Editor</h2>
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={handleStorefrontSave}
+                            className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors hidden md:block"
+                        >
+                            Save Changes
+                        </button>
+                        <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                            <Menu size={20} />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Left Column: Brand & Visuals */}
+                    <div className="space-y-8">
+                        {/* Brand Identity */}
+                        <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                                <BadgeCheck size={14} /> Brand Identity
+                            </h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Atelier Name</label>
+                                    <input 
+                                        value={storefrontForm.name} 
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, name: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Location</label>
+                                    <div className="relative">
+                                        <input 
+                                            value={storefrontForm.location} 
+                                            onChange={(e) => setStorefrontForm({...storefrontForm, location: e.target.value})}
+                                            className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent pl-6"
+                                        />
+                                        <MapPin size={14} className="absolute left-0 top-2.5 text-gray-400" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Bio / Philosophy</label>
+                                    <textarea 
+                                        value={storefrontForm.bio} 
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, bio: e.target.value})}
+                                        className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none bg-gray-50 h-32 resize-none"
+                                        placeholder="Tell your story..."
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Visual Assets */}
+                        <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                             <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                                <ImageIcon size={14} /> Visual Assets
+                            </h3>
+                            
+                            <div className="flex gap-8 items-start">
+                                {/* Avatar */}
+                                <div className="text-center">
+                                    <div className="relative w-24 h-24 rounded-full bg-gray-50 border border-gray-200 overflow-hidden group cursor-pointer mb-2 mx-auto">
+                                        <img src={storefrontForm.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                            <Camera className="text-white" size={20} />
+                                        </div>
+                                        <input 
+                                            type="file" 
+                                            accept="image/*"
+                                            ref={avatarInputRef}
+                                            onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'AVATAR')}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
+                                    </div>
+                                    <span className="text-[10px] uppercase font-bold text-gray-400">Profile Logo</span>
+                                </div>
+
+                                {/* Cover Image */}
+                                <div className="flex-1">
+                                     <div className="relative w-full h-24 bg-gray-50 border border-gray-200 overflow-hidden group cursor-pointer mb-2 rounded-sm">
+                                        <img src={storefrontForm.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                            <Upload className="text-white" size={20} />
+                                        </div>
+                                         <input 
+                                            type="file" 
+                                            accept="image/*"
+                                            ref={coverInputRef}
+                                            onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'COVER')}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
+                                    </div>
+                                    <span className="text-[10px] uppercase font-bold text-gray-400">Cover Image</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Theme */}
+                         <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                                <Palette size={14} /> Visual Theme
+                            </h3>
+                            <div className="grid grid-cols-3 gap-4">
+                                {['MINIMALIST', 'DARK', 'GOLD'].map((theme) => (
+                                    <button
+                                        key={theme}
+                                        onClick={() => setStorefrontForm({...storefrontForm, visualTheme: theme as any})}
+                                        className={`p-4 border rounded-sm text-xs font-bold uppercase transition-all ${
+                                            storefrontForm.visualTheme === theme 
+                                            ? 'border-black bg-black text-white' 
+                                            : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                                        }`}
+                                    >
+                                        {theme}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Moodboard & Socials */}
+                    <div className="space-y-8">
+                         {/* Moodboard Gallery */}
+                        <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-gray-400">
+                                    <Grid size={14} /> Moodboard Gallery
+                                </h3>
+                                <div className="relative overflow-hidden">
+                                     <button className="text-[10px] bg-black text-white px-3 py-1 uppercase font-bold tracking-widest flex items-center gap-1 hover:bg-luxury-gold transition-colors">
+                                        <Plus size={12} /> Add Image
+                                     </button>
+                                     <input 
+                                        type="file" 
+                                        accept="image/*"
+                                        ref={galleryInputRef}
+                                        onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'GALLERY')}
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-2">
+                                {storefrontForm.gallery?.map((img, idx) => (
+                                    <div key={idx} className="aspect-square bg-gray-50 relative group overflow-hidden rounded-sm">
+                                        <img src={img} className="w-full h-full object-cover" alt="" />
+                                        <button 
+                                            onClick={() => removeFromGallery(idx)}
+                                            className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X size={10} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {(!storefrontForm.gallery || storefrontForm.gallery.length === 0) && (
+                                    <div className="col-span-3 py-8 text-center border border-dashed border-gray-200 rounded-sm text-gray-400 text-xs">
+                                        Upload images to showcase your aesthetic.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Social Links */}
+                        <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                                <Link size={14} /> Connections
+                            </h3>
+                            <div className="space-y-4">
+                                <div className="relative">
+                                    <Globe size={14} className="absolute left-0 top-3 text-gray-400" />
+                                    <input 
+                                        placeholder="Website URL"
+                                        value={storefrontForm.website || ''}
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, website: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <Instagram size={14} className="absolute left-0 top-3 text-gray-400" />
+                                    <input 
+                                        placeholder="Instagram Handle"
+                                        value={storefrontForm.instagram || ''}
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, instagram: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <Twitter size={14} className="absolute left-0 top-3 text-gray-400" />
+                                    <input 
+                                        placeholder="Twitter Handle"
+                                        value={storefrontForm.twitter || ''}
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, twitter: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                                 <div className="relative">
+                                    <Facebook size={14} className="absolute left-0 top-3 text-gray-400" />
+                                    <input 
+                                        placeholder="Facebook URL"
+                                        value={storefrontForm.facebook || ''}
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, facebook: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="md:hidden mt-6 pb-20">
+                      <button 
+                          onClick={handleStorefrontSave}
+                          className="w-full bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
+                      >
+                          Save Changes
+                      </button>
+                  </div>
+            </div>
+          );
 
       case 'ORDERS':
         return (
