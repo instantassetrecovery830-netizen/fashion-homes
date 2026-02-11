@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  PieChart, Pie, Cell
+  PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { 
   Package, Users, DollarSign, Activity, Settings, LayoutDashboard, Shirt, ShoppingBag, 
@@ -11,13 +11,13 @@ import {
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, 
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, BadgeCheck,
   Lock, MessageSquare, Flag, Store, Grid, ChevronDown, Loader, Star, Save, Menu, Wallet, ArrowLeft, Inbox,
-  Phone, Clock, Filter, Search, Facebook, User
+  Phone, Clock, Filter, Search, Facebook, User, ExternalLink, Image as ImageIcon, Video, Type, PieChart as PieChartIcon
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, User as AppUser, LandingPageContent, ContactSubmission, Follower } from '../types.ts';
 import { updateUserPassword, auth } from '../services/firebase.ts';
 import { VendorProfileView } from './VendorProfileView.tsx';
 
-const COLORS = ['#0a0a0a', '#C5A059', '#8B8580', '#E5E5E5', '#4A0404'];
+const COLORS = ['#0a0a0a', '#C5A059', '#8B8580', '#E5E5E5', '#4A0404', '#1B2432'];
 
 interface DashboardProps {
   role: UserRole;
@@ -38,6 +38,7 @@ interface DashboardProps {
   cmsContent?: LandingPageContent;
   onUpdateCMSContent?: (content: LandingPageContent) => Promise<void>;
   contactSubmissions?: ContactSubmission[];
+  onUpdateContact?: (id: string, status: 'NEW' | 'READ' | 'ARCHIVED') => Promise<void>;
   initialTab?: string;
   followedVendors?: Vendor[];
   onToggleFollow?: (vendor: Vendor) => Promise<void>;
@@ -63,13 +64,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
   cmsContent,
   onUpdateCMSContent,
   contactSubmissions = [],
+  onUpdateContact,
   initialTab,
   followedVendors = [],
   onToggleFollow,
   onDesignerClick
 }) => {
   const [activeTab, setActiveTab] = useState(initialTab || 'OVERVIEW');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default closed on mobile, logic handled in render
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // CMS State
+  const [cmsForm, setCmsForm] = useState<LandingPageContent | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>('hero');
   
   // Profile State
   const [newPassword, setNewPassword] = useState('');
@@ -79,6 +85,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
   }, [initialTab]);
+
+  // Init CMS Form
+  useEffect(() => {
+      if (cmsContent) setCmsForm(cmsContent);
+  }, [cmsContent]);
 
   // Force sidebar open on desktop mount
   useEffect(() => {
@@ -100,13 +111,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const myOrders = useMemo(() => {
     if (role === UserRole.ADMIN) return orders;
     if (role === UserRole.VENDOR) {
-        // Find vendor based on current user email
         const vendor = vendors.find(v => v.email === currentUser?.email);
         if (!vendor) return [];
-        // Filter orders that contain items from this vendor
         return orders.filter(o => o.items.some(i => i.designer === vendor.name));
     }
-    // Buyer
     return orders.filter(o => o.customerName === currentUser?.email);
   }, [orders, role, vendors, currentUser]);
 
@@ -120,12 +128,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return [];
   }, [products, role, vendors, currentUser]);
 
-  // Calculations for Overview
-  const totalRevenue = useMemo(() => {
-      return myOrders.reduce((sum, order) => sum + order.total, 0);
+  const totalRevenue = useMemo(() => myOrders.reduce((sum, order) => sum + order.total, 0), [myOrders]);
+  const totalSales = myOrders.length;
+
+  // Chart Data Preparation
+  const revenueData = useMemo(() => {
+      return myOrders.slice(0, 7).map(o => ({ 
+          name: new Date(o.date).toLocaleDateString(undefined, { weekday: 'short' }), 
+          amount: o.total 
+      })).reverse();
   }, [myOrders]);
 
-  const totalSales = myOrders.length;
+  const categoryData = useMemo(() => {
+      const data: Record<string, number> = {};
+      myOrders.forEach(o => {
+          o.items.forEach(i => {
+              if (data[i.category]) data[i.category] += 1;
+              else data[i.category] = 1;
+          });
+      });
+      return Object.entries(data).map(([name, value]) => ({ name, value }));
+  }, [myOrders]);
   
   // Handlers for Profile
   const handlePasswordUpdate = async (e: React.FormEvent) => {
@@ -133,12 +156,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (!newPassword) return;
       try {
           if (auth.currentUser) {
-              await updateUserPassword(auth.currentUser as any, newPassword); // Type cast for our interface
+              await updateUserPassword(auth.currentUser as any, newPassword);
               setPasswordMsg('Password updated successfully.');
               setNewPassword('');
           }
       } catch (err: any) {
           setPasswordMsg('Error updating password: ' + err.message);
+      }
+  };
+
+  const handleCMSUpdate = async () => {
+      if (cmsForm && onUpdateCMSContent) {
+          await onUpdateCMSContent(cmsForm);
+          alert("Landing page updated successfully.");
       }
   };
 
@@ -165,8 +195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         />
 
         {/* Sidebar Panel */}
-        <div className={`fixed left-0 top-0 h-full bg-white border-r border-gray-100 transition-transform duration-300 ease-in-out z-50 w-64 pt-6 md:pt-20 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} md:translate-x-0 flex flex-col`}>
-            {/* Mobile Header in Sidebar */}
+        <div className={`fixed left-0 top-0 h-full bg-white border-r border-gray-100 transition-transform duration-300 ease-in-out z-50 w-64 pt-6 md:pt-20 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} md:translate-x-0 flex flex-col shadow-xl md:shadow-none`}>
             <div className="md:hidden px-6 pb-6 flex justify-between items-center border-b border-gray-50">
                 <h2 className="text-xl font-serif italic">Dashboard</h2>
                 <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">
@@ -179,20 +208,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                     key={tab.id}
                     onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }}
-                    className={`w-full flex items-center gap-4 p-3 text-sm font-medium transition-colors rounded-sm ${activeTab === tab.id ? 'bg-luxury-black text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                    className={`w-full flex items-center gap-4 p-3 text-sm font-medium transition-all rounded-sm ${activeTab === tab.id ? 'bg-luxury-black text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-black'}`}
                 >
-                    <tab.icon size={20} />
-                    <span>{tab.label}</span>
+                    <tab.icon size={18} />
+                    <span className="tracking-wide">{tab.label}</span>
                 </button>
                 ))}
             </div>
             
-            <div className="p-4 border-t border-gray-100 hidden md:block">
+            <div className="p-6 border-t border-gray-100 hidden md:block">
                 <button 
-                    onClick={() => setIsSidebarOpen(!isSidebarOpen)} // On desktop this might just collapse to icons (logic simplified here)
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                     className="flex items-center gap-4 text-gray-400 hover:text-black transition-colors"
                 >
-                    <span className="text-xs uppercase tracking-widest w-full text-center">MyFitStore</span>
+                    <span className="text-[10px] uppercase tracking-[0.2em] w-full text-center">MyFitStore</span>
                 </button>
             </div>
         </div>
@@ -207,52 +236,84 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return (
           <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
              <div className="flex items-center justify-between">
-                 <h2 className="text-2xl font-serif italic">Dashboard Overview</h2>
-                 {/* Mobile Menu Trigger */}
+                 <h2 className="text-3xl font-serif italic">Dashboard Overview</h2>
                  <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
                      <Menu size={20} />
                  </button>
              </div>
              
-             {/* Stats Cards */}
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-                <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-sm">
+             {/* KPIs */}
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
                    <div className="flex items-center justify-between mb-4">
                       <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Revenue</h3>
-                      <DollarSign className="text-luxury-gold" size={20} />
+                      <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><DollarSign size={20} /></div>
                    </div>
-                   <p className="text-3xl font-serif">${totalRevenue.toLocaleString()}</p>
+                   <p className="text-4xl font-serif">${totalRevenue.toLocaleString()}</p>
+                   <p className="text-xs text-green-600 mt-2 flex items-center gap-1"><ArrowUpRight size={12} /> +12% this month</p>
                 </div>
-                <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-sm">
+                <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
                    <div className="flex items-center justify-between mb-4">
                       <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Orders</h3>
-                      <ShoppingBag className="text-luxury-gold" size={20} />
+                      <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><ShoppingBag size={20} /></div>
                    </div>
-                   <p className="text-3xl font-serif">{totalSales}</p>
+                   <p className="text-4xl font-serif">{totalSales}</p>
+                   <p className="text-xs text-gray-400 mt-2">Processed successfully</p>
                 </div>
                 {role !== UserRole.BUYER && (
-                  <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-sm">
+                  <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Products</h3>
-                        <Shirt className="text-luxury-gold" size={20} />
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Active Products</h3>
+                        <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><Shirt size={20} /></div>
                     </div>
-                    <p className="text-3xl font-serif">{myProducts.length}</p>
+                    <p className="text-4xl font-serif">{myProducts.length}</p>
+                    <p className="text-xs text-gray-400 mt-2">Live in marketplace</p>
                   </div>
                 )}
              </div>
 
-             {/* Chart (Placeholder) */}
-             <div className="bg-white p-6 border border-gray-100 shadow-sm h-80 rounded-sm">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6">Activity Overview</h3>
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={myOrders.slice(0, 7).map(o => ({ name: o.date, amount: o.total }))}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" tick={{fontSize: 10}} />
-                        <YAxis tick={{fontSize: 10}} />
-                        <Tooltip />
-                        <Bar dataKey="amount" fill="#C5A059" />
-                    </BarChart>
-                </ResponsiveContainer>
+             {/* Charts Row */}
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-sm h-96">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+                        <Activity size={14} /> Revenue History
+                    </h3>
+                    <ResponsiveContainer width="100%" height="85%">
+                        <BarChart data={revenueData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                            <XAxis dataKey="name" tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: '#fff', border: '1px solid #f3f4f6', borderRadius: '4px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                cursor={{ fill: '#f9fafb' }}
+                            />
+                            <Bar dataKey="amount" fill="#C5A059" radius={[4, 4, 0, 0]} barSize={40} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+
+                <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-sm h-96">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+                        <PieChartIcon size={14} /> Sales by Category
+                    </h3>
+                    <ResponsiveContainer width="100%" height="85%">
+                        <PieChart>
+                            <Pie 
+                                data={categoryData} 
+                                innerRadius={60} 
+                                outerRadius={80} 
+                                paddingAngle={5} 
+                                dataKey="value"
+                            >
+                                {categoryData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #f3f4f6', fontSize: '12px' }} />
+                            <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }} />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
              </div>
           </div>
         );
@@ -261,46 +322,55 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return (
           <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
              <div className="flex items-center justify-between">
-                 <h2 className="text-2xl font-serif italic">Order History</h2>
+                 <h2 className="text-3xl font-serif italic">Order History</h2>
                  <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
                      <Menu size={20} />
                  </button>
              </div>
              
-             <div className="bg-white border border-gray-100 overflow-x-auto rounded-sm">
-                <table className="w-full text-left text-sm min-w-[600px]">
-                   <thead className="bg-gray-50 text-xs uppercase tracking-widest text-gray-500 font-bold">
+             <div className="bg-white border border-gray-100 overflow-x-auto rounded-sm shadow-sm">
+                <table className="w-full text-left text-sm min-w-full">
+                   <thead className="bg-gray-50 text-xs uppercase tracking-widest text-gray-500 font-bold border-b border-gray-100">
                       <tr>
-                         <th className="p-4">Order ID</th>
-                         <th className="p-4">Date</th>
-                         <th className="p-4">Customer</th>
-                         <th className="p-4">Total</th>
-                         <th className="p-4">Status</th>
-                         {role !== UserRole.BUYER && <th className="p-4">Actions</th>}
+                         <th className="p-6">Order ID</th>
+                         <th className="p-6">Date</th>
+                         <th className="p-6">Customer</th>
+                         <th className="p-6">Items</th>
+                         <th className="p-6">Total</th>
+                         <th className="p-6">Status</th>
+                         {role !== UserRole.BUYER && <th className="p-6">Actions</th>}
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-gray-100">
                       {myOrders.map(order => (
-                         <tr key={order.id} className="hover:bg-gray-50/50">
-                            <td className="p-4 font-medium">{order.id}</td>
-                            <td className="p-4 text-gray-500">{new Date(order.date).toLocaleDateString()}</td>
-                            <td className="p-4">{order.customerName}</td>
-                            <td className="p-4 font-bold">${order.total}</td>
-                            <td className="p-4">
-                               <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full ${
-                                  order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
-                                  order.status === 'Shipped' ? 'bg-blue-100 text-blue-700' :
-                                  'bg-yellow-100 text-yellow-700'
+                         <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="p-6 font-medium text-xs font-mono">{order.id}</td>
+                            <td className="p-6 text-gray-500">{new Date(order.date).toLocaleDateString()}</td>
+                            <td className="p-6">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold">
+                                        {order.customerName.charAt(0)}
+                                    </div>
+                                    <span className="truncate max-w-[150px]">{order.customerName}</span>
+                                </div>
+                            </td>
+                            <td className="p-6 text-gray-500">{order.items.length} items</td>
+                            <td className="p-6 font-bold text-luxury-gold">${order.total}</td>
+                            <td className="p-6">
+                               <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full ${
+                                  order.status === 'Delivered' ? 'bg-green-50 text-green-700 border border-green-100' :
+                                  order.status === 'Shipped' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                  'bg-yellow-50 text-yellow-700 border border-yellow-100'
                                }`}>
                                   {order.status}
                                </span>
                             </td>
                             {role !== UserRole.BUYER && (
-                               <td className="p-4">
+                               <td className="p-6">
                                   {onUpdateOrderStatus && order.status !== 'Delivered' && (
                                      <button 
                                         onClick={() => onUpdateOrderStatus(order.id, order.status === 'Processing' ? 'Shipped' : 'Delivered')}
-                                        className="text-xs underline hover:text-luxury-gold"
+                                        className="text-[10px] uppercase font-bold tracking-wider hover:text-luxury-gold border-b border-transparent hover:border-luxury-gold transition-all"
                                      >
                                         Mark {order.status === 'Processing' ? 'Shipped' : 'Delivered'}
                                      </button>
@@ -311,7 +381,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       ))}
                       {myOrders.length === 0 && (
                           <tr>
-                              <td colSpan={6} className="p-8 text-center text-gray-400">No orders found.</td>
+                              <td colSpan={7} className="p-12 text-center text-gray-400">No orders found.</td>
                           </tr>
                       )}
                    </tbody>
@@ -325,36 +395,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
              <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
                  <div className="flex justify-between items-center">
                      <div className="flex items-center gap-4">
-                        <h2 className="text-2xl font-serif italic">Products</h2>
+                        <h2 className="text-3xl font-serif italic">Products</h2>
                         <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
                             <Menu size={20} />
                         </button>
                      </div>
                      {onAddProduct && (
-                         <button className="bg-luxury-black text-white px-4 py-2 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-luxury-gold transition-colors">
-                             <Plus size={16} /> <span className="hidden md:inline">Add Product</span>
+                         <button className="bg-luxury-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-luxury-gold transition-colors shadow-lg">
+                             <Plus size={16} /> <span className="hidden md:inline">Add New Piece</span>
                          </button>
                      )}
                  </div>
                  
-                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
                      {myProducts.map(product => (
-                         <div key={product.id} className="bg-white border border-gray-100 group relative rounded-sm overflow-hidden">
-                             <div className="aspect-[3/4] bg-gray-50 overflow-hidden">
-                                 <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                         <div key={product.id} className="bg-white border border-gray-100 group relative rounded-sm overflow-hidden hover:shadow-lg transition-shadow">
+                             <div className="aspect-[3/4] bg-gray-50 overflow-hidden relative">
+                                 <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                 {product.stock < 5 && (
+                                     <div className="absolute top-2 left-2 bg-red-500 text-white text-[9px] font-bold px-2 py-1 uppercase tracking-wide">
+                                         Low Stock
+                                     </div>
+                                 )}
                              </div>
-                             <div className="p-4">
-                                 <h3 className="font-bold text-sm truncate">{product.name}</h3>
-                                 <p className="text-xs text-gray-500 uppercase">{product.category}</p>
-                                 <div className="flex justify-between items-center mt-2">
+                             <div className="p-5">
+                                 <div className="flex justify-between items-start mb-2">
+                                     <h3 className="font-bold text-sm truncate pr-2">{product.name}</h3>
                                      <span className="text-sm font-medium">${product.price}</span>
-                                     <span className="text-xs text-gray-400">{product.stock} in stock</span>
+                                 </div>
+                                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">{product.category}</p>
+                                 <div className="flex justify-between items-center text-[10px] text-gray-400 pt-3 border-t border-gray-50">
+                                     <span>{product.stock} units</span>
+                                     <span>{product.rating} ★</span>
                                  </div>
                              </div>
-                             <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                 <button className="p-2 bg-white rounded-full shadow-md hover:text-luxury-gold"><Edit2 size={14} /></button>
+                             <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-300">
+                                 <button className="p-2 bg-white rounded-full shadow-md hover:text-luxury-gold transition-colors"><Edit2 size={14} /></button>
                                  {onDeleteProduct && (
-                                     <button onClick={() => onDeleteProduct(product.id)} className="p-2 bg-white rounded-full shadow-md hover:text-red-500"><Trash2 size={14} /></button>
+                                     <button onClick={() => onDeleteProduct(product.id)} className="p-2 bg-white rounded-full shadow-md hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
                                  )}
                              </div>
                          </div>
@@ -362,24 +440,458 @@ export const Dashboard: React.FC<DashboardProps> = ({
                  </div>
              </div>
          );
-      
-      case 'FOLLOWING':
+
+      case 'CUSTOMERS':
           return (
               <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
                   <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-serif italic">Ateliers You Follow</h2>
+                      <h2 className="text-3xl font-serif italic">Registered Buyers</h2>
                       <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
                           <Menu size={20} />
                       </button>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white border border-gray-100 overflow-x-auto rounded-sm shadow-sm">
+                      <table className="w-full text-left text-sm min-w-full">
+                          <thead className="bg-gray-50 text-xs uppercase tracking-widest text-gray-500 font-bold border-b border-gray-100">
+                              <tr>
+                                  <th className="p-6">User</th>
+                                  <th className="p-6">Email</th>
+                                  <th className="p-6">Joined</th>
+                                  <th className="p-6">Total Spend</th>
+                                  <th className="p-6">Status</th>
+                                  <th className="p-6">Actions</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                              {users?.filter(u => u.role === UserRole.BUYER).map(user => (
+                                  <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
+                                      <td className="p-6 flex items-center gap-4">
+                                          <img src={user.avatar || 'https://via.placeholder.com/32'} className="w-10 h-10 rounded-full object-cover border border-gray-100" alt="" />
+                                          <span className="font-medium">{user.name}</span>
+                                      </td>
+                                      <td className="p-6 text-gray-600">{user.email}</td>
+                                      <td className="p-6 text-gray-500">{new Date(user.joined).toLocaleDateString()}</td>
+                                      <td className="p-6 font-mono text-luxury-gold font-bold">{user.spend || '$0.00'}</td>
+                                      <td className="p-6">
+                                          <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full flex w-fit items-center gap-1 ${user.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                                              {user.status === 'ACTIVE' && <CheckCircle size={10} />}
+                                              {user.status}
+                                          </span>
+                                      </td>
+                                      <td className="p-6">
+                                          {onUpdateUser && (
+                                              <button 
+                                                  onClick={() => onUpdateUser({ ...user, status: user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' })}
+                                                  className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded transition-colors ${
+                                                      user.status === 'ACTIVE' 
+                                                      ? 'text-red-500 hover:bg-red-50' 
+                                                      : 'text-green-500 hover:bg-green-50'
+                                                  }`}
+                                              >
+                                                  {user.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                                              </button>
+                                          )}
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          );
+
+      case 'VENDORS':
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Atelier Management</h2>
+                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                          <Menu size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-100 overflow-x-auto rounded-sm shadow-sm">
+                      <table className="w-full text-left text-sm min-w-full">
+                          <thead className="bg-gray-50 text-xs uppercase tracking-widest text-gray-500 font-bold border-b border-gray-100">
+                              <tr>
+                                  <th className="p-6">Brand</th>
+                                  <th className="p-6">Email</th>
+                                  <th className="p-6">Plan</th>
+                                  <th className="p-6">Verification</th>
+                                  <th className="p-6">Subscription</th>
+                                  <th className="p-6">Actions</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                              {vendors.map(vendor => (
+                                  <tr key={vendor.id} className="hover:bg-gray-50/50 transition-colors">
+                                      <td className="p-6 flex items-center gap-4">
+                                          <img src={vendor.avatar} className="w-10 h-10 rounded-full object-cover border border-gray-200 shadow-sm" alt="" />
+                                          <div>
+                                              <p className="font-bold text-sm uppercase tracking-wide">{vendor.name}</p>
+                                              <p className="text-[10px] text-gray-400 flex items-center gap-1"><MapPin size={10} /> {vendor.location || 'Unknown'}</p>
+                                          </div>
+                                      </td>
+                                      <td className="p-6 text-gray-600">{vendor.email}</td>
+                                      <td className="p-6">
+                                          <span className="bg-gray-100 px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wide">{vendor.subscriptionPlan}</span>
+                                      </td>
+                                      <td className="p-6">
+                                          <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full flex w-fit items-center gap-1 ${
+                                              vendor.verificationStatus === 'VERIFIED' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 
+                                              vendor.verificationStatus === 'REJECTED' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-yellow-50 text-yellow-600 border border-yellow-100'
+                                          }`}>
+                                              {vendor.verificationStatus === 'VERIFIED' && <BadgeCheck size={12} />}
+                                              {vendor.verificationStatus}
+                                          </span>
+                                      </td>
+                                      <td className="p-6">
+                                          <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full ${vendor.subscriptionStatus === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
+                                              {vendor.subscriptionStatus}
+                                          </span>
+                                      </td>
+                                      <td className="p-6">
+                                          <div className="flex gap-3">
+                                              {setVendors && vendor.verificationStatus !== 'VERIFIED' && (
+                                                  <button 
+                                                      onClick={() => setVendors && setVendors([{ ...vendor, verificationStatus: 'VERIFIED' }])}
+                                                      className="text-blue-600 hover:bg-blue-50 p-2 rounded-full transition-colors border border-transparent hover:border-blue-100"
+                                                      title="Verify Vendor"
+                                                  >
+                                                      <ShieldCheck size={16} />
+                                                  </button>
+                                              )}
+                                              {setVendors && (
+                                                  <button 
+                                                      onClick={() => setVendors && setVendors([{ ...vendor, subscriptionStatus: vendor.subscriptionStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' }])}
+                                                      className={`p-2 rounded-full transition-colors border border-transparent ${vendor.subscriptionStatus === 'ACTIVE' ? 'text-red-500 hover:bg-red-50 hover:border-red-100' : 'text-green-600 hover:bg-green-50 hover:border-green-100'}`}
+                                                      title={vendor.subscriptionStatus === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                                                  >
+                                                      {vendor.subscriptionStatus === 'ACTIVE' ? <Ban size={16} /> : <CheckCircle size={16} />}
+                                                  </button>
+                                              )}
+                                          </div>
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          );
+
+      case 'MESSAGES':
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Concierge Inbox</h2>
+                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                          <Menu size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-100 rounded-sm divide-y divide-gray-100 shadow-sm max-w-5xl">
+                      {contactSubmissions.length === 0 ? (
+                          <div className="p-12 text-center text-gray-400">No messages found.</div>
+                      ) : (
+                          contactSubmissions.map(msg => (
+                              <div key={msg.id} className={`p-6 transition-colors ${msg.status === 'NEW' ? 'bg-luxury-cream/20' : 'hover:bg-gray-50'}`}>
+                                  <div className="flex justify-between items-start mb-2">
+                                      <div className="flex items-center gap-3">
+                                          <div className={`w-2 h-2 rounded-full ${msg.status === 'NEW' ? 'bg-luxury-gold' : 'bg-transparent'}`} />
+                                          <div>
+                                              <h4 className={`text-sm ${msg.status === 'NEW' ? 'font-bold' : 'font-medium'}`}>{msg.subject}</h4>
+                                              <p className="text-xs text-gray-500 flex items-center gap-2 mt-1">
+                                                  <span className="font-bold text-black">{msg.name}</span> &lt;{msg.email}&gt;
+                                              </p>
+                                          </div>
+                                      </div>
+                                      <span className="text-[10px] text-gray-400 uppercase tracking-widest whitespace-nowrap">{new Date(msg.date).toLocaleString()}</span>
+                                  </div>
+                                  <p className="text-sm text-gray-600 mt-4 leading-relaxed border-l-2 border-gray-100 pl-4 ml-5">
+                                      {msg.message}
+                                  </p>
+                                  <div className="mt-4 flex gap-4 ml-5">
+                                      {msg.status === 'NEW' && onUpdateContact && (
+                                          <button 
+                                              onClick={() => onUpdateContact(msg.id, 'READ')}
+                                              className="text-[10px] font-bold uppercase tracking-widest text-luxury-gold hover:underline flex items-center gap-1"
+                                          >
+                                              <Check size={12} /> Mark Read
+                                          </button>
+                                      )}
+                                      <a href={`mailto:${msg.email}`} className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-black flex items-center gap-1">
+                                          <ArrowUpRight size={12} /> Reply
+                                      </a>
+                                      {msg.status !== 'ARCHIVED' && onUpdateContact && (
+                                          <button 
+                                              onClick={() => onUpdateContact(msg.id, 'ARCHIVED')}
+                                              className="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-red-500 flex items-center gap-1"
+                                          >
+                                              <Trash2 size={12} /> Archive
+                                          </button>
+                                      )}
+                                  </div>
+                              </div>
+                          ))
+                      )}
+                  </div>
+              </div>
+          );
+
+      case 'CMS':
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-7xl">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Content Management</h2>
+                      <div className="flex gap-4">
+                          <button 
+                              onClick={handleCMSUpdate}
+                              className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors hidden md:block"
+                          >
+                              Save All Changes
+                          </button>
+                          <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                              <Menu size={20} />
+                          </button>
+                      </div>
+                  </div>
+                  
+                  {cmsForm && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* Left Column */}
+                          <div className="space-y-6">
+                              {/* Hero Section */}
+                              <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
+                                  <button 
+                                    onClick={() => setExpandedSection(expandedSection === 'hero' ? null : 'hero')}
+                                    className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
+                                  >
+                                    <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><Video size={14} /> Hero Section</span>
+                                    <ChevronDown size={16} className={`transition-transform ${expandedSection === 'hero' ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  
+                                  {expandedSection === 'hero' && (
+                                    <div className="p-6 space-y-4 border-t border-gray-100">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Title Line 1</label>
+                                            <input 
+                                                value={cmsForm.hero.titleLine1}
+                                                onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, titleLine1: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Title Line 2 (Italic)</label>
+                                            <input 
+                                                value={cmsForm.hero.titleLine2}
+                                                onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, titleLine2: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Subtitle</label>
+                                            <input 
+                                                value={cmsForm.hero.subtitle}
+                                                onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, subtitle: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Video URL</label>
+                                                <input 
+                                                    value={cmsForm.hero.videoUrl}
+                                                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, videoUrl: e.target.value}})}
+                                                    className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Poster URL</label>
+                                                <input 
+                                                    value={cmsForm.hero.posterUrl}
+                                                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, posterUrl: e.target.value}})}
+                                                    className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Button Text</label>
+                                            <input 
+                                                value={cmsForm.hero.buttonText}
+                                                onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, buttonText: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                  )}
+                              </div>
+
+                              {/* Sections */}
+                              <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
+                                  <button 
+                                    onClick={() => setExpandedSection(expandedSection === 'sections' ? null : 'sections')}
+                                    className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
+                                  >
+                                    <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><Type size={14} /> Sections</span>
+                                    <ChevronDown size={16} className={`transition-transform ${expandedSection === 'sections' ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  
+                                  {expandedSection === 'sections' && (
+                                    <div className="p-6 space-y-4 border-t border-gray-100">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Marquee Text</label>
+                                            <textarea 
+                                                value={cmsForm.marquee?.text || ''}
+                                                onChange={e => setCmsForm({...cmsForm, marquee: { text: e.target.value }})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white min-h-[80px]"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Designers Title</label>
+                                                <input 
+                                                    value={cmsForm.designers?.title || ''}
+                                                    onChange={e => setCmsForm({...cmsForm, designers: { ...cmsForm.designers, title: e.target.value }})}
+                                                    className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Spotlight Title</label>
+                                                <input 
+                                                    value={cmsForm.spotlight?.title || ''}
+                                                    onChange={e => setCmsForm({...cmsForm, spotlight: { title: e.target.value }})}
+                                                    className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                  )}
+                              </div>
+                          </div>
+
+                          {/* Right Column */}
+                          <div className="space-y-6">
+                              {/* Campaign */}
+                              <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
+                                  <button 
+                                    onClick={() => setExpandedSection(expandedSection === 'campaign' ? null : 'campaign')}
+                                    className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
+                                  >
+                                    <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><ImageIcon size={14} /> Campaign</span>
+                                    <ChevronDown size={16} className={`transition-transform ${expandedSection === 'campaign' ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  
+                                  {expandedSection === 'campaign' && (
+                                    <div className="p-6 space-y-4 border-t border-gray-100">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Campaign Title</label>
+                                            <input 
+                                                value={cmsForm.campaign.title}
+                                                onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, title: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Overlay Text</label>
+                                            <input 
+                                                value={cmsForm.campaign.overlayText1}
+                                                onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, overlayText1: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {[1, 2, 3, 4].map(num => (
+                                                <div key={num}>
+                                                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Image {num} URL</label>
+                                                    <input 
+                                                        // @ts-ignore
+                                                        value={cmsForm.campaign[`image${num}`]}
+                                                        // @ts-ignore
+                                                        onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, [`image${num}`]: e.target.value}})}
+                                                        className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                  )}
+                              </div>
+
+                              {/* About Page */}
+                              <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
+                                  <button 
+                                    onClick={() => setExpandedSection(expandedSection === 'about' ? null : 'about')}
+                                    className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
+                                  >
+                                    <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><FileText size={14} /> About & Contact</span>
+                                    <ChevronDown size={16} className={`transition-transform ${expandedSection === 'about' ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  
+                                  {expandedSection === 'about' && (
+                                    <div className="p-6 space-y-4 border-t border-gray-100">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Philosophy Text 1</label>
+                                            <textarea 
+                                                value={cmsForm.about.philosophy.description1}
+                                                onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description1: e.target.value}}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32 transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Email</label>
+                                                <input 
+                                                    value={cmsForm.about.contact.email}
+                                                    onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, email: e.target.value}}})}
+                                                    className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Phone</label>
+                                                <input 
+                                                    value={cmsForm.about.contact.phone}
+                                                    onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, phone: e.target.value}}})}
+                                                    className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                  )}
+                              </div>
+                          </div>
+                      </div>
+                  )}
+                  
+                  <div className="md:hidden mt-6">
+                      <button 
+                          onClick={handleCMSUpdate}
+                          className="w-full bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
+                      >
+                          Save Changes
+                      </button>
+                  </div>
+              </div>
+          );
+      
+      case 'FOLLOWING':
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Ateliers You Follow</h2>
+                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                          <Menu size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                       {followedVendors.map(vendor => (
-                          <div key={vendor.id} className="bg-white border border-gray-100 p-6 flex flex-col items-center text-center rounded-sm">
-                              <img src={vendor.avatar} alt={vendor.name} className="w-20 h-20 rounded-full object-cover mb-4" />
+                          <div key={vendor.id} className="bg-white border border-gray-100 p-8 flex flex-col items-center text-center rounded-sm hover:shadow-lg transition-all">
+                              <img src={vendor.avatar} alt={vendor.name} className="w-24 h-24 rounded-full object-cover mb-4 border border-gray-100" />
                               <h3 className="font-bold text-lg mb-1">{vendor.name}</h3>
-                              <p className="text-xs text-gray-500 mb-4 line-clamp-2">{vendor.bio}</p>
-                              <div className="flex gap-2 w-full">
+                              <p className="text-xs text-gray-500 mb-6 line-clamp-2 h-8">{vendor.bio}</p>
+                              <div className="flex gap-2 w-full mt-auto">
                                   <button 
                                     onClick={() => onDesignerClick && onDesignerClick(vendor.name)}
                                     className="flex-1 bg-black text-white px-4 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors"
@@ -389,7 +901,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                   {onToggleFollow && (
                                       <button 
                                         onClick={() => onToggleFollow(vendor)}
-                                        className="border border-gray-200 px-4 py-3 text-black hover:text-red-500 hover:border-red-500 transition-colors"
+                                        className="border border-gray-200 px-3 py-3 text-black hover:text-red-500 hover:border-red-500 transition-colors"
                                       >
                                           <X size={16} />
                                       </button>
@@ -398,7 +910,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </div>
                       ))}
                       {followedVendors.length === 0 && (
-                          <div className="col-span-full text-center py-12 text-gray-400">
+                          <div className="col-span-full text-center py-20 text-gray-400 bg-gray-50 rounded-sm border border-dashed border-gray-200">
                               <Heart size={48} className="mx-auto mb-4 opacity-20" />
                               <p>You are not following any ateliers yet.</p>
                           </div>
@@ -409,57 +921,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       case 'PROFILE':
         return (
-          <div className="max-w-2xl space-y-8 animate-fade-in pb-20 md:pb-0">
+          <div className="max-w-3xl space-y-8 animate-fade-in pb-20 md:pb-0">
              <div className="flex items-center justify-between">
-                 <h2 className="text-2xl font-serif italic">Account Settings</h2>
+                 <h2 className="text-3xl font-serif italic">Account Settings</h2>
                  <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
                      <Menu size={20} />
                  </button>
              </div>
              
              {/* Profile Update */}
-             <div className="bg-white p-8 border border-gray-100 rounded-sm">
-                <h3 className="text-sm font-bold uppercase tracking-widest mb-6">Personal Details</h3>
-                <div className="flex items-center gap-6 mb-8">
-                    <div className="w-20 h-20 bg-gray-100 rounded-full overflow-hidden">
+             <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2"><User size={14} /> Personal Details</h3>
+                <div className="flex items-center gap-8 mb-8">
+                    <div className="w-24 h-24 bg-gray-100 rounded-full overflow-hidden border-2 border-white shadow-md">
                         {auth.currentUser?.photoURL ? (
                             <img src={auth.currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
-                            <User size={32} className="m-auto mt-6 text-gray-400" />
+                            <User size={32} className="m-auto mt-8 text-gray-400" />
                         )}
                     </div>
                     <div>
-                        <p className="font-bold text-lg">{auth.currentUser?.displayName || 'User'}</p>
-                        <p className="text-gray-500 text-sm">{auth.currentUser?.email}</p>
-                        <div className="mt-2 flex gap-2">
-                           <span className="bg-gray-100 text-[10px] px-2 py-1 uppercase tracking-wider font-bold">{role}</span>
-                           {auth.currentUser?.emailVerified && <span className="bg-green-50 text-green-700 text-[10px] px-2 py-1 uppercase tracking-wider font-bold flex items-center gap-1"><CheckCircle size={10} /> Verified</span>}
+                        <p className="font-bold text-xl mb-1">{auth.currentUser?.displayName || 'User'}</p>
+                        <p className="text-gray-500 text-sm mb-3">{auth.currentUser?.email}</p>
+                        <div className="flex gap-2">
+                           <span className="bg-gray-100 text-[10px] px-3 py-1 uppercase tracking-wider font-bold rounded-full border border-gray-200">{role}</span>
+                           {auth.currentUser?.emailVerified && <span className="bg-green-50 text-green-700 text-[10px] px-3 py-1 uppercase tracking-wider font-bold flex items-center gap-1 rounded-full border border-green-100"><CheckCircle size={10} /> Verified</span>}
                         </div>
                     </div>
                 </div>
              </div>
 
              {/* Security */}
-             <div className="bg-white p-8 border border-gray-100 rounded-sm">
-                 <h3 className="text-sm font-bold uppercase tracking-widest mb-6">Security</h3>
-                 <form onSubmit={handlePasswordUpdate} className="space-y-4">
+             <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                 <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2"><Lock size={14} /> Security</h3>
+                 <form onSubmit={handlePasswordUpdate} className="space-y-6 max-w-md">
                      <div>
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">New Password</label>
+                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">New Password</label>
                          <input 
                             type="password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none"
+                            className="w-full border-b border-gray-200 py-3 text-sm focus:border-black outline-none transition-colors"
                             placeholder="••••••••"
                          />
                      </div>
                      {passwordMsg && (
-                         <p className={`text-xs ${passwordMsg.includes('success') ? 'text-green-600' : 'text-red-500'}`}>{passwordMsg}</p>
+                         <div className={`text-xs p-3 rounded-sm flex items-center gap-2 ${passwordMsg.includes('success') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-500'}`}>
+                             {passwordMsg.includes('success') ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                             {passwordMsg}
+                         </div>
                      )}
                      <button 
                         type="submit" 
                         disabled={!newPassword}
-                        className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50"
+                        className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                      >
                          Update Password
                      </button>
@@ -468,17 +983,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
              
              {/* Feature Flags (Admin Only) */}
              {role === UserRole.ADMIN && (
-                 <div className="bg-white p-8 border border-gray-100 rounded-sm">
-                     <h3 className="text-sm font-bold uppercase tracking-widest mb-6">System Controls</h3>
+                 <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                     <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2"><Settings size={14} /> System Controls</h3>
                      <div className="space-y-4">
                          {Object.entries(featureFlags).map(([key, value]) => (
-                             <div key={key} className="flex justify-between items-center">
+                             <div key={key} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
                                  <span className="text-sm text-gray-600 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
                                  <button 
                                     onClick={() => toggleFeatureFlag(key as keyof FeatureFlags)}
-                                    className={`w-12 h-6 rounded-full p-1 transition-colors ${value ? 'bg-green-500' : 'bg-gray-200'}`}
+                                    className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${value ? 'bg-green-500' : 'bg-gray-200'}`}
                                  >
-                                     <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${value ? 'translate-x-6' : 'translate-x-0'}`} />
+                                     <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${value ? 'translate-x-6' : 'translate-x-0'}`} />
                                  </button>
                              </div>
                          ))}

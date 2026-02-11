@@ -8,7 +8,7 @@ import {
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
-  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb
+  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb
 } from '../services/dataService.ts';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
@@ -532,6 +532,11 @@ const App: React.FC = () => {
     await refreshData();
   };
   
+  const handleUpdateContact = async (id: string, status: 'NEW' | 'READ' | 'ARCHIVED') => {
+      await updateContactStatusInDb(id, status);
+      await refreshData();
+  };
+  
   const handlePlaceOrder = async (order: Order) => {
      await createOrderInDb(order);
      await refreshData();
@@ -694,6 +699,7 @@ const App: React.FC = () => {
               cmsContent={cmsContent}
               onUpdateCMSContent={handleUpdateCMSContent}
               contactSubmissions={contactSubmissions}
+              onUpdateContact={handleUpdateContact}
               followedVendors={followedVendors}
               onToggleFollow={handleToggleFollow}
               onDesignerClick={handleDesignerSelect}
