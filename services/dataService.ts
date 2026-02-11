@@ -1,140 +1,13 @@
 
 import { pool } from './db.ts';
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus, Follower, AppNotification } from '../types.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus, Follower, AppNotification, WaitlistEntry } from '../types.ts';
 
-// --- MOCK DATA FOR SEEDING ---
+// --- PRODUCTION CONFIGURATION ---
 
-const MOCK_VENDORS: Vendor[] = [
-  {
-    id: 'v1',
-    name: 'Aura Atelier',
-    bio: 'Merging digital craftsmanship with sustainable organic fibers. Based in Copenhagen.',
-    avatar: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=600',
-    verificationStatus: 'VERIFIED',
-    subscriptionStatus: 'ACTIVE',
-    location: 'Copenhagen, Denmark',
-    coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200',
-    email: 'contact@aura.com',
-    subscriptionPlan: 'Maison',
-    website: 'www.aura-atelier.com',
-    instagram: '@aura_atelier',
-    twitter: '@aura',
-    visualTheme: 'MINIMALIST'
-  },
-  {
-    id: 'v2',
-    name: 'Noir Et Blanc',
-    bio: 'Monochromatic minimalism for the modern avant-garde. Tokyo styling meets Parisian cut.',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600',
-    verificationStatus: 'VERIFIED',
-    subscriptionStatus: 'ACTIVE',
-    location: 'Tokyo, Japan',
-    coverImage: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=1200',
-    email: 'studio@noiretblanc.jp',
-    subscriptionPlan: 'Couture',
-    website: 'www.noiretblanc.jp',
-    instagram: '@noiretblanc',
-    twitter: '',
-    visualTheme: 'DARK'
-  },
-  {
-    id: 'v3',
-    name: 'Neo-Genesis',
-    bio: 'Futuristic streetwear inspired by cybernetic aesthetics.',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=600',
-    verificationStatus: 'PENDING',
-    subscriptionStatus: 'ACTIVE',
-    location: 'Berlin, Germany',
-    coverImage: 'https://images.unsplash.com/photo-1485230946086-1d99d529c7d4?q=80&w=1200',
-    email: 'info@neogenesis.de',
-    subscriptionPlan: 'Atelier',
-    website: '',
-    instagram: '@neogenesis',
-    twitter: '',
-    visualTheme: 'MINIMALIST'
-  }
-];
-
-const MOCK_PRODUCTS: Product[] = [
-  {
-    id: 'p1',
-    name: 'Structured Wool Trench',
-    designer: 'Aura Atelier',
-    price: 850,
-    category: 'Outerwear',
-    image: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?q=80&w=800',
-    description: 'Oversized wool trench coat with asymmetrical lapels and hidden button placket.',
-    rating: 4.8,
-    isNewSeason: true,
-    stock: 5,
-    sizes: ['S', 'M', 'L'],
-    isPreOrder: false
-  },
-  {
-    id: 'p2',
-    name: 'Cyber-Knit Turtleneck',
-    designer: 'Noir Et Blanc',
-    price: 320,
-    category: 'Knitwear',
-    image: 'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?q=80&w=800',
-    description: 'Fine gauge merino wool turtleneck with distressed detailing.',
-    rating: 5.0,
-    isNewSeason: true,
-    stock: 12,
-    sizes: ['M', 'L', 'XL'],
-    isPreOrder: false
-  },
-  {
-    id: 'p3',
-    name: 'Obsidian Wide Trousers',
-    designer: 'Noir Et Blanc',
-    price: 450,
-    category: 'Bottoms',
-    image: 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?q=80&w=800',
-    description: 'High-waisted wide leg trousers in Japanese denim.',
-    rating: 4.5,
-    isNewSeason: false,
-    stock: 8,
-    sizes: ['28', '30', '32', '34'],
-    isPreOrder: false
-  },
-  {
-    id: 'p4',
-    name: 'Void Runner Boots',
-    designer: 'Neo-Genesis',
-    price: 680,
-    category: 'Footwear',
-    image: 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?q=80&w=800',
-    description: 'Platform leather boots with metallic hardware.',
-    rating: 4.9,
-    isNewSeason: true,
-    stock: 3,
-    sizes: ['39', '40', '41', '42'],
-    isPreOrder: true
-  },
-  {
-    id: 'p5',
-    name: 'Silk Wrap Blouse',
-    designer: 'Aura Atelier',
-    price: 290,
-    category: 'Tops',
-    image: 'https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=800',
-    description: '100% organic silk blouse with elongated sleeves.',
-    rating: 4.7,
-    isNewSeason: false,
-    stock: 15,
-    sizes: ['XS', 'S', 'M'],
-    isPreOrder: false
-  }
-];
-
-const MOCK_FOLLOWERS: Follower[] = [
-    { id: 'f1', name: 'Sofia R.', location: 'Milan', avatar: 'https://i.pravatar.cc/150?u=1', joined: 'Oct 2023', purchases: 12, style: 'Avant-Garde', vendorId: 'v1' },
-    { id: 'f2', name: 'James K.', location: 'London', avatar: 'https://i.pravatar.cc/150?u=2', joined: 'Dec 2023', purchases: 3, style: 'Minimalist', vendorId: 'v1' },
-    { id: 'f3', name: 'Arjun P.', location: 'New York', avatar: 'https://i.pravatar.cc/150?u=3', joined: 'Jan 2024', purchases: 8, style: 'Streetwear', vendorId: 'v1' },
-    { id: 'f4', name: 'Wei L.', location: 'Shanghai', avatar: 'https://i.pravatar.cc/150?u=4', joined: 'Feb 2024', purchases: 5, style: 'Luxury', vendorId: 'v2' },
-    { id: 'f5', name: 'Zoe M.', location: 'Berlin', avatar: 'https://i.pravatar.cc/150?u=5', joined: 'Mar 2024', purchases: 1, style: 'Techno', vendorId: 'v3' }
-];
+// Empty mock data for production environment
+const MOCK_VENDORS: Vendor[] = [];
+const MOCK_PRODUCTS: Product[] = [];
+const MOCK_FOLLOWERS: Follower[] = [];
 
 const DEFAULT_CMS_CONTENT: LandingPageContent = {
   hero: {
@@ -270,7 +143,8 @@ const initSchema = async () => {
             joined TEXT,
             purchases INTEGER,
             style TEXT,
-            vendorId TEXT
+            vendorId TEXT,
+            followerId TEXT
         )`,
         `CREATE TABLE IF NOT EXISTS notifications (
             id TEXT PRIMARY KEY,
@@ -281,6 +155,12 @@ const initSchema = async () => {
             date TEXT,
             type TEXT,
             link TEXT
+        )`,
+        `CREATE TABLE IF NOT EXISTS waitlist (
+            id TEXT PRIMARY KEY,
+            email TEXT,
+            productId TEXT,
+            date TEXT
         )`,
         // Real-time Authentication Table
         `CREATE TABLE IF NOT EXISTS auth_accounts (
@@ -312,6 +192,7 @@ const initSchema = async () => {
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS paymentMethods JSONB`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS kycDocuments JSONB`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS visualTheme TEXT`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS gallery JSONB`,
         
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS verificationStatus TEXT`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`,
@@ -325,8 +206,11 @@ const initSchema = async () => {
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes JSONB`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS rating NUMERIC`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS isNewSeason BOOLEAN`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS releaseDate TEXT`,
         
-        `ALTER TABLE products ALTER COLUMN sizes TYPE JSONB USING to_jsonb(sizes)`
+        `ALTER TABLE products ALTER COLUMN sizes TYPE JSONB USING to_jsonb(sizes)`,
+        
+        `ALTER TABLE followers ADD COLUMN IF NOT EXISTS followerId TEXT`
     ];
 
     for (const m of migrations) {
@@ -347,59 +231,30 @@ export const seedDatabase = async () => {
     try {
         await initSchema();
 
-        // Check if vendors exist
-        const res = await pool.query('SELECT count(*) FROM vendors');
-        if (res.rows[0].count === '0') {
-            console.log('Seeding Database...');
+        // Check if content exists to determine if we need to seed the system defaults
+        const cmsRes = await pool.query('SELECT count(*) FROM cms');
+        
+        if (cmsRes.rows[0].count === '0') {
+            console.log('Initializing System Data...');
             
-            // Seed Vendors
-            for (const v of MOCK_VENDORS) {
-                await pool.query(
-                    `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, website, instagram, twitter, visualTheme)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-                    [v.id, v.name, v.bio, v.avatar, v.verificationStatus, v.subscriptionStatus, v.location, v.coverImage, v.email, v.subscriptionPlan, v.website, v.instagram, v.twitter, v.visualTheme || 'MINIMALIST']
-                );
-                // Create auth account for seeded vendor
-                await pool.query(
-                    `INSERT INTO auth_accounts (email, password, uid, email_verified) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING`,
-                    [v.email, 'password', v.id, true]
-                );
-            }
-
-            // Seed Products
-            for (const p of MOCK_PRODUCTS) {
-                await pool.query(
-                    `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-                    [p.id, p.name, p.designer, p.price, p.category, p.image, p.description, p.rating, p.isNewSeason, p.stock, JSON.stringify(p.sizes), p.isPreOrder]
-                );
-            }
-
-            // Seed Followers
-            for (const f of MOCK_FOLLOWERS) {
-                await pool.query(
-                    `INSERT INTO followers (id, name, avatar, location, joined, purchases, style, vendorId)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                    [f.id, f.name, f.avatar, f.location, f.joined, f.purchases, f.style, f.vendorId]
-                );
-            }
-
-            // Seed Notifications (Welcome)
-            await pool.query(
-                `INSERT INTO notifications (id, userId, title, message, read, date, type, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
-                ['notif_init', 'all', 'Welcome to MyFitStore', 'Explore our new collection of avant-garde digital fashion.', false, new Date().toISOString(), 'SYSTEM', 'MARKETPLACE']
-            );
-
-            // Seed CMS
+            // Seed CMS content only
             await pool.query(
                 `INSERT INTO cms (id, content) VALUES ($1, $2)`,
                 ['main', JSON.stringify(DEFAULT_CMS_CONTENT)]
             );
+
+            // Seed Welcome Notification (System Wide)
+            await pool.query(
+                `INSERT INTO notifications (id, userId, title, message, read, date, type, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
+                ['notif_init', 'all', 'Welcome to MyFitStore', 'Explore our curated collection of digital fashion.', false, new Date().toISOString(), 'SYSTEM', 'MARKETPLACE']
+            );
+            
+            console.log('System initialized. Waiting for real users.');
         } else {
             console.log('Database already initialized.');
         }
     } catch (e) {
-        console.error("Error seeding database:", e);
+        console.error("Error initializing database:", e);
     }
 };
 
@@ -418,7 +273,8 @@ export const fetchVendors = async (): Promise<Vendor[]> => {
             subscriptionPlan: row.subscriptionplan,
             visualTheme: row.visualtheme,
             facebook: row.facebook,
-            tiktok: row.tiktok
+            tiktok: row.tiktok,
+            gallery: row.gallery || []
         })) as Vendor[];
     } catch (e) {
         console.error(e);
@@ -436,7 +292,8 @@ export const fetchProducts = async (): Promise<Product[]> => {
             stock: Number(row.stock),
             sizes: row.sizes, // JSONB is auto-parsed by node-postgres
             isNewSeason: row.isnewseason,
-            isPreOrder: row.ispreorder
+            isPreOrder: row.ispreorder,
+            releaseDate: row.releasedate
         })) as Product[];
     } catch (e) {
         console.error(e);
@@ -474,12 +331,87 @@ export const fetchUsers = async (): Promise<User[]> => {
     }
 };
 
+// --- OPTIMIZED SINGLE FETCH OPERATIONS ---
+
+export const getUserByEmail = async (email: string): Promise<User | null> => {
+    try {
+        const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (rows.length > 0) {
+             const row = rows[0];
+             return {
+                ...row,
+                verificationStatus: row.verificationstatus,
+                ...(row.profiledata || {})
+            } as User;
+        }
+        return null;
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
+};
+
+export const getVendorByEmail = async (email: string): Promise<Vendor | null> => {
+    try {
+        const { rows } = await pool.query('SELECT * FROM vendors WHERE email = $1', [email]);
+        if (rows.length > 0) {
+            const row = rows[0];
+            return {
+                ...row,
+                paymentMethods: row.paymentmethods,
+                kycDocuments: row.kycdocuments,
+                verificationStatus: row.verificationstatus,
+                subscriptionStatus: row.subscriptionstatus,
+                coverImage: row.coverimage,
+                subscriptionPlan: row.subscriptionplan,
+                visualTheme: row.visualtheme,
+                facebook: row.facebook,
+                tiktok: row.tiktok,
+                gallery: row.gallery || []
+            } as Vendor;
+        }
+        return null;
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
+};
+
 export const fetchVendorFollowers = async (vendorId: string): Promise<Follower[]> => {
     try {
         const { rows } = await pool.query('SELECT * FROM followers WHERE vendorId = $1 ORDER BY id DESC', [vendorId]);
         return rows as Follower[];
     } catch (e) {
         console.error(e);
+        return [];
+    }
+};
+
+export const fetchUserFollowedVendors = async (userId: string): Promise<Vendor[]> => {
+    try {
+        // Find vendors that the user (followerId) is following
+        const { rows } = await pool.query(`
+            SELECT v.* 
+            FROM vendors v 
+            JOIN followers f ON v.id = f.vendorId 
+            WHERE f.followerId = $1
+        `, [userId]);
+        
+        return rows.map(row => ({
+            ...row,
+            paymentMethods: row.paymentmethods,
+            kycDocuments: row.kycdocuments,
+            verificationStatus: row.verificationstatus,
+            subscriptionStatus: row.subscriptionstatus,
+            coverImage: row.coverimage,
+            subscriptionPlan: row.subscriptionplan,
+            visualTheme: row.visualtheme,
+            facebook: row.facebook,
+            tiktok: row.tiktok,
+            gallery: row.gallery || []
+        })) as Vendor[];
+    } catch (e) {
+        console.error("Error fetching followed vendors:", e);
         return [];
     }
 };
@@ -523,9 +455,9 @@ export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> =>
 export const addProductToDb = async (product: Product) => {
     try {
         await pool.query(
-            `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-            [product.id, product.name, product.designer, product.price, product.category, product.image, product.description, product.rating, product.isNewSeason, product.stock, JSON.stringify(product.sizes), product.isPreOrder]
+            `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder, releaseDate)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            [product.id, product.name, product.designer, product.price, product.category, product.image, product.description, product.rating, product.isNewSeason, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null]
         );
     } catch (e) {
         console.error("Add Product Failed", e);
@@ -535,8 +467,8 @@ export const addProductToDb = async (product: Product) => {
 export const updateProductInDb = async (product: Product) => {
     try {
         await pool.query(
-            `UPDATE products SET name=$1, price=$2, category=$3, image=$4, description=$5, stock=$6, sizes=$7, isPreOrder=$8 WHERE id=$9`,
-            [product.name, product.price, product.category, product.image, product.description, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.id]
+            `UPDATE products SET name=$1, price=$2, category=$3, image=$4, description=$5, stock=$6, sizes=$7, isPreOrder=$8, releaseDate=$9 WHERE id=$10`,
+            [product.name, product.price, product.category, product.image, product.description, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null, product.id]
         );
     } catch (e) {
         console.error("Update Product Failed", e);
@@ -560,12 +492,12 @@ export const updateVendorInDb = async (vendor: Vendor) => {
                 name=$1, bio=$2, avatar=$3, verificationStatus=$4, subscriptionStatus=$5, 
                 location=$6, coverImage=$7, email=$8, subscriptionPlan=$9, 
                 website=$10, instagram=$11, twitter=$12, kycDocuments=$13, visualTheme=$14,
-                facebook=$15, tiktok=$16
-             WHERE id=$17`,
+                facebook=$15, tiktok=$16, gallery=$17
+             WHERE id=$18`,
             [vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus,
              vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan,
              vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.kycDocuments), vendor.visualTheme,
-             vendor.facebook, vendor.tiktok, vendor.id]
+             vendor.facebook, vendor.tiktok, JSON.stringify(vendor.gallery || []), vendor.id]
         );
     } catch (e) {
         console.error("Update Vendor Failed", e);
@@ -588,15 +520,24 @@ export const createVendorInDb = async (vendor: Vendor) => {
     }
 };
 
-export const addFollowerToDb = async (follower: Follower) => {
+export const addFollowerToDb = async (follower: Follower & { followerId: string }) => {
     try {
         await pool.query(
-            `INSERT INTO followers (id, name, avatar, location, joined, purchases, style, vendorId)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [follower.id, follower.name, follower.avatar, follower.location, follower.joined, follower.purchases, follower.style, follower.vendorId]
+            `INSERT INTO followers (id, name, avatar, location, joined, purchases, style, vendorId, followerId)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             ON CONFLICT (id) DO NOTHING`,
+            [follower.id, follower.name, follower.avatar, follower.location, follower.joined, follower.purchases, follower.style, follower.vendorId, follower.followerId]
         );
     } catch (e) {
         console.error("Add Follower Failed", e);
+    }
+};
+
+export const removeFollowerFromDb = async (followerId: string, vendorId: string) => {
+    try {
+        await pool.query('DELETE FROM followers WHERE followerId = $1 AND vendorId = $2', [followerId, vendorId]);
+    } catch (e) {
+        console.error("Remove Follower Failed", e);
     }
 };
 
@@ -714,5 +655,18 @@ export const updateContactStatusInDb = async (id: string, status: 'NEW' | 'READ'
         await pool.query("UPDATE contacts SET status = $1 WHERE id = $2", [status, id]);
     } catch (e) {
         console.error("Update Contact Status Failed", e);
+    }
+};
+
+// --- WRITE OPERATIONS (WAITLIST) ---
+
+export const joinWaitlistInDb = async (entry: WaitlistEntry) => {
+    try {
+        await pool.query(
+            `INSERT INTO waitlist (id, email, productId, date) VALUES ($1, $2, $3, $4)`,
+            [entry.id, entry.email, entry.productId, entry.date]
+        );
+    } catch (e) {
+        console.error("Join Waitlist Failed", e);
     }
 };

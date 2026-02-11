@@ -57,6 +57,7 @@ export interface Product {
   stock: number;
   sizes: string[];
   isPreOrder?: boolean;
+  releaseDate?: string; // ISO string for The Drop
 }
 
 export type SubscriptionStatus = 'ACTIVE' | 'INACTIVE';
@@ -103,6 +104,7 @@ export interface Vendor {
   paymentMethods?: PaymentMethod[];
   kycDocuments?: KycDocuments;
   visualTheme?: 'MINIMALIST' | 'DARK' | 'GOLD';
+  gallery?: string[];
 }
 
 export interface Follower {
@@ -114,6 +116,13 @@ export interface Follower {
   purchases: number;
   style: string;
   vendorId: string;
+}
+
+export interface WaitlistEntry {
+  id: string;
+  email: string;
+  productId: string;
+  date: string;
 }
 
 export interface CartItem extends Product {
@@ -154,6 +163,7 @@ export type ViewState =
   | 'MARKETPLACE' 
   | 'NEW_ARRIVALS'
   | 'DESIGNERS'
+  | 'THE_DROP'
   | 'VENDOR_PROFILE'
   | 'PRODUCT_DETAIL' 
   | 'VENDOR_DASHBOARD' 

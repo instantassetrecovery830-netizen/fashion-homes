@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, ArrowLeft, RefreshCw, Briefcase, ShoppingBag } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types.ts';
 import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail } from '../services/firebase.ts';
-import { createVendorInDb, createUserInDb, fetchUsers, fetchVendors } from '../services/dataService.ts';
+import { createVendorInDb, createUserInDb, getUserByEmail, getVendorByEmail } from '../services/dataService.ts';
 
 interface AuthViewProps {
   onLogin: (role: UserRole) => void;
@@ -141,8 +141,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
 
          if (selectedRole === UserRole.VENDOR) {
             // Check if vendor already exists to avoid overwriting details
-            const vendors = await fetchVendors();
-            if (!vendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase())) {
+            const vendor = await getVendorByEmail(user.email);
+            if (!vendor) {
                 await createVendorInDb({
                     id: user.uid,
                     name: brandName || displayName, // Fallback to displayName if brandName not set
@@ -160,8 +160,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 });
             }
          } else {
-            const users = await fetchUsers();
-            if (!users.find(u => u.email?.toLowerCase() === user.email?.toLowerCase())) {
+            const dbUser = await getUserByEmail(user.email);
+            if (!dbUser) {
                 await createUserInDb({
                     id: user.uid,
                     name: displayName,
@@ -199,18 +199,16 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
       } 
       
       try {
-          // Check Buyers (Users table)
-          const dbUsers = await fetchUsers();
-          const dbUser = dbUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
+          // Optimized parallel lookup to minimize delay
+          const [dbUser, dbVendor] = await Promise.all([
+              getUserByEmail(user.email || ''),
+              getVendorByEmail(user.email || '')
+          ]);
           
           if (dbUser && dbUser.role) {
               onLogin(dbUser.role);
               return;
           }
-
-          // Check Vendors (Vendors table)
-          const dbVendors = await fetchVendors();
-          const dbVendor = dbVendors.find(v => v.email?.toLowerCase() === user.email?.toLowerCase());
 
           if (dbVendor) {
               onLogin(UserRole.VENDOR);

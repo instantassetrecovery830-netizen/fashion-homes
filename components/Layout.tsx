@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Menu, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, CreditCard, Calendar, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight, Instagram, Twitter, Facebook } from 'lucide-react';
+import { ShoppingBag, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight, Instagram, Twitter, Facebook, Heart, Share2, Copy } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
-import { UserRole, ViewState, CartItem, Order, AppNotification } from '../types.ts';
+import { UserRole, ViewState, CartItem, Order, AppNotification, Product } from '../types.ts';
 import { auth } from '../services/firebase.ts';
 import { markNotificationRead } from '../services/dataService.ts';
 
@@ -11,10 +11,14 @@ interface LayoutProps {
   children: React.ReactNode;
   role: UserRole;
   cart: CartItem[];
+  savedItems: Product[];
   isCartOpen: boolean;
   setIsCartOpen: (isOpen: boolean) => void;
+  isSavedOpen: boolean;
+  setIsSavedOpen: (isOpen: boolean) => void;
   onUpdateCartItem: (index: number, updates: Partial<CartItem>) => void;
   onRemoveFromCart: (index: number) => void;
+  onToggleSave: (product: Product) => void;
   onNavigate: (view: ViewState) => void;
   onRoleChange: (role: UserRole) => void;
   currentView: ViewState;
@@ -31,10 +35,14 @@ export const Layout: React.FC<LayoutProps> = ({
   children, 
   role, 
   cart,
+  savedItems = [],
   isCartOpen,
   setIsCartOpen,
+  isSavedOpen,
+  setIsSavedOpen,
   onUpdateCartItem,
   onRemoveFromCart,
+  onToggleSave,
   onNavigate,
   onRoleChange,
   currentView,
@@ -47,11 +55,11 @@ export const Layout: React.FC<LayoutProps> = ({
   onRefreshNotifications
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [measurementError, setMeasurementError] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   
   // Notification State
   const [showNotifications, setShowNotifications] = useState(false);
@@ -205,6 +213,17 @@ export const Layout: React.FC<LayoutProps> = ({
     setCheckoutStep('PAYMENT');
   };
 
+  const handleShareSaved = () => {
+      if (savedItems.length === 0) return;
+      const ids = savedItems.map(p => p.id).join(',');
+      const shareUrl = `${window.location.origin}${window.location.pathname}?outfit=${ids}`;
+      
+      navigator.clipboard.writeText(shareUrl).then(() => {
+          setCopiedLink(true);
+          setTimeout(() => setCopiedLink(false), 2000);
+      });
+  };
+
   // Called when Paystack success callback fires
   const onPaystackSuccess = async (reference: any) => {
     setIsProcessingCheckout(true);
@@ -252,9 +271,8 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   // Logic for Nav Appearance
-  const isNavTransparent = currentView === 'LANDING' && !isScrolled && !mobileMenuOpen;
+  const isNavTransparent = currentView === 'LANDING' && !isScrolled;
   const navTextColor = isNavTransparent ? 'text-white' : 'text-luxury-black';
-  const hamburgerColor = isNavTransparent ? 'bg-white' : 'bg-black';
 
   return (
     <div className="min-h-screen bg-luxury-cream text-luxury-black font-sans selection:bg-luxury-gold selection:text-white transition-colors duration-500 relative">
@@ -284,26 +302,15 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Navigation */}
       <nav 
         className={`fixed top-0 w-full z-50 transition-all duration-300 border-b border-transparent ${
-          isScrolled || mobileMenuOpen ? 'bg-white/95 backdrop-blur-md border-gray-100 py-3' : 'bg-transparent py-6'
+          isScrolled ? 'bg-white/95 backdrop-blur-md border-gray-100 py-3' : 'bg-transparent py-4 md:py-6'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="flex justify-between items-center">
             
-            {/* Custom Mobile Menu Button */}
-            <button 
-              className="md:hidden flex items-center gap-3 group focus:outline-none" 
-              onClick={() => setMobileMenuOpen(true)}
-            >
-              <div className="flex flex-col gap-1.5 w-6">
-                  <span className={`h-0.5 ${hamburgerColor} w-full transform origin-left group-hover:scale-x-75 transition-transform duration-300`}></span>
-                  <span className={`h-0.5 ${hamburgerColor} w-3/4 transform origin-left group-hover:scale-x-100 transition-transform duration-300`}></span>
-              </div>
-            </button>
-
             {/* Logo */}
             <div 
-              className={`text-2xl md:text-3xl font-serif font-bold tracking-widest cursor-pointer hover:opacity-70 transition-opacity ${navTextColor}`}
+              className={`text-xl md:text-3xl font-serif font-bold tracking-widest cursor-pointer hover:opacity-70 transition-opacity ${navTextColor}`}
               onClick={() => onNavigate('LANDING')}
             >
               MyFitStore
@@ -445,6 +452,19 @@ export const Layout: React.FC<LayoutProps> = ({
                 )}
               </div>
 
+              {/* Saved Items (Heart) */}
+              <div 
+                className="relative cursor-pointer hover:text-luxury-gold transition-colors hidden md:block" 
+                onClick={() => setIsSavedOpen(true)}
+              >
+                <Heart size={20} fill={savedItems.length > 0 ? "currentColor" : "none"} className={savedItems.length > 0 ? "text-luxury-gold" : ""} />
+                {savedItems.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-luxury-black text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full">
+                    {savedItems.length}
+                  </span>
+                )}
+              </div>
+
               <div 
                 className="relative cursor-pointer hover:text-luxury-gold transition-colors hidden md:block" 
                 onClick={() => setIsCartOpen(true)}
@@ -460,109 +480,94 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
           
           {/* Mobile Quick Links (Visible Horizontal Scroll) */}
-          {!mobileMenuOpen && (
-             <div className={`md:hidden flex gap-6 overflow-x-auto pb-2 mt-4 scrollbar-hide ${navTextColor} transition-colors duration-300`}>
-                {NAV_LINKS.map(link => (
-                  <button 
-                    key={link.label}
-                    onClick={() => onNavigate(link.view)}
-                    className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap opacity-90 hover:opacity-100 shrink-0"
-                  >
-                    {link.label}
-                  </button>
-                ))}
-             </div>
-          )}
-        </div>
-
-        {/* Mobile Full Screen Menu - Redesigned */}
-        <div 
-            className={`fixed inset-0 z-[100] bg-white transition-all duration-500 ease-in-out md:hidden ${
-                mobileMenuOpen 
-                ? 'opacity-100 translate-y-0 visible' 
-                : 'opacity-0 -translate-y-full invisible pointer-events-none'
-            }`}
-        >
-            {/* Close Button */}
-            <button 
-                onClick={() => setMobileMenuOpen(false)}
-                className="absolute top-6 right-6 p-2 hover:rotate-90 transition-transform duration-300 z-50 text-black hover:text-luxury-gold"
-            >
-                <X size={32} strokeWidth={1} />
-            </button>
-
-            {/* Menu Content */}
-            <div className="h-full flex flex-col justify-center px-8 relative overflow-hidden text-black">
-                {/* Decorative Background Text */}
-                <div className="absolute -right-20 top-1/4 text-9xl font-serif italic text-gray-50 opacity-50 pointer-events-none rotate-90 whitespace-nowrap">
-                    MyFitStore
-                </div>
-
-                <nav className="flex flex-col gap-6 relative z-10">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Explore</p>
-                    {NAV_LINKS.map((link, idx) => (
-                        <button
-                            key={link.label}
-                            onClick={() => { setMobileMenuOpen(false); onNavigate(link.view); }}
-                            className="text-4xl sm:text-5xl font-serif italic text-left text-black hover:text-luxury-gold hover:pl-4 transition-all duration-300 relative group flex items-center gap-4"
-                            style={{ transitionDelay: `${idx * 50}ms` }}
-                        >
-                            {link.label}
-                            <ArrowRight size={24} className="opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300 text-luxury-gold" strokeWidth={1} />
-                        </button>
-                    ))}
-                    
-                    <button
-                        onClick={() => { setMobileMenuOpen(false); onNavigate('PRICING'); }}
-                        className="text-4xl sm:text-5xl font-serif italic text-left text-black hover:text-luxury-gold hover:pl-4 transition-all duration-300 relative group"
-                    >
-                        Membership
-                    </button>
-                </nav>
-
-                <div className="mt-12 pt-8 border-t border-gray-100 relative z-10">
-                    {isLoggedIn ? (
-                        <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => { setMobileMenuOpen(false); handleDashboardClick(); }} className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest hover:text-luxury-gold transition-colors">
-                                <Settings size={16} /> Dashboard
-                            </button>
-                            <button onClick={() => { setMobileMenuOpen(false); onNavigate('PROFILE_SETTINGS'); }} className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest hover:text-luxury-gold transition-colors">
-                                <User size={16} /> Profile
-                            </button>
-                            <button onClick={() => { setMobileMenuOpen(false); onLogout(); }} className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-red-500 hover:text-red-600 transition-colors col-span-2 mt-4">
-                                <LogOut size={16} /> Sign Out
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex gap-4">
-                            <button 
-                                onClick={() => { setMobileMenuOpen(false); onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH'); }} 
-                                className="flex-1 py-4 border border-black text-black text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors"
-                            >
-                                Sign In
-                            </button>
-                            <button 
-                                onClick={() => { setMobileMenuOpen(false); onAuthRequest ? onAuthRequest('REGISTER', UserRole.BUYER) : onNavigate('AUTH'); }} 
-                                className="flex-1 py-4 bg-black text-white text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors"
-                            >
-                                Join
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Social Footer */}
-                <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end">
-                    <div className="flex gap-6">
-                        <Instagram size={20} className="text-gray-400 hover:text-black cursor-pointer transition-colors" />
-                        <Twitter size={20} className="text-gray-400 hover:text-black cursor-pointer transition-colors" />
-                        <Facebook size={20} className="text-gray-400 hover:text-black cursor-pointer transition-colors" />
-                    </div>
-                    <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">© 2024</p>
-                </div>
-            </div>
+          <div className={`md:hidden flex gap-6 overflow-x-auto pb-2 mt-4 scrollbar-hide ${navTextColor} transition-colors duration-300 -mx-4 px-4`}>
+            {NAV_LINKS.map(link => (
+              <button 
+                key={link.label}
+                onClick={() => onNavigate(link.view)}
+                className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap shrink-0 pb-1 ${currentView === link.view ? 'border-b border-current opacity-100' : 'opacity-80 hover:opacity-100'}`}
+              >
+                {link.label}
+              </button>
+            ))}
+          </div>
         </div>
       </nav>
+
+      {/* Wardrobe (Saved Items) Drawer */}
+      <div 
+        className={`fixed inset-0 z-[60] transition-visibility duration-500 ${isSavedOpen ? 'visible' : 'invisible'}`}
+      >
+        <div 
+          className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-500 ${isSavedOpen ? 'opacity-100' : 'opacity-0'}`}
+          onClick={() => setIsSavedOpen(false)}
+        />
+        <div 
+          className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl transform transition-transform duration-500 ease-out flex flex-col ${isSavedOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        >
+          {/* Drawer Header */}
+          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10 text-black">
+             <div className="flex items-center gap-3">
+                 <h2 className="text-xl font-serif italic">Your Wardrobe</h2>
+             </div>
+             <button onClick={() => setIsSavedOpen(false)} className="hover:rotate-90 transition-transform duration-300">
+               <X size={24} />
+             </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 text-black">
+            {savedItems.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                <Heart size={48} className="mb-4 opacity-20" />
+                <p className="text-sm uppercase tracking-widest">Your wardrobe is empty</p>
+                <button 
+                  onClick={() => { setIsSavedOpen(false); onNavigate('MARKETPLACE'); }}
+                  className="mt-6 text-xs underline hover:text-black"
+                >
+                  Browse Collections
+                </button>
+              </div>
+            ) : (
+              savedItems.map((item, index) => (
+                <div key={`${item.id}-${index}`} className="animate-fade-in flex gap-4">
+                  <div className="w-24 h-32 bg-gray-100 shrink-0 cursor-pointer" onClick={() => { setIsSavedOpen(false); /* Navigate to product */ }}>
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 flex flex-col justify-between py-1">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-widest mb-1">{item.designer}</h3>
+                      <p className="font-serif italic text-sm text-gray-600 leading-tight">{item.name}</p>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <span className="text-sm font-medium">${item.price}</span>
+                      <button 
+                        onClick={() => onToggleSave(item)}
+                        className="text-luxury-gold hover:text-black transition-colors"
+                      >
+                        <Heart size={16} fill="currentColor" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {savedItems.length > 0 && (
+            <div className="p-6 bg-gray-50 border-t border-gray-100 text-black">
+               <button 
+                  onClick={handleShareSaved}
+                  className="w-full bg-white border border-black text-black py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 mb-3"
+               >
+                  {copiedLink ? <><CheckCircle size={16} /> Link Copied</> : <><Share2 size={16} /> Share Outfit</>}
+               </button>
+               <p className="text-[10px] text-gray-400 text-center">
+                  Create a shareable link of your current selection.
+               </p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Cart Drawer */}
       <div 
@@ -730,13 +735,13 @@ export const Layout: React.FC<LayoutProps> = ({
         </div>
       </div>
 
-      <main className="pt-32 md:pt-20 pb-24 md:pb-0 min-h-screen">
+      <main className="pt-28 md:pt-20 pb-24 md:pb-0 min-h-screen">
         {children}
       </main>
 
       {/* Mobile Bottom Navigation */}
       {!['PRODUCT_DETAIL', 'AUTH'].includes(currentView) && (
-        <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 z-50 md:hidden flex justify-around items-end px-2 pt-3 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+        <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 z-50 md:hidden flex justify-around items-end px-2 pt-3 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)] h-[72px]">
           <button onClick={() => onNavigate('LANDING')} className={`flex flex-col items-center gap-1 p-2 ${currentView === 'LANDING' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}>
             <Home size={20} />
             <span className="text-[9px] font-bold uppercase tracking-widest">Home</span>

@@ -5,6 +5,7 @@ export const NAV_LINKS: { label: string; view: ViewState }[] = [
   { label: 'Shop', view: 'MARKETPLACE' },
   { label: 'New Arrivals', view: 'NEW_ARRIVALS' },
   { label: 'Designers', view: 'DESIGNERS' },
+  { label: 'The Drop', view: 'THE_DROP' },
   { label: 'The Maison', view: 'ABOUT' }
 ];
 

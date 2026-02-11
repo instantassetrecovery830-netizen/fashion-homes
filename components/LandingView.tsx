@@ -53,7 +53,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
     else onNavigate('BUYER_DASHBOARD');
   };
 
-  const activeVendors = vendors.filter(v => v.subscriptionStatus === 'ACTIVE');
+  // Only show vendors that are both active (subscribed) and verified by admin
+  const activeVendors = vendors.filter(v => v.subscriptionStatus === 'ACTIVE' && v.verificationStatus === 'VERIFIED');
   const spotlightProducts = products.slice(0, 3); // Display first 3 real products
 
   // Safe access to CMS content
@@ -182,27 +183,33 @@ export const LandingView: React.FC<LandingViewProps> = ({
           </div>
           
           <div className="flex flex-wrap justify-center gap-8 md:gap-20">
-            {activeVendors.slice(0, 4).map((vendor) => (
-              <div 
-                key={vendor.id} 
-                className="group flex flex-col items-center cursor-pointer w-[40%] md:w-auto"
-                onClick={() => onDesignerClick(vendor.name)}
-              >
-                <div className="w-20 h-20 md:w-32 md:h-32 rounded-full border border-gray-100 p-1 mb-4 md:mb-6 transition-all duration-500 group-hover:border-luxury-gold group-hover:scale-105 shadow-sm group-hover:shadow-xl">
-                  <div className="w-full h-full rounded-full overflow-hidden bg-gray-50 relative">
-                    <img 
-                      src={vendor.avatar} 
-                      alt={vendor.name} 
-                      className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 ease-out" 
-                    />
+            {activeVendors.length === 0 ? (
+               <div className="w-full text-center text-gray-400">
+                  <p>Our curated ateliers are being updated.</p>
+               </div>
+            ) : (
+              activeVendors.slice(0, 4).map((vendor) => (
+                <div 
+                  key={vendor.id} 
+                  className="group flex flex-col items-center cursor-pointer w-[40%] md:w-auto"
+                  onClick={() => onDesignerClick(vendor.name)}
+                >
+                  <div className="w-20 h-20 md:w-32 md:h-32 rounded-full border border-gray-100 p-1 mb-4 md:mb-6 transition-all duration-500 group-hover:border-luxury-gold group-hover:scale-105 shadow-sm group-hover:shadow-xl">
+                    <div className="w-full h-full rounded-full overflow-hidden bg-gray-50 relative">
+                      <img 
+                        src={vendor.avatar} 
+                        alt={vendor.name} 
+                        className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 ease-out" 
+                      />
+                    </div>
                   </div>
+                  <h3 className="text-xs md:text-sm font-bold uppercase tracking-widest border-b border-transparent group-hover:border-luxury-black pb-1 transition-all duration-300 text-luxury-charcoal text-center">
+                    {vendor.name}
+                  </h3>
+                  <p className="text-[9px] md:text-[10px] text-luxury-taupe mt-1 md:mt-2 font-serif italic">{vendor.location}</p>
                 </div>
-                <h3 className="text-xs md:text-sm font-bold uppercase tracking-widest border-b border-transparent group-hover:border-luxury-black pb-1 transition-all duration-300 text-luxury-charcoal text-center">
-                  {vendor.name}
-                </h3>
-                <p className="text-[9px] md:text-[10px] text-luxury-taupe mt-1 md:mt-2 font-serif italic">{vendor.location}</p>
-              </div>
-            ))}
+              ))
+            )}
           </div>
           
           <div className="text-center mt-12 md:mt-16">

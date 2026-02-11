@@ -3,11 +3,12 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { Layout } from './Layout.tsx';
 import { LandingView } from './LandingView.tsx';
 import { Loader } from 'lucide-react';
-import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission, AppNotification } from '../types.ts';
+import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission, AppNotification, Follower } from '../types.ts';
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
-  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications
+  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
+  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb
 } from '../services/dataService.ts';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
@@ -23,6 +24,7 @@ const AuthView = React.lazy(() => import('./AuthView.tsx').then(m => ({ default:
 const PricingView = React.lazy(() => import('./PricingView.tsx').then(m => ({ default: m.PricingView })));
 const AboutView = React.lazy(() => import('./AboutView.tsx').then(m => ({ default: m.AboutView })));
 const AiConcierge = React.lazy(() => import('./AiConcierge.tsx').then(m => ({ default: m.AiConcierge })));
+const TheDropView = React.lazy(() => import('./TheDropView.tsx').then(m => ({ default: m.TheDropView })));
 
 const LoadingFallback = () => (
   <div className="h-[50vh] flex items-center justify-center">
@@ -36,7 +38,10 @@ const App: React.FC = () => {
   const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [savedItems, setSavedItems] = useState<Product[]>([]);
+  const [followedVendors, setFollowedVendors] = useState<Vendor[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isSavedOpen, setIsSavedOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string | null>(null);
@@ -72,7 +77,7 @@ const App: React.FC = () => {
       setVendors(dbVendors);
       setProducts(dbProducts);
 
-      // Fetch user-specific data (Notifications, Orders)
+      // Fetch user-specific data (Notifications, Orders, Follows)
       const currentUserId = auth.currentUser?.uid;
       
       // Load heavy data in parallel
@@ -87,6 +92,11 @@ const App: React.FC = () => {
       setAllUsers(dbUsers);
       setContactSubmissions(dbContacts);
       setNotifications(dbNotifications);
+
+      if (currentUserId) {
+          const follows = await fetchUserFollowedVendors(currentUserId);
+          setFollowedVendors(follows);
+      }
 
     } catch (error) {
       console.error("Failed to refresh data", error);
@@ -105,6 +115,16 @@ const App: React.FC = () => {
     };
     initData();
 
+    // Load saved items from local storage
+    const saved = localStorage.getItem('myfitstore_saved');
+    if (saved) {
+      try {
+        setSavedItems(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load saved items", e);
+      }
+    }
+
     // Real-time: Poll for general data updates every 30 seconds
     const pollInterval = setInterval(() => {
         refreshData();
@@ -112,6 +132,32 @@ const App: React.FC = () => {
 
     return () => clearInterval(pollInterval);
   }, []);
+
+  // Sync saved items to local storage
+  useEffect(() => {
+    localStorage.setItem('myfitstore_saved', JSON.stringify(savedItems));
+  }, [savedItems]);
+
+  // Handle Shared Outfit URL Params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outfitIds = params.get('outfit');
+    
+    // Only process if products are loaded
+    if (outfitIds && products.length > 0) {
+      const ids = outfitIds.split(',');
+      const sharedProducts = products.filter(p => ids.includes(p.id));
+      
+      if (sharedProducts.length > 0) {
+        setSavedItems(sharedProducts);
+        setIsSavedOpen(true); // Open the drawer to show the shared outfit
+        
+        // Clean URL without reloading
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [products]);
 
   // Simulate Live Transactions (Context-Aware)
   useEffect(() => {
@@ -278,16 +324,17 @@ const App: React.FC = () => {
         setIsLoggedIn(false);
         setUserRole(UserRole.BUYER);
         setNotifications([]); // Clear notifications on logout
+        setFollowedVendors([]);
       }
     });
 
     return () => unsubscribe();
   }, [allUsers, vendors]); // Depend on data to ensure correct role assignment
 
-  // Derived State: Active Products (only from active vendors)
+  // Derived State: Active Products (only from active vendors who are verified)
   const activeProducts = products.filter(product => {
       const vendor = vendors.find(v => v.name === product.designer);
-      return vendor ? vendor.subscriptionStatus === 'ACTIVE' : true; 
+      return vendor ? (vendor.subscriptionStatus === 'ACTIVE' && vendor.verificationStatus === 'VERIFIED') : true; 
   });
 
   // Feature Flags Management
@@ -310,16 +357,18 @@ const App: React.FC = () => {
         setSelectedDesignerFilter(null);
     }
     setCurrentView(view);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setIsCartOpen(false);
+    setIsSavedOpen(false);
   };
 
   const handleAuthNavigation = (mode: 'LOGIN' | 'REGISTER', role: UserRole) => {
     setAuthInitialMode(mode);
     setAuthInitialRole(role);
     setCurrentView('AUTH');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setIsCartOpen(false);
+    setIsSavedOpen(false);
   };
 
   const handleDesignerSelect = (designerName: string) => {
@@ -381,6 +430,53 @@ const App: React.FC = () => {
     const newCart = [...cart];
     newCart.splice(index, 1);
     setCart(newCart);
+  };
+
+  // Saved Items Handler
+  const handleToggleSave = (product: Product) => {
+    setSavedItems(prev => {
+      const exists = prev.find(p => p.id === product.id);
+      if (exists) {
+        return prev.filter(p => p.id !== product.id);
+      } else {
+        setIsSavedOpen(true); // Open drawer when saving for better feedback
+        return [...prev, product];
+      }
+    });
+  };
+
+  // Follow Vendor Handler
+  const handleToggleFollow = async (vendor: Vendor) => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+          handleAuthNavigation('LOGIN', UserRole.BUYER);
+          return;
+      }
+
+      const isFollowing = followedVendors.some(v => v.id === vendor.id);
+      const followerId = currentUser.uid;
+
+      if (isFollowing) {
+          // Optimistic update
+          setFollowedVendors(prev => prev.filter(v => v.id !== vendor.id));
+          await removeFollowerFromDb(followerId, vendor.id);
+      } else {
+          // Optimistic update
+          setFollowedVendors(prev => [...prev, vendor]);
+          
+          const newFollower: Follower & { followerId: string } = {
+              id: `follow_${followerId}_${vendor.id}`,
+              name: currentUser.displayName || 'Anonymous',
+              avatar: currentUser.photoURL || '',
+              location: 'Unknown',
+              joined: new Date().toISOString(),
+              purchases: 0,
+              style: 'General',
+              vendorId: vendor.id,
+              followerId: followerId
+          };
+          await addFollowerToDb(newFollower);
+      }
   };
 
   // --- VISUAL SEARCH HANDLER ---
@@ -502,19 +598,32 @@ const App: React.FC = () => {
               vendors={vendors}
               customTitle={visualSearchResults ? "Visual Search Results" : null}
               onClearFilter={handleClearVisualSearch}
+              savedItems={savedItems}
+              onToggleSave={handleToggleSave}
             />
           </Suspense>
         );
       case 'NEW_ARRIVALS':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <NewArrivalsView onProductSelect={handleProductSelect} products={activeProducts} />
+            <NewArrivalsView 
+                onProductSelect={handleProductSelect} 
+                products={activeProducts}
+                savedItems={savedItems}
+                onToggleSave={handleToggleSave}
+            />
           </Suspense>
         );
       case 'DESIGNERS':
         return (
           <Suspense fallback={<LoadingFallback />}>
             <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />
+          </Suspense>
+        );
+      case 'THE_DROP':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <TheDropView products={products} onNavigate={handleNavigate} />
           </Suspense>
         );
       case 'VENDOR_PROFILE':
@@ -526,6 +635,10 @@ const App: React.FC = () => {
                 onProductSelect={handleProductSelect}
                 onNavigate={handleNavigate}
                 products={activeProducts}
+                savedItems={savedItems}
+                onToggleSave={handleToggleSave}
+                onToggleFollow={handleToggleFollow}
+                isFollowing={followedVendors.some(v => v.id === selectedVendor.id)}
               />
             ) : <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />}
           </Suspense>
@@ -542,6 +655,8 @@ const App: React.FC = () => {
                 onBack={() => handleNavigate('MARKETPLACE')}
                 onViewDesigner={() => associatedVendor && handleDesignerSelect(associatedVendor.name)}
                 featureFlags={featureFlags}
+                savedItems={savedItems}
+                onToggleSave={handleToggleSave}
               />
             ) : (
                 <MarketplaceView 
@@ -549,6 +664,8 @@ const App: React.FC = () => {
                     onProductSelect={handleProductSelect} 
                     products={activeProducts}
                     vendors={vendors}
+                    savedItems={savedItems}
+                    onToggleSave={handleToggleSave}
                 />
             )}
           </Suspense>
@@ -577,6 +694,9 @@ const App: React.FC = () => {
               cmsContent={cmsContent}
               onUpdateCMSContent={handleUpdateCMSContent}
               contactSubmissions={contactSubmissions}
+              followedVendors={followedVendors}
+              onToggleFollow={handleToggleFollow}
+              onDesignerClick={handleDesignerSelect}
             />
           </Suspense>
         );
@@ -601,6 +721,8 @@ const App: React.FC = () => {
               cmsContent={cmsContent}
               onUpdateCMSContent={handleUpdateCMSContent}
               contactSubmissions={contactSubmissions}
+              followedVendors={followedVendors}
+              onToggleFollow={handleToggleFollow}
             />
           </Suspense>
         );
@@ -632,14 +754,27 @@ const App: React.FC = () => {
     }
   };
 
+  if (featureFlags.maintenanceMode && userRole !== UserRole.ADMIN) {
+    return (
+      <div className="min-h-screen bg-luxury-cream flex flex-col items-center justify-center animate-fade-in">
+        <h1 className="text-3xl font-serif font-bold tracking-widest mb-6">MyFitStore</h1>
+        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-gray-400">Under Maintenance</p>
+      </div>
+    );
+  }
+
   return (
     <Layout 
       role={userRole} 
       cart={cart}
+      savedItems={savedItems}
       isCartOpen={isCartOpen}
       setIsCartOpen={setIsCartOpen}
+      isSavedOpen={isSavedOpen}
+      setIsSavedOpen={setIsSavedOpen}
       onUpdateCartItem={handleUpdateCartItem}
       onRemoveFromCart={handleRemoveFromCart}
+      onToggleSave={handleToggleSave}
       onNavigate={handleNavigate}
       onRoleChange={setUserRole}
       currentView={currentView}

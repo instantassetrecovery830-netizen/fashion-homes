@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Heart } from 'lucide-react';
 import { Product } from '../types';
@@ -5,10 +6,13 @@ import { Product } from '../types';
 interface NewArrivalsViewProps {
   onProductSelect: (product: Product) => void;
   products: Product[];
+  savedItems?: Product[];
+  onToggleSave?: (product: Product) => void;
 }
 
-export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ onProductSelect, products }) => {
+export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ onProductSelect, products, savedItems = [], onToggleSave }) => {
   const newArrivals = products.filter(p => p.isNewSeason);
+  const isSaved = (productId: string) => savedItems.some(p => p.id === productId);
 
   return (
     <div className="min-h-screen pt-12 pb-24 animate-fade-in">
@@ -50,8 +54,11 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ onProductSelec
                   </button>
                 </div>
                 
-                <button className="absolute top-4 right-4 text-white mix-blend-difference hover:scale-110 transition-transform opacity-0 group-hover:opacity-100 duration-500">
-                  <Heart size={20} strokeWidth={1.5} />
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onToggleSave && onToggleSave(product); }}
+                    className={`absolute top-4 right-4 transition-transform hover:scale-110 duration-300 opacity-0 group-hover:opacity-100 ${isSaved(product.id) ? 'opacity-100 text-luxury-gold' : 'text-white mix-blend-difference'}`}
+                >
+                  <Heart size={20} strokeWidth={1.5} fill={isSaved(product.id) ? "currentColor" : "none"} />
                 </button>
               </div>
 

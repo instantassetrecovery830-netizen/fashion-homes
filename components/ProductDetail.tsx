@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler } from 'lucide-react';
+import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler, Heart } from 'lucide-react';
 import { Product, Vendor } from '../types.ts';
 import { getStyleMatch } from '../services/geminiService.ts';
 
@@ -11,6 +11,8 @@ interface ProductDetailProps {
   onBack: () => void;
   onViewDesigner?: () => void;
   featureFlags: { enableAiStyleMatch: boolean; enableReviews: boolean; };
+  savedItems?: Product[];
+  onToggleSave?: (product: Product) => void;
 }
 
 interface Review {
@@ -21,7 +23,7 @@ interface Review {
   date: string;
 }
 
-export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, onAddToCart, onBack, onViewDesigner, featureFlags }) => {
+export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, onAddToCart, onBack, onViewDesigner, featureFlags, savedItems = [], onToggleSave }) => {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState(false);
   const [measurements, setMeasurements] = useState('');
@@ -36,6 +38,8 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   ]);
   const [newReview, setNewReview] = useState('');
   const [newRating, setNewRating] = useState(5);
+
+  const isSaved = savedItems.some(p => p.id === product.id);
 
   useEffect(() => {
     setActiveImage(product.image);
@@ -94,7 +98,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
           {/* Gallery */}
           <div className="space-y-4">
             {/* Main Image */}
-            <div className="aspect-[3/4] overflow-hidden bg-gray-50 cursor-zoom-in relative">
+            <div className="aspect-[3/4] overflow-hidden bg-gray-50 cursor-zoom-in relative group">
               <img 
                 src={activeImage} 
                 alt={product.name} 
@@ -105,6 +109,12 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
                    <Clock size={12} /> Pre-Order
                  </div>
               )}
+              <button 
+                onClick={() => onToggleSave && onToggleSave(product)}
+                className={`absolute top-4 right-4 p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white hover:text-luxury-gold transition-all ${isSaved ? 'text-luxury-gold bg-white' : 'text-white'}`}
+              >
+                <Heart size={20} fill={isSaved ? "currentColor" : "none"} />
+              </button>
             </div>
             {/* Thumbnails */}
             <div className="grid grid-cols-4 gap-4">
