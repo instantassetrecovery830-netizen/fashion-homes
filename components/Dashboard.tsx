@@ -11,11 +11,10 @@ import {
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, 
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, BadgeCheck,
   Lock, MessageSquare, Flag, Store, Grid, ChevronDown, Loader, Star, Save, Menu, Wallet, ArrowLeft, Inbox,
-  Phone, Clock, Filter, Search, Facebook, User, ExternalLink, Image as ImageIcon, Video, Type, PieChart as PieChartIcon
+  Phone, Clock, Filter, Search, Facebook, User, ExternalLink, Image as ImageIcon, Video, Type, PieChart as PieChartIcon, LogOut
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, User as AppUser, LandingPageContent, ContactSubmission, Follower } from '../types.ts';
 import { updateUserPassword, auth } from '../services/firebase.ts';
-import { VendorProfileView } from './VendorProfileView.tsx';
 
 const COLORS = ['#0a0a0a', '#C5A059', '#8B8580', '#E5E5E5', '#4A0404', '#1B2432'];
 
@@ -216,13 +215,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 ))}
             </div>
             
-            <div className="p-6 border-t border-gray-100 hidden md:block">
+            <div className="p-6 border-t border-gray-100 space-y-2">
                 <button 
-                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                    className="flex items-center gap-4 text-gray-400 hover:text-black transition-colors"
+                    onClick={() => onNavigate('MARKETPLACE')}
+                    className="flex items-center gap-4 text-gray-400 hover:text-black transition-colors w-full p-2 text-sm"
                 >
-                    <span className="text-[10px] uppercase tracking-[0.2em] w-full text-center">MyFitStore</span>
+                    <ArrowLeft size={18} />
+                    <span className="tracking-wide">Back to Store</span>
                 </button>
+                <div className="hidden md:block text-center pt-4">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-gray-300">MyFitStore</span>
+                </div>
             </div>
         </div>
       </>
