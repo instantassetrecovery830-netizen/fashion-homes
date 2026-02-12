@@ -11,7 +11,8 @@ import {
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, 
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, BadgeCheck,
   Lock, MessageSquare, Flag, Store, Grid, ChevronDown, Loader, Star, Save, Menu, Wallet, ArrowLeft, Inbox,
-  Phone, Clock, Filter, Search, Facebook, User, ExternalLink, Image as ImageIcon, Video, Type, PieChart as PieChartIcon, LogOut, Upload, Link
+  Phone, Clock, Filter, Search, Facebook, User, ExternalLink, Image as ImageIcon, Video, Type, PieChart as PieChartIcon, LogOut, Upload, Link, Tag, Layers,
+  CreditCard, Plane, Info, Calendar
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, User as AppUser, LandingPageContent, ContactSubmission, Follower } from '../types.ts';
 import { updateUserPassword, auth } from '../services/firebase.ts';
@@ -79,14 +80,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Vendor Storefront State
   const [storefrontForm, setStorefrontForm] = useState<Vendor | null>(null);
   
+  // Product Management State
+  const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+  const [productForm, setProductForm] = useState<Partial<Product>>({});
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+
   // Profile State
   const [newPassword, setNewPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
+
+  // Shipping & Delivery Mock State
+  const [shippingSettings, setShippingSettings] = useState({
+      processingTime: '3-5 business days',
+      domesticRate: 15,
+      internationalRate: 45,
+      freeShippingThreshold: 500,
+      shipsInternationally: true,
+      returnPolicy: '14-day return policy for unworn items with original tags. Buyer pays return shipping.'
+  });
 
   // Refs for file inputs
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const productImageInputRef = useRef<HTMLInputElement>(null);
 
   // Update active tab if initialTab changes
   useEffect(() => {
@@ -231,13 +248,80 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
   };
 
+  // Product Management Handlers
+  const handleProductImageUpload = (file: File) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+          setProductForm(prev => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+  };
+
+  const handleSaveProduct = async () => {
+      if (!productForm.name || !productForm.price || !productForm.category) {
+          alert("Please fill in all required fields.");
+          return;
+      }
+
+      setIsSavingProduct(true);
+      try {
+          const currentVendor = role === UserRole.VENDOR ? vendors.find(v => v.email === currentUser?.email) : null;
+          
+          const newProduct: Product = {
+              id: productForm.id || `prod_${Date.now()}`,
+              name: productForm.name,
+              designer: currentVendor?.name || productForm.designer || 'MyFitStore',
+              price: Number(productForm.price),
+              category: productForm.category,
+              image: productForm.image || 'https://via.placeholder.com/400x600',
+              description: productForm.description || '',
+              rating: productForm.rating || 5,
+              stock: Number(productForm.stock) || 0,
+              sizes: Array.isArray(productForm.sizes) ? productForm.sizes : (typeof productForm.sizes === 'string' ? (productForm.sizes as string).split(',').map((s: string) => s.trim()) : ['S', 'M', 'L']),
+              isNewSeason: !!productForm.isNewSeason,
+              isPreOrder: !!productForm.isPreOrder
+          };
+
+          if (productForm.id) {
+              if (onUpdateProduct) await onUpdateProduct(newProduct);
+          } else {
+              if (onAddProduct) await onAddProduct(newProduct);
+          }
+          
+          setIsProductFormOpen(false);
+          setProductForm({});
+      } catch (e) {
+          console.error(e);
+          alert("Failed to save product.");
+      } finally {
+          setIsSavingProduct(false);
+      }
+  };
+
+  const openProductForm = (product?: Product) => {
+      if (product) {
+          setProductForm({ ...product });
+      } else {
+          const currentVendor = role === UserRole.VENDOR ? vendors.find(v => v.email === currentUser?.email) : null;
+          setProductForm({
+              designer: currentVendor?.name || '',
+              category: 'Outerwear',
+              stock: 10,
+              sizes: ['S', 'M', 'L']
+          });
+      }
+      setIsProductFormOpen(true);
+  };
+
   // Render Sidebar
   const renderSidebar = () => {
     const tabs = [
       { id: 'OVERVIEW', label: 'Overview', icon: LayoutDashboard, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
       { id: 'ORDERS', label: 'Orders', icon: ShoppingBag, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
       { id: 'PRODUCTS', label: 'Products', icon: Shirt, roles: [UserRole.ADMIN, UserRole.VENDOR] },
-      { id: 'STOREFRONT', label: 'Storefront', icon: Palette, roles: [UserRole.VENDOR] },
+      { id: 'STOREFRONT', label: 'Design Store', icon: Palette, roles: [UserRole.VENDOR] },
+      { id: 'SUBSCRIPTION', label: 'Subscription', icon: CreditCard, roles: [UserRole.VENDOR] },
+      { id: 'SHIPPING', label: 'Delivery', icon: Truck, roles: [UserRole.VENDOR] },
       { id: 'CUSTOMERS', label: 'Customers', icon: Users, roles: [UserRole.ADMIN] },
       { id: 'VENDORS', label: 'Ateliers', icon: Store, roles: [UserRole.ADMIN] },
       { id: 'MESSAGES', label: 'Messages', icon: Inbox, roles: [UserRole.ADMIN] },
@@ -267,7 +351,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {tabs.filter(t => t.roles.includes(role)).map(tab => (
                 <button
                     key={tab.id}
-                    onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }}
+                    onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); setIsProductFormOpen(false); }}
                     className={`w-full flex items-center gap-4 p-3 text-sm font-medium transition-all rounded-sm ${activeTab === tab.id ? 'bg-luxury-black text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-black'}`}
                 >
                     <tab.icon size={18} />
@@ -301,9 +385,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
              <div className="flex items-center justify-between">
                  <h2 className="text-3xl font-serif italic">Dashboard Overview</h2>
-                 <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
-                     <Menu size={20} />
-                 </button>
+                 <div className="flex gap-4">
+                    {role === UserRole.VENDOR && storefrontForm && (
+                        <button 
+                            onClick={() => onDesignerClick && onDesignerClick(storefrontForm.name)}
+                            className="hidden md:flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-sm text-xs font-bold uppercase tracking-widest hover:border-black transition-colors"
+                        >
+                            <ExternalLink size={14} /> Preview Live Boutique
+                        </button>
+                    )}
+                    <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                        <Menu size={20} />
+                    </button>
+                 </div>
              </div>
              
              {/* KPIs */}
@@ -388,7 +482,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           return (
             <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-7xl">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-3xl font-serif italic">Storefront Editor</h2>
+                    <h2 className="text-3xl font-serif italic">Design Store Editor</h2>
                     <div className="flex gap-4">
                         <button 
                             onClick={handleStorefrontSave}
@@ -610,6 +704,216 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           );
 
+      case 'SUBSCRIPTION':
+          if (!storefrontForm) return <div className="p-8"><Loader className="animate-spin text-luxury-gold" /></div>;
+          
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-7xl">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Membership & Plan</h2>
+                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                          <Menu size={20} />
+                      </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm md:col-span-2">
+                          <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                              <BadgeCheck size={14} /> Current Status
+                          </h3>
+                          <div className="flex items-center justify-between p-6 bg-gray-50 rounded-sm mb-6">
+                              <div>
+                                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Current Plan</p>
+                                  <p className="text-2xl font-serif italic">{storefrontForm.subscriptionPlan || 'Atelier'}</p>
+                              </div>
+                              <div className="text-right">
+                                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${storefrontForm.subscriptionStatus === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                      {storefrontForm.subscriptionStatus || 'Inactive'}
+                                  </span>
+                                  <p className="text-[10px] text-gray-400 mt-2">Renews automatically</p>
+                              </div>
+                          </div>
+                          
+                          <div className="space-y-4">
+                              <h4 className="text-sm font-bold uppercase tracking-wide">Billing History</h4>
+                              <div className="border border-gray-100 rounded-sm overflow-hidden">
+                                  {[1, 2].map(i => (
+                                      <div key={i} className="flex justify-between items-center p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+                                          <div className="flex items-center gap-3">
+                                              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
+                                                  <FileText size={14} />
+                                              </div>
+                                              <div>
+                                                  <p className="text-xs font-bold">Invoice #{2024000 + i}</p>
+                                                  <p className="text-[10px] text-gray-400">Oct {10 - i}, 2024</p>
+                                              </div>
+                                          </div>
+                                          <div className="flex items-center gap-4">
+                                              <span className="text-sm font-medium">$165.00</span>
+                                              <button className="text-[10px] uppercase font-bold text-luxury-gold hover:underline">Download</button>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                          <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                              <CreditCard size={14} /> Payment Method
+                          </h3>
+                          <div className="flex items-center gap-3 p-4 border border-gray-200 rounded-sm mb-4">
+                              <div className="w-10 h-6 bg-blue-900 rounded-sm" /> 
+                              <div>
+                                  <p className="text-xs font-bold">•••• 4242</p>
+                                  <p className="text-[10px] text-gray-400">Expires 12/25</p>
+                              </div>
+                          </div>
+                          <button className="w-full border border-black text-black py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors">
+                              Update Card
+                          </button>
+                      </div>
+                  </div>
+
+                  <div className="bg-luxury-black text-white p-8 md:p-12 rounded-sm shadow-lg relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-luxury-gold/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+                      <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                          <div>
+                              <h3 className="text-2xl font-serif italic mb-2">Upgrade to Couture Tier</h3>
+                              <p className="text-gray-400 text-sm max-w-lg">Unlock white-glove logistics, priority placement in "The Drop", and reduced commission rates.</p>
+                          </div>
+                          <button className="bg-luxury-gold text-white px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-white hover:text-black transition-colors">
+                              View Plans
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          );
+
+      case 'SHIPPING':
+          if (!storefrontForm) return <div className="p-8"><Loader className="animate-spin text-luxury-gold" /></div>;
+
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-5xl">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Delivery & Logistics</h2>
+                      <div className="flex gap-4">
+                          <button 
+                              className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors hidden md:block"
+                              onClick={() => alert("Shipping settings saved.")}
+                          >
+                              Save Settings
+                          </button>
+                          <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                              <Menu size={20} />
+                          </button>
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                          <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                              <Truck size={14} /> Shipping Zones
+                          </h3>
+                          
+                          <div className="space-y-6">
+                              <div>
+                                  <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Dispatch Origin</label>
+                                  <input 
+                                      value={storefrontForm.location || ''}
+                                      disabled
+                                      className="w-full bg-gray-50 border border-gray-200 py-3 px-4 text-sm text-gray-500"
+                                  />
+                                  <p className="text-[10px] text-gray-400 mt-1">Based on your atelier location</p>
+                              </div>
+
+                              <div className="flex items-center justify-between border-b border-gray-50 pb-4">
+                                  <div>
+                                      <p className="text-sm font-bold">International Shipping</p>
+                                      <p className="text-[10px] text-gray-400">Enable worldwide delivery</p>
+                                  </div>
+                                  <div className={`w-10 h-5 rounded-full p-1 cursor-pointer transition-colors ${shippingSettings.shipsInternationally ? 'bg-green-500' : 'bg-gray-200'}`} onClick={() => setShippingSettings({...shippingSettings, shipsInternationally: !shippingSettings.shipsInternationally})}>
+                                      <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${shippingSettings.shipsInternationally ? 'translate-x-5' : 'translate-x-0'}`} />
+                                  </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                      <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Domestic Rate ($)</label>
+                                      <input 
+                                          type="number"
+                                          value={shippingSettings.domesticRate}
+                                          onChange={(e) => setShippingSettings({...shippingSettings, domesticRate: Number(e.target.value)})}
+                                          className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Intl Rate ($)</label>
+                                      <input 
+                                          type="number"
+                                          value={shippingSettings.internationalRate}
+                                          onChange={(e) => setShippingSettings({...shippingSettings, internationalRate: Number(e.target.value)})}
+                                          disabled={!shippingSettings.shipsInternationally}
+                                          className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent disabled:text-gray-300"
+                                      />
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                          <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                              <Clock size={14} /> Processing & Returns
+                          </h3>
+                          
+                          <div className="space-y-6">
+                              <div>
+                                  <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Processing Time</label>
+                                  <select 
+                                      value={shippingSettings.processingTime}
+                                      onChange={(e) => setShippingSettings({...shippingSettings, processingTime: e.target.value})}
+                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                  >
+                                      <option>1-2 business days</option>
+                                      <option>3-5 business days</option>
+                                      <option>1-2 weeks (Made to Order)</option>
+                                      <option>3-4 weeks (Couture)</option>
+                                  </select>
+                              </div>
+
+                              <div>
+                                  <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Free Shipping Threshold ($)</label>
+                                  <input 
+                                      type="number"
+                                      value={shippingSettings.freeShippingThreshold}
+                                      onChange={(e) => setShippingSettings({...shippingSettings, freeShippingThreshold: Number(e.target.value)})}
+                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                  />
+                              </div>
+
+                              <div>
+                                  <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Return Policy</label>
+                                  <textarea 
+                                      value={shippingSettings.returnPolicy}
+                                      onChange={(e) => setShippingSettings({...shippingSettings, returnPolicy: e.target.value})}
+                                      className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none bg-gray-50 h-24 resize-none"
+                                  />
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div className="md:hidden mt-6">
+                      <button 
+                          className="w-full bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
+                          onClick={() => alert("Shipping settings saved.")}
+                      >
+                          Save Settings
+                      </button>
+                  </div>
+              </div>
+          );
+
       case 'ORDERS':
         return (
           <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
@@ -693,43 +997,64 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </button>
                      </div>
                      {onAddProduct && (
-                         <button className="bg-luxury-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-luxury-gold transition-colors shadow-lg">
+                         <button 
+                            onClick={() => openProductForm()}
+                            className="bg-luxury-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-luxury-gold transition-colors shadow-lg"
+                         >
                              <Plus size={16} /> <span className="hidden md:inline">Add New Piece</span>
                          </button>
                      )}
                  </div>
                  
-                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
-                     {myProducts.map(product => (
-                         <div key={product.id} className="bg-white border border-gray-100 group relative rounded-sm overflow-hidden hover:shadow-lg transition-shadow">
-                             <div className="aspect-[3/4] bg-gray-50 overflow-hidden relative">
-                                 <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                                 {product.stock < 5 && (
-                                     <div className="absolute top-2 left-2 bg-red-500 text-white text-[9px] font-bold px-2 py-1 uppercase tracking-wide">
-                                         Low Stock
+                 {myProducts.length === 0 ? (
+                     <div className="py-20 text-center border border-dashed border-gray-200 rounded-sm">
+                         <Shirt size={48} className="mx-auto mb-4 text-gray-200" />
+                         <p className="text-gray-400 mb-6">Your collection is empty.</p>
+                         <button 
+                            onClick={() => openProductForm()}
+                            className="text-xs font-bold uppercase tracking-widest underline hover:text-luxury-gold"
+                         >
+                             Create your first product
+                         </button>
+                     </div>
+                 ) : (
+                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                         {myProducts.map(product => (
+                             <div key={product.id} className="bg-white border border-gray-100 group relative rounded-sm overflow-hidden hover:shadow-lg transition-shadow">
+                                 <div className="aspect-[3/4] bg-gray-50 overflow-hidden relative">
+                                     <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                     {product.stock < 5 && (
+                                         <div className="absolute top-2 left-2 bg-red-500 text-white text-[9px] font-bold px-2 py-1 uppercase tracking-wide">
+                                             Low Stock
+                                         </div>
+                                     )}
+                                 </div>
+                                 <div className="p-5">
+                                     <div className="flex justify-between items-start mb-2">
+                                         <h3 className="font-bold text-sm truncate pr-2">{product.name}</h3>
+                                         <span className="text-sm font-medium">${product.price}</span>
                                      </div>
-                                 )}
-                             </div>
-                             <div className="p-5">
-                                 <div className="flex justify-between items-start mb-2">
-                                     <h3 className="font-bold text-sm truncate pr-2">{product.name}</h3>
-                                     <span className="text-sm font-medium">${product.price}</span>
+                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">{product.category}</p>
+                                     <div className="flex justify-between items-center text-[10px] text-gray-400 pt-3 border-t border-gray-50">
+                                         <span>{product.stock} units</span>
+                                         <span>{product.rating} ★</span>
+                                     </div>
                                  </div>
-                                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">{product.category}</p>
-                                 <div className="flex justify-between items-center text-[10px] text-gray-400 pt-3 border-t border-gray-50">
-                                     <span>{product.stock} units</span>
-                                     <span>{product.rating} ★</span>
+                                 <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-300">
+                                     <button 
+                                        onClick={() => openProductForm(product)}
+                                        className="p-2 bg-white rounded-full shadow-md hover:text-luxury-gold transition-colors"
+                                     >
+                                         <Edit2 size={14} />
+                                     </button>
+                                     {onDeleteProduct && (
+                                         <button onClick={() => onDeleteProduct(product.id)} className="p-2 bg-white rounded-full shadow-md hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                                     )}
                                  </div>
                              </div>
-                             <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-300">
-                                 <button className="p-2 bg-white rounded-full shadow-md hover:text-luxury-gold transition-colors"><Edit2 size={14} /></button>
-                                 {onDeleteProduct && (
-                                     <button onClick={() => onDeleteProduct(product.id)} className="p-2 bg-white rounded-full shadow-md hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
-                                 )}
-                             </div>
-                         </div>
-                     ))}
-                 </div>
+                         ))}
+                     </div>
+                 )}
              </div>
          );
 
