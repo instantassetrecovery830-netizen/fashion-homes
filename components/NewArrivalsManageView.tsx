@@ -48,7 +48,7 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
     return myNewArrivals.filter(p => p.createdAt && new Date(p.createdAt) > oneWeekAgo).length;
   }, [myNewArrivals]);
 
-  const canUpload = userRole === UserRole.ADMIN || uploadCount < 20;
+  const canUpload = uploadCount < 3;
 
   const handleImageUpload = (file: File) => {
     const reader = new FileReader();
@@ -146,9 +146,7 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
             </button>
             <h1 className="text-3xl md:text-4xl font-serif italic mb-2">Manage New Arrivals</h1>
             <p className="text-gray-500 text-sm">
-              {userRole === UserRole.ADMIN 
-                ? "Manage all new season drops." 
-                : `You have used ${uploadCount} of 20 weekly uploads.`}
+              You have used {uploadCount} of 3 weekly uploads.
             </p>
           </div>
 
@@ -169,11 +167,11 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
         </div>
 
         {/* Limit Warning */}
-        {!canUpload && userRole !== UserRole.ADMIN && (
+        {!canUpload && (
             <div className="bg-yellow-50 border border-yellow-100 p-4 mb-8 flex items-center gap-3 text-yellow-800 rounded-sm">
                 <AlertCircle size={20} />
                 <span className="text-xs font-bold uppercase tracking-wide">Weekly Limit Reached</span>
-                <span className="text-sm">You have reached the maximum of 20 uploads for this week.</span>
+                <span className="text-sm">You have reached the maximum of 3 uploads for this week.</span>
             </div>
         )}
 

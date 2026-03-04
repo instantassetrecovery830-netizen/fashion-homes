@@ -12,7 +12,7 @@ import {
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, BadgeCheck,
   Lock, MessageSquare, Flag, Store, Grid, ChevronDown, Loader, Star, Save, Menu, Wallet, ArrowLeft, Inbox,
   Phone, Clock, Filter, Search, Facebook, User, ExternalLink, Image as ImageIcon, Video, Type, PieChart as PieChartIcon, LogOut, Upload, Link, Tag, Layers,
-  CreditCard, Plane, Info, Calendar, Percent, TrendingUp, Download, Eye, FileCheck, XCircle, AlertTriangle
+  CreditCard, Plane, Info, Calendar, Percent, TrendingUp, Download, Eye, FileCheck, XCircle, AlertTriangle, Sparkles
 } from 'lucide-react';
 import { FeatureFlags, UserRole, Product, ViewState, Vendor, Order, User as AppUser, LandingPageContent, ContactSubmission, Follower } from '../types.ts';
 import { updateUserPassword, auth } from '../services/firebase.ts';
@@ -355,6 +355,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'MESSAGES', label: 'Messages', icon: Inbox, roles: [UserRole.ADMIN] },
       { id: 'CMS', label: 'Content', icon: FileText, roles: [UserRole.ADMIN] },
       { id: 'FOLLOWING', label: 'Following', icon: Heart, roles: [UserRole.BUYER] },
+      { id: 'NEW_ARRIVALS_FEED', label: 'New Arrivals', icon: Sparkles, roles: [UserRole.BUYER] },
       { id: 'PROFILE', label: 'Settings', icon: Settings, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
     ];
 
@@ -417,9 +418,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {role === UserRole.VENDOR && storefrontForm && (
                         <button 
                             onClick={() => onDesignerClick && onDesignerClick(storefrontForm.name)}
-                            className="hidden md:flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-sm text-xs font-bold uppercase tracking-widest hover:border-black transition-colors"
+                            className="flex items-center gap-2 px-3 py-2 md:px-4 border border-gray-200 rounded-sm text-[10px] md:text-xs font-bold uppercase tracking-widest hover:border-black transition-colors"
                         >
-                            <ExternalLink size={14} /> Preview Live Boutique
+                            <ExternalLink size={14} /> 
+                            <span className="hidden sm:inline">Preview Live Boutique</span>
+                            <span className="sm:hidden">Preview</span>
                         </button>
                     )}
                     <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
@@ -1905,6 +1908,69 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <div className="col-span-full text-center py-20 text-gray-400 bg-gray-50 rounded-sm border border-dashed border-gray-200">
                               <Heart size={48} className="mx-auto mb-4 opacity-20" />
                               <p>You are not following any ateliers yet.</p>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          );
+
+      case 'NEW_ARRIVALS_FEED':
+          // Filter for active new arrivals (last 7 days) from active vendors/admin
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+          const newArrivalsFeed = products
+            .filter(product => {
+                // 1. Must be marked as New Season
+                if (!product.isNewSeason) return false;
+                
+                // 2. Must be created within last 7 days
+                if (!product.createdAt) return false;
+                if (new Date(product.createdAt) <= oneWeekAgo) return false;
+
+                // 3. Vendor must be active (or be Admin/System - if no vendor found, we assume it's Admin/System and show it)
+                const vendor = vendors.find(v => v.name === product.designer);
+                return vendor ? vendor.subscriptionStatus === 'ACTIVE' : true;
+            })
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">New Arrivals</h2>
+                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                          <Menu size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {newArrivalsFeed.map(product => (
+                          <div 
+                            key={product.id} 
+                            className="bg-white border border-gray-100 group relative rounded-sm overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                            onClick={() => onProductSelect && onProductSelect(product)}
+                          >
+                              <div className="aspect-[3/4] bg-gray-50 overflow-hidden relative">
+                                  <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                  <div className="absolute top-2 left-2 bg-black text-white text-[9px] font-bold px-2 py-1 uppercase tracking-wide">
+                                      New Season
+                                  </div>
+                              </div>
+                              <div className="p-5">
+                                  <div className="flex justify-between items-start mb-2">
+                                      <div>
+                                          <h3 className="font-bold text-sm truncate pr-2">{product.name}</h3>
+                                          <p className="text-[10px] text-gray-500 uppercase tracking-wide">{product.designer}</p>
+                                      </div>
+                                      <span className="text-sm font-medium">${product.price}</span>
+                                  </div>
+                              </div>
+                          </div>
+                      ))}
+                      {newArrivalsFeed.length === 0 && (
+                          <div className="col-span-full text-center py-20 text-gray-400 bg-gray-50 rounded-sm border border-dashed border-gray-200">
+                              <Sparkles size={48} className="mx-auto mb-4 opacity-20" />
+                              <p>No new arrivals this week. Check back soon!</p>
                           </div>
                       )}
                   </div>

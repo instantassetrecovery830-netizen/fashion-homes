@@ -183,6 +183,15 @@ const App: React.FC = () => {
       return vendor ? vendor.subscriptionStatus === 'ACTIVE' : true; 
   });
 
+  // Helper to check if a product is effectively a "New Arrival" (isNewSeason AND created within last 7 days)
+  const isEffectiveNewArrival = (product: Product) => {
+      if (!product.isNewSeason) return false;
+      if (!product.createdAt) return false; // Assume not new if no date, or handle as needed
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      return new Date(product.createdAt) > oneWeekAgo;
+  };
+
   // Feature Flags Management
   const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({
     enableMarketplace: true,
@@ -378,7 +387,7 @@ const App: React.FC = () => {
             isLoggedIn={isLoggedIn} 
             userRole={userRole} 
             vendors={vendors}
-            products={activeProducts}
+            products={activeProducts.map(p => ({...p, isNewSeason: isEffectiveNewArrival(p)}))} // Override isNewSeason for display
             onDesignerClick={handleDesignerSelect}
             cmsContent={cmsContent}
             onAuthRequest={handleAuthNavigation}
@@ -390,7 +399,7 @@ const App: React.FC = () => {
             onNavigate={handleNavigate} 
             onProductSelect={handleProductSelect} 
             initialDesigner={selectedDesignerFilter}
-            products={(visualSearchResults || activeProducts).filter(p => !p.isNewSeason)}
+            products={(visualSearchResults || activeProducts).filter(p => !isEffectiveNewArrival(p))}
             vendors={vendors}
             customTitle={visualSearchResults ? "Visual Search Results" : null}
             onClearFilter={handleClearVisualSearch}
@@ -402,7 +411,7 @@ const App: React.FC = () => {
         return (
           <NewArrivalsView 
             onProductSelect={handleProductSelect} 
-            products={activeProducts}
+            products={activeProducts.filter(p => isEffectiveNewArrival(p))}
             savedItems={savedItems}
             onToggleSave={handleToggleSave}
             onNavigate={handleNavigate}
@@ -429,7 +438,7 @@ const App: React.FC = () => {
             vendor={selectedVendor} 
             onProductSelect={handleProductSelect}
             onNavigate={handleNavigate}
-            products={activeProducts.filter(p => !p.isNewSeason)}
+            products={activeProducts.filter(p => !isEffectiveNewArrival(p))}
             savedItems={savedItems}
             onToggleSave={handleToggleSave}
           />
@@ -451,7 +460,7 @@ const App: React.FC = () => {
             <MarketplaceView 
                 onNavigate={handleNavigate} 
                 onProductSelect={handleProductSelect} 
-                products={activeProducts.filter(p => !p.isNewSeason)}
+                products={activeProducts.filter(p => !isEffectiveNewArrival(p))}
                 vendors={vendors}
                 savedItems={savedItems}
                 onToggleSave={handleToggleSave}
