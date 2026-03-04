@@ -162,6 +162,7 @@ export type ViewState =
   | 'LANDING' 
   | 'MARKETPLACE' 
   | 'NEW_ARRIVALS'
+  | 'NEW_ARRIVALS_MANAGE'
   | 'DESIGNERS'
   | 'THE_DROP'
   | 'VENDOR_PROFILE'

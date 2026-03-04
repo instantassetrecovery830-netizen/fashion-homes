@@ -16,6 +16,7 @@ import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
 // Lazy Load Heavy Components for Performance
 const MarketplaceView = React.lazy(() => import('./MarketplaceView.tsx').then(m => ({ default: m.MarketplaceView })));
 const NewArrivalsView = React.lazy(() => import('./NewArrivalsView.tsx').then(m => ({ default: m.NewArrivalsView })));
+const NewArrivalsManageView = React.lazy(() => import('./NewArrivalsManageView.tsx').then(m => ({ default: m.NewArrivalsManageView })));
 const DesignersView = React.lazy(() => import('./DesignersView.tsx').then(m => ({ default: m.DesignersView })));
 const VendorProfileView = React.lazy(() => import('./VendorProfileView.tsx').then(m => ({ default: m.VendorProfileView })));
 const ProductDetail = React.lazy(() => import('./ProductDetail.tsx').then(m => ({ default: m.ProductDetail })));
@@ -616,6 +617,19 @@ const App: React.FC = () => {
                 products={activeProducts}
                 savedItems={savedItems}
                 onToggleSave={handleToggleSave}
+            />
+          </Suspense>
+        );
+      case 'NEW_ARRIVALS_MANAGE':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <NewArrivalsManageView 
+              products={products}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
+              userRole={userRole}
+              onNavigate={handleNavigate}
             />
           </Suspense>
         );

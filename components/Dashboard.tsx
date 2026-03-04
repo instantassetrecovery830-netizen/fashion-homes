@@ -521,6 +521,832 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         );
 
+      case 'FINANCE':
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Finance & Payouts</h2>
+                      <div className="flex gap-4">
+                          <button className="bg-luxury-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hidden md:flex items-center gap-2 hover:bg-luxury-gold transition-colors">
+                              <Download size={16} /> Export CSV
+                          </button>
+                          <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                              <Menu size={20} />
+                          </button>
+                      </div>
+                  </div>
+
+                  {/* Wallet Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-luxury-black text-white p-8 rounded-sm shadow-lg relative overflow-hidden">
+                          <div className="relative z-10">
+                              <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Available Balance</p>
+                              <h3 className="text-4xl font-serif mb-6">${(totalRevenue * 0.85).toLocaleString()}</h3>
+                              <button className="bg-white text-black px-6 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold hover:text-white transition-colors">
+                                  Request Payout
+                              </button>
+                          </div>
+                          <div className="absolute -right-6 -bottom-6 text-white/5">
+                              <Wallet size={150} />
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                          <div className="flex items-center gap-3 mb-4">
+                              <div className="p-2 bg-yellow-50 text-yellow-600 rounded-full">
+                                  <Clock size={20} />
+                              </div>
+                              <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Pending Clearance</span>
+                          </div>
+                          <h3 className="text-3xl font-serif">$1,250.00</h3>
+                          <p className="text-[10px] text-gray-400 mt-2">Available on Nov 1st</p>
+                      </div>
+
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                          <div className="flex items-center gap-3 mb-4">
+                              <div className="p-2 bg-green-50 text-green-600 rounded-full">
+                                  <TrendingUp size={20} />
+                              </div>
+                              <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Earnings</span>
+                          </div>
+                          <h3 className="text-3xl font-serif">${totalRevenue.toLocaleString()}</h3>
+                          <p className="text-[10px] text-gray-400 mt-2">Lifetime volume</p>
+                      </div>
+                  </div>
+
+                  {/* Transaction Table */}
+                  <div className="bg-white border border-gray-100 overflow-hidden rounded-sm shadow-sm">
+                      <div className="p-6 border-b border-gray-100">
+                          <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                              <Activity size={14} /> Recent Transactions
+                          </h3>
+                      </div>
+                      <table className="w-full text-left text-sm min-w-full">
+                          <thead className="bg-gray-50 text-xs uppercase tracking-widest text-gray-500 font-bold">
+                              <tr>
+                                  <th className="p-6">Date</th>
+                                  <th className="p-6">Description</th>
+                                  <th className="p-6">Type</th>
+                                  <th className="p-6 text-right">Amount</th>
+                                  <th className="p-6 text-center">Status</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                              {myOrders.slice(0, 5).map((order) => (
+                                  <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                                      <td className="p-6 text-gray-500">{new Date(order.date).toLocaleDateString()}</td>
+                                      <td className="p-6 font-medium">Order #{order.id.slice(-6)}</td>
+                                      <td className="p-6"><span className="bg-green-50 text-green-700 px-2 py-1 rounded-sm text-[10px] uppercase font-bold">Sale</span></td>
+                                      <td className="p-6 text-right font-mono text-green-600">+${(order.total * 0.85).toFixed(2)}</td>
+                                      <td className="p-6 text-center">
+                                          <span className="text-green-600 text-[10px] uppercase font-bold flex items-center justify-center gap-1">
+                                              <CheckCircle size={10} /> Cleared
+                                          </span>
+                                      </td>
+                                  </tr>
+                              ))}
+                              {/* Mock Payout */}
+                              <tr className="hover:bg-gray-50/50 transition-colors">
+                                  <td className="p-6 text-gray-500">Oct 15, 2024</td>
+                                  <td className="p-6 font-medium">Payout to Bank •••• 4242</td>
+                                  <td className="p-6"><span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-sm text-[10px] uppercase font-bold">Withdrawal</span></td>
+                                  <td className="p-6 text-right font-mono text-black">-$2,400.00</td>
+                                  <td className="p-6 text-center">
+                                      <span className="text-gray-400 text-[10px] uppercase font-bold flex items-center justify-center gap-1">
+                                          <CheckCircle size={10} /> Processed
+                                      </span>
+                                  </td>
+                              </tr>
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          );
+
+      case 'MARKETING':
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Marketing Tools</h2>
+                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                          <Menu size={20} />
+                      </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                      {/* Create Promo */}
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm h-fit">
+                          <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                              <Tag size={14} /> Create Promotion
+                          </h3>
+                          <div className="space-y-4">
+                              <div>
+                                  <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Discount Code</label>
+                                  <input className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent uppercase" placeholder="e.g. WINTERSALE" />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                      <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Discount %</label>
+                                      <input type="number" className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent" placeholder="20" />
+                                  </div>
+                                  <div>
+                                      <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Limit (Uses)</label>
+                                      <input type="number" className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent" placeholder="100" />
+                                  </div>
+                              </div>
+                              <button className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mt-4">
+                                  Launch Campaign
+                              </button>
+                          </div>
+                      </div>
+
+                      {/* Active Campaigns */}
+                      <div className="lg:col-span-2 bg-white border border-gray-100 rounded-sm shadow-sm overflow-hidden">
+                          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                              <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-gray-400">
+                                  <Layers size={14} /> Active Campaigns
+                              </h3>
+                          </div>
+                          <table className="w-full text-left text-sm">
+                              <thead className="bg-gray-50 text-xs uppercase tracking-widest text-gray-500 font-bold">
+                                  <tr>
+                                      <th className="p-6">Code</th>
+                                      <th className="p-6">Discount</th>
+                                      <th className="p-6">Usage</th>
+                                      <th className="p-6">Status</th>
+                                      <th className="p-6 text-right">Actions</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                  {promotions.map((promo) => (
+                                      <tr key={promo.id} className="hover:bg-gray-50/50 transition-colors">
+                                          <td className="p-6 font-mono font-bold">{promo.code}</td>
+                                          <td className="p-6">{promo.discount} Off</td>
+                                          <td className="p-6 text-gray-500">{promo.uses} redemptions</td>
+                                          <td className="p-6">
+                                              <span className={`px-2 py-1 rounded-sm text-[10px] uppercase font-bold ${
+                                                  promo.status === 'ACTIVE' ? 'bg-green-50 text-green-700' : 
+                                                  promo.status === 'SCHEDULED' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'
+                                              }`}>
+                                                  {promo.status}
+                                              </span>
+                                          </td>
+                                          <td className="p-6 text-right">
+                                              <button className="text-gray-400 hover:text-red-500 transition-colors">
+                                                  <Trash2 size={16} />
+                                              </button>
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+          );
+
+      case 'STOREFRONT':
+          if (!storefrontForm) return <div className="p-8"><Loader className="animate-spin text-luxury-gold" /></div>;
+          
+          return (
+            <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-7xl">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-3xl font-serif italic">Design Store Editor</h2>
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={handleStorefrontSave}
+                            className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors hidden md:block"
+                        >
+                            Save Changes
+                        </button>
+                        <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                            <Menu size={20} />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Left Column: Brand & Visuals */}
+                    <div className="space-y-8">
+                        {/* Brand Identity */}
+                        <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                                <BadgeCheck size={14} /> Brand Identity
+                            </h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Atelier Name</label>
+                                    <input 
+                                        value={storefrontForm.name} 
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, name: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Location</label>
+                                    <div className="relative">
+                                        <input 
+                                            value={storefrontForm.location} 
+                                            onChange={(e) => setStorefrontForm({...storefrontForm, location: e.target.value})}
+                                            className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent pl-6"
+                                        />
+                                        <MapPin size={14} className="absolute left-0 top-2.5 text-gray-400" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Bio / Philosophy</label>
+                                    <textarea 
+                                        value={storefrontForm.bio} 
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, bio: e.target.value})}
+                                        className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none bg-gray-50 h-32 resize-none"
+                                        placeholder="Tell your story..."
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Visual Assets */}
+                        <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                             <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                                <ImageIcon size={14} /> Visual Assets
+                            </h3>
+                            
+                            <div className="flex gap-8 items-start">
+                                {/* Avatar */}
+                                <div className="text-center">
+                                    <div className="relative w-24 h-24 rounded-full bg-gray-50 border border-gray-200 overflow-hidden group cursor-pointer mb-2 mx-auto">
+                                        <img src={storefrontForm.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                            <Camera className="text-white" size={20} />
+                                        </div>
+                                        <input 
+                                            type="file" 
+                                            accept="image/*"
+                                            ref={avatarInputRef}
+                                            onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'AVATAR')}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
+                                    </div>
+                                    <span className="text-[10px] uppercase font-bold text-gray-400">Profile Logo</span>
+                                </div>
+
+                                {/* Cover Image */}
+                                <div className="flex-1">
+                                     <div className="relative w-full h-24 bg-gray-50 border border-gray-200 overflow-hidden group cursor-pointer mb-2 rounded-sm">
+                                        <img src={storefrontForm.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                            <Upload className="text-white" size={20} />
+                                        </div>
+                                         <input 
+                                            type="file" 
+                                            accept="image/*"
+                                            ref={coverInputRef}
+                                            onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'COVER')}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
+                                    </div>
+                                    <span className="text-[10px] uppercase font-bold text-gray-400">Cover Image</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Theme */}
+                         <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                                <Palette size={14} /> Visual Theme
+                            </h3>
+                            <div className="grid grid-cols-3 gap-4">
+                                {['MINIMALIST', 'DARK', 'GOLD'].map((theme) => (
+                                    <button
+                                        key={theme}
+                                        onClick={() => setStorefrontForm({...storefrontForm, visualTheme: theme as any})}
+                                        className={`p-4 border rounded-sm text-xs font-bold uppercase transition-all ${
+                                            storefrontForm.visualTheme === theme 
+                                            ? 'border-black bg-black text-white' 
+                                            : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                                        }`}
+                                    >
+                                        {theme}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Moodboard & Socials */}
+                    <div className="space-y-8">
+                         {/* Moodboard Gallery */}
+                        <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-gray-400">
+                                    <Grid size={14} /> Moodboard Gallery
+                                </h3>
+                                <div className="relative overflow-hidden">
+                                     <button className="text-[10px] bg-black text-white px-3 py-1 uppercase font-bold tracking-widest flex items-center gap-1 hover:bg-luxury-gold transition-colors">
+                                        <Plus size={12} /> Add Image
+                                     </button>
+                                     <input 
+                                        type="file" 
+                                        accept="image/*"
+                                        ref={galleryInputRef}
+                                        onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'GALLERY')}
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-2">
+                                {storefrontForm.gallery?.map((img, idx) => (
+                                    <div key={idx} className="aspect-square bg-gray-50 relative group overflow-hidden rounded-sm">
+                                        <img src={img} className="w-full h-full object-cover" alt="" />
+                                        <button 
+                                            onClick={() => removeFromGallery(idx)}
+                                            className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X size={10} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {(!storefrontForm.gallery || storefrontForm.gallery.length === 0) && (
+                                    <div className="col-span-3 py-8 text-center border border-dashed border-gray-200 rounded-sm text-gray-400 text-xs">
+                                        Upload images to showcase your aesthetic.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Social Links */}
+                        <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                                <Link size={14} /> Connections
+                            </h3>
+                            <div className="space-y-4">
+                                <div className="relative">
+                                    <Globe size={14} className="absolute left-0 top-3 text-gray-400" />
+                                    <input 
+                                        placeholder="Website URL"
+                                        value={storefrontForm.website || ''}
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, website: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <Instagram size={14} className="absolute left-0 top-3 text-gray-400" />
+                                    <input 
+                                        placeholder="Instagram Handle"
+                                        value={storefrontForm.instagram || ''}
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, instagram: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <Twitter size={14} className="absolute left-0 top-3 text-gray-400" />
+                                    <input 
+                                        placeholder="Twitter Handle"
+                                        value={storefrontForm.twitter || ''}
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, twitter: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                                 <div className="relative">
+                                    <Facebook size={14} className="absolute left-0 top-3 text-gray-400" />
+                                    <input 
+                                        placeholder="Facebook URL"
+                                        value={storefrontForm.facebook || ''}
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, facebook: e.target.value})}
+                                        className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none bg-transparent"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="md:hidden mt-6 pb-20">
+                      <button 
+                          onClick={handleStorefrontSave}
+                          className="w-full bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
+                      >
+                          Save Changes
+                      </button>
+                  </div>
+            </div>
+          );
+
+      case 'SUBSCRIPTION':
+          if (!storefrontForm) return <div className="p-8"><Loader className="animate-spin text-luxury-gold" /></div>;
+          
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-7xl">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Membership & Plan</h2>
+                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                          <Menu size={20} />
+                      </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm md:col-span-2">
+                          <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                              <BadgeCheck size={14} /> Current Status
+                          </h3>
+                          <div className="flex items-center justify-between p-6 bg-gray-50 rounded-sm mb-6">
+                              <div>
+                                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Current Plan</p>
+                                  <p className="text-2xl font-serif italic">{storefrontForm.subscriptionPlan || 'Atelier'}</p>
+                              </div>
+                              <div className="text-right">
+                                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${storefrontForm.subscriptionStatus === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                      {storefrontForm.subscriptionStatus || 'Inactive'}
+                                  </span>
+                                  <p className="text-[10px] text-gray-400 mt-2">Renews automatically</p>
+                              </div>
+                          </div>
+                          
+                          <div className="space-y-4">
+                              <h4 className="text-sm font-bold uppercase tracking-wide">Billing History</h4>
+                              <div className="border border-gray-100 rounded-sm overflow-hidden">
+                                  {[1, 2].map(i => (
+                                      <div key={i} className="flex justify-between items-center p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+                                          <div className="flex items-center gap-3">
+                                              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
+                                                  <FileText size={14} />
+                                              </div>
+                                              <div>
+                                                  <p className="text-xs font-bold">Invoice #{2024000 + i}</p>
+                                                  <p className="text-[10px] text-gray-400">Oct {10 - i}, 2024</p>
+                                              </div>
+                                          </div>
+                                          <div className="flex items-center gap-4">
+                                              <span className="text-sm font-medium">$165.00</span>
+                                              <button className="text-[10px] uppercase font-bold text-luxury-gold hover:underline">Download</button>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                          <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                              <CreditCard size={14} /> Payment Method
+                          </h3>
+                          <div className="flex items-center gap-3 p-4 border border-gray-200 rounded-sm mb-4">
+                              <div className="w-10 h-6 bg-blue-900 rounded-sm" /> 
+                              <div>
+                                  <p className="text-xs font-bold">•••• 4242</p>
+                                  <p className="text-[10px] text-gray-400">Expires 12/25</p>
+                              </div>
+                          </div>
+                          <button className="w-full border border-black text-black py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors">
+                              Update Card
+                          </button>
+                      </div>
+                  </div>
+
+                  <div className="bg-luxury-black text-white p-8 md:p-12 rounded-sm shadow-lg relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-luxury-gold/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+                      <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                          <div>
+                              <h3 className="text-2xl font-serif italic mb-2">Upgrade to Couture Tier</h3>
+                              <p className="text-gray-400 text-sm max-w-lg">Unlock white-glove logistics, priority placement in "The Drop", and reduced commission rates.</p>
+                          </div>
+                          <button className="bg-luxury-gold text-white px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-white hover:text-black transition-colors">
+                              View Plans
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          );
+
+      case 'SHIPPING':
+          if (!storefrontForm) return <div className="p-8"><Loader className="animate-spin text-luxury-gold" /></div>;
+
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-5xl">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Delivery & Logistics</h2>
+                      <div className="flex gap-4">
+                          <button 
+                              className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors hidden md:block"
+                              onClick={() => alert("Shipping settings saved.")}
+                          >
+                              Save Settings
+                          </button>
+                          <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                              <Menu size={20} />
+                          </button>
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                          <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                              <Truck size={14} /> Shipping Zones
+                          </h3>
+                          
+                          <div className="space-y-6">
+                              <div>
+                                  <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Dispatch Origin</label>
+                                  <input 
+                                      value={storefrontForm.location || ''}
+                                      disabled
+                                      className="w-full bg-gray-50 border border-gray-200 py-3 px-4 text-sm text-gray-500"
+                                  />
+                                  <p className="text-[10px] text-gray-400 mt-1">Based on your atelier location</p>
+                              </div>
+
+                              <div className="flex items-center justify-between border-b border-gray-50 pb-4">
+                                  <div>
+                                      <p className="text-sm font-bold">International Shipping</p>
+                                      <p className="text-[10px] text-gray-400">Enable worldwide delivery</p>
+                                  </div>
+                                  <div className={`w-10 h-5 rounded-full p-1 cursor-pointer transition-colors ${shippingSettings.shipsInternationally ? 'bg-green-500' : 'bg-gray-200'}`} onClick={() => setShippingSettings({...shippingSettings, shipsInternationally: !shippingSettings.shipsInternationally})}>
+                                      <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${shippingSettings.shipsInternationally ? 'translate-x-5' : 'translate-x-0'}`} />
+                                  </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                      <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Domestic Rate ($)</label>
+                                      <input 
+                                          type="number"
+                                          value={shippingSettings.domesticRate}
+                                          onChange={(e) => setShippingSettings({...shippingSettings, domesticRate: Number(e.target.value)})}
+                                          className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Intl Rate ($)</label>
+                                      <input 
+                                          type="number"
+                                          value={shippingSettings.internationalRate}
+                                          onChange={(e) => setShippingSettings({...shippingSettings, internationalRate: Number(e.target.value)})}
+                                          disabled={!shippingSettings.shipsInternationally}
+                                          className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent disabled:text-gray-300"
+                                      />
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
+                          <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                              <Clock size={14} /> Processing & Returns
+                          </h3>
+                          
+                          <div className="space-y-6">
+                              <div>
+                                  <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Processing Time</label>
+                                  <select 
+                                      value={shippingSettings.processingTime}
+                                      onChange={(e) => setShippingSettings({...shippingSettings, processingTime: e.target.value})}
+                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                  >
+                                      <option>1-2 business days</option>
+                                      <option>3-5 business days</option>
+                                      <option>1-2 weeks (Made to Order)</option>
+                                      <option>3-4 weeks (Couture)</option>
+                                  </select>
+                              </div>
+
+                              <div>
+                                  <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Free Shipping Threshold ($)</label>
+                                  <input 
+                                      type="number"
+                                      value={shippingSettings.freeShippingThreshold}
+                                      onChange={(e) => setShippingSettings({...shippingSettings, freeShippingThreshold: Number(e.target.value)})}
+                                      className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                  />
+                              </div>
+
+                              <div>
+                                  <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Return Policy</label>
+                                  <textarea 
+                                      value={shippingSettings.returnPolicy}
+                                      onChange={(e) => setShippingSettings({...shippingSettings, returnPolicy: e.target.value})}
+                                      className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none bg-gray-50 h-24 resize-none"
+                                  />
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div className="md:hidden mt-6">
+                      <button 
+                          className="w-full bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
+                          onClick={() => alert("Shipping settings saved.")}
+                      >
+                          Save Settings
+                      </button>
+                  </div>
+              </div>
+          );
+
+      case 'ORDERS':
+        return (
+          <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+             <div className="flex items-center justify-between">
+                 <h2 className="text-3xl font-serif italic">Order History</h2>
+                 <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                     <Menu size={20} />
+                 </button>
+             </div>
+             
+             <div className="bg-white border border-gray-100 overflow-x-auto rounded-sm shadow-sm">
+                <table className="w-full text-left text-sm min-w-full">
+                   <thead className="bg-gray-50 text-xs uppercase tracking-widest text-gray-500 font-bold border-b border-gray-100">
+                      <tr>
+                         <th className="p-6">Order ID</th>
+                         <th className="p-6">Date</th>
+                         <th className="p-6">Customer</th>
+                         <th className="p-6">Items</th>
+                         <th className="p-6">Total</th>
+                         <th className="p-6">Status</th>
+                         {role !== UserRole.BUYER && <th className="p-6">Actions</th>}
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-100">
+                      {myOrders.map(order => (
+                         <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="p-6 font-medium text-xs font-mono">{order.id}</td>
+                            <td className="p-6 text-gray-500">{new Date(order.date).toLocaleDateString()}</td>
+                            <td className="p-6">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold">
+                                        {order.customerName.charAt(0)}
+                                    </div>
+                                    <span className="truncate max-w-[150px]">{order.customerName}</span>
+                                </div>
+                            </td>
+                            <td className="p-6 text-gray-500">{order.items.length} items</td>
+                            <td className="p-6 font-bold text-luxury-gold">${order.total}</td>
+                            <td className="p-6">
+                               <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full ${
+                                  order.status === 'Delivered' ? 'bg-green-50 text-green-700 border border-green-100' :
+                                  order.status === 'Shipped' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                  'bg-yellow-50 text-yellow-700 border border-yellow-100'
+                               }`}>
+                                  {order.status}
+                               </span>
+                            </td>
+                            {role !== UserRole.BUYER && (
+                               <td className="p-6">
+                                  {onUpdateOrderStatus && order.status !== 'Delivered' && (
+                                     <button 
+                                        onClick={() => onUpdateOrderStatus(order.id, order.status === 'Processing' ? 'Shipped' : 'Delivered')}
+                                        className="text-[10px] uppercase font-bold tracking-wider hover:text-luxury-gold border-b border-transparent hover:border-luxury-gold transition-all"
+                                     >
+                                        Mark {order.status === 'Processing' ? 'Shipped' : 'Delivered'}
+                                     </button>
+                                  )}
+                               </td>
+                            )}
+                         </tr>
+                      ))}
+                      {myOrders.length === 0 && (
+                          <tr>
+                              <td colSpan={7} className="p-12 text-center text-gray-400">No orders found.</td>
+                          </tr>
+                      )}
+                   </tbody>
+                </table>
+             </div>
+          </div>
+        );
+
+      case 'PRODUCTS':
+         return (
+             <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+                 <div className="flex justify-between items-center">
+                     <div className="flex items-center gap-4">
+                        <h2 className="text-3xl font-serif italic">Products</h2>
+                        <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                            <Menu size={20} />
+                        </button>
+                     </div>
+                     {onAddProduct && (
+                         <button 
+                            onClick={() => openProductForm()}
+                            className="bg-luxury-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-luxury-gold transition-colors shadow-lg"
+                         >
+                             <Plus size={16} /> <span className="hidden md:inline">Add New Piece</span>
+                         </button>
+                     )}
+                 </div>
+                 
+                 {myProducts.length === 0 ? (
+                     <div className="py-20 text-center border border-dashed border-gray-200 rounded-sm">
+                         <Shirt size={48} className="mx-auto mb-4 text-gray-200" />
+                         <p className="text-gray-400 mb-6">Your collection is empty.</p>
+                         <button 
+                            onClick={() => openProductForm()}
+                            className="text-xs font-bold uppercase tracking-widest underline hover:text-luxury-gold"
+                         >
+                             Create your first product
+                         </button>
+                     </div>
+                 ) : (
+                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                         {myProducts.map(product => (
+                             <div key={product.id} className="bg-white border border-gray-100 group relative rounded-sm overflow-hidden hover:shadow-lg transition-shadow">
+                                 <div className="aspect-[3/4] bg-gray-50 overflow-hidden relative">
+                                     <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                     {product.stock < 5 && (
+                                         <div className="absolute top-2 left-2 bg-red-500 text-white text-[9px] font-bold px-2 py-1 uppercase tracking-wide">
+                                             Low Stock
+                                         </div>
+                                     )}
+                                 </div>
+                                 <div className="p-5">
+                                     <div className="flex justify-between items-start mb-2">
+                                         <h3 className="font-bold text-sm truncate pr-2">{product.name}</h3>
+                                         <span className="text-sm font-medium">${product.price}</span>
+                                     </div>
+                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">{product.category}</p>
+                                     <div className="flex justify-between items-center text-[10px] text-gray-400 pt-3 border-t border-gray-50">
+                                         <span>{product.stock} units</span>
+                                         <span>{product.rating} ★</span>
+                                     </div>
+                                 </div>
+                                 <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-300">
+                                     <button 
+                                        onClick={() => openProductForm(product)}
+                                        className="p-2 bg-white rounded-full shadow-md hover:text-luxury-gold transition-colors"
+                                     >
+                                         <Edit2 size={14} />
+                                     </button>
+                                     {onDeleteProduct && (
+                                         <button onClick={() => onDeleteProduct(product.id)} className="p-2 bg-white rounded-full shadow-md hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                                     )}
+                                 </div>
+                             </div>
+                         ))}
+                     </div>
+                 )}
+             </div>
+         );
+
+      case 'CUSTOMERS':
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Registered Buyers</h2>
+                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                          <Menu size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-100 overflow-x-auto rounded-sm shadow-sm">
+                      <table className="w-full text-left text-sm min-w-full">
+                          <thead className="bg-gray-50 text-xs uppercase tracking-widest text-gray-500 font-bold border-b border-gray-100">
+                              <tr>
+                                  <th className="p-6">User</th>
+                                  <th className="p-6">Email</th>
+                                  <th className="p-6">Joined</th>
+                                  <th className="p-6">Total Spend</th>
+                                  <th className="p-6">Status</th>
+                                  <th className="p-6">Actions</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                              {users?.filter(u => u.role === UserRole.BUYER).map(user => (
+                                  <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
+                                      <td className="p-6 flex items-center gap-4">
+                                          <img src={user.avatar || 'https://via.placeholder.com/32'} className="w-10 h-10 rounded-full object-cover border border-gray-100" alt="" />
+                                          <span className="font-medium">{user.name}</span>
+                                      </td>
+                                      <td className="p-6 text-gray-600">{user.email}</td>
+                                      <td className="p-6 text-gray-500">{new Date(user.joined).toLocaleDateString()}</td>
+                                      <td className="p-6 font-mono text-luxury-gold font-bold">{user.spend || '$0.00'}</td>
+                                      <td className="p-6">
+                                          <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full flex w-fit items-center gap-1 ${user.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                                              {user.status === 'ACTIVE' && <CheckCircle size={10} />}
+                                              {user.status}
+                                          </span>
+                                      </td>
+                                      <td className="p-6">
+                                          {onUpdateUser && (
+                                              <button 
+                                                  onClick={() => onUpdateUser({ ...user, status: user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' })}
+                                                  className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded transition-colors ${
+                                                      user.status === 'ACTIVE' 
+                                                      ? 'text-red-500 hover:bg-red-50' 
+                                                      : 'text-green-500 hover:bg-green-50'
+                                                  }`}
+                                              >
+                                                  {user.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                                              </button>
+                                          )}
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          );
+
       case 'VENDORS':
           if (selectedVendorForReview) {
               return (

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight, Instagram, Twitter, Facebook, Heart, Share2, Copy } from 'lucide-react';
+import { ShoppingBag, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight, Instagram, Twitter, Facebook, Heart, Share2, Copy, Shirt } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
 import { UserRole, ViewState, CartItem, Order, AppNotification, Product } from '../types.ts';
@@ -432,6 +432,13 @@ export const Layout: React.FC<LayoutProps> = ({
                         className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
                       >
                         <User size={14} /> Profile Settings
+                      </button>
+                      
+                      <button
+                        onClick={() => onNavigate('NEW_ARRIVALS_MANAGE')}
+                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <Shirt size={14} /> Manage New Arrivals
                       </button>
                       
                       <button
