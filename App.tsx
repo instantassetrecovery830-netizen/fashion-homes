@@ -4,6 +4,7 @@ import { Layout } from './components/Layout.tsx';
 import { LandingView } from './components/LandingView.tsx';
 import { MarketplaceView } from './components/MarketplaceView.tsx';
 import { NewArrivalsView } from './components/NewArrivalsView.tsx';
+import { NewArrivalsManageView } from './components/NewArrivalsManageView.tsx';
 import { DesignersView } from './components/DesignersView.tsx';
 import { VendorProfileView } from './components/VendorProfileView.tsx';
 import { ProductDetail } from './components/ProductDetail.tsx';
@@ -36,6 +37,7 @@ const App: React.FC = () => {
   // Auth Navigation State
   const [authInitialMode, setAuthInitialMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [authInitialRole, setAuthInitialRole] = useState<UserRole>(UserRole.BUYER);
+  const [authInitialPlan, setAuthInitialPlan] = useState<'Atelier' | 'Maison' | 'Couture' | undefined>(undefined);
 
   // Data State
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -48,6 +50,52 @@ const App: React.FC = () => {
 
   // Visual Search State
   const [visualSearchResults, setVisualSearchResults] = useState<Product[] | null>(null);
+
+  // Saved Items State (Wardrobe)
+  const [savedItems, setSavedItems] = useState<Product[]>(() => {
+    const saved = localStorage.getItem('myfitstore_saved');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [isSavedOpen, setIsSavedOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('myfitstore_saved', JSON.stringify(savedItems));
+  }, [savedItems]);
+
+  // Handle Shared Outfits via URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outfitIds = params.get('outfit');
+    
+    if (outfitIds && products.length > 0) {
+      const ids = outfitIds.split(',');
+      const sharedProducts = products.filter(p => ids.includes(p.id));
+      
+      if (sharedProducts.length > 0) {
+        setSavedItems(prev => {
+          // Merge shared items with existing, avoiding duplicates
+          const existingIds = new Set(prev.map(p => p.id));
+          const newItems = sharedProducts.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newItems];
+        });
+        setIsSavedOpen(true);
+        
+        // Clean URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [products]);
+
+  const handleToggleSave = (product: Product) => {
+    setSavedItems(prev => {
+      const exists = prev.find(p => p.id === product.id);
+      if (exists) {
+        return prev.filter(p => p.id !== product.id);
+      }
+      return [...prev, product];
+    });
+  };
 
   // Initialize DB and Fetch Data
   const refreshData = async () => {
@@ -149,6 +197,7 @@ const App: React.FC = () => {
         // Reset defaults if navigating generically
         setAuthInitialMode('LOGIN');
         setAuthInitialRole(UserRole.BUYER);
+        setAuthInitialPlan(undefined);
     }
     
     if (view !== 'MARKETPLACE') {
@@ -159,9 +208,10 @@ const App: React.FC = () => {
     setIsCartOpen(false);
   };
 
-  const handleAuthNavigation = (mode: 'LOGIN' | 'REGISTER', role: UserRole) => {
+  const handleAuthNavigation = (mode: 'LOGIN' | 'REGISTER', role: UserRole, plan?: 'Atelier' | 'Maison' | 'Couture') => {
     setAuthInitialMode(mode);
     setAuthInitialRole(role);
+    setAuthInitialPlan(plan);
     setCurrentView('AUTH');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setIsCartOpen(false);
@@ -306,6 +356,7 @@ const App: React.FC = () => {
           cmsContent={cmsContent}
           initialMode={authInitialMode}
           initialRole={authInitialRole}
+          initialPlan={authInitialPlan}
         />
       );
     }
@@ -339,14 +390,37 @@ const App: React.FC = () => {
             onNavigate={handleNavigate} 
             onProductSelect={handleProductSelect} 
             initialDesigner={selectedDesignerFilter}
-            products={visualSearchResults || activeProducts}
+            products={(visualSearchResults || activeProducts).filter(p => !p.isNewSeason)}
             vendors={vendors}
             customTitle={visualSearchResults ? "Visual Search Results" : null}
             onClearFilter={handleClearVisualSearch}
+            savedItems={savedItems}
+            onToggleSave={handleToggleSave}
           />
         );
       case 'NEW_ARRIVALS':
-        return <NewArrivalsView onProductSelect={handleProductSelect} products={activeProducts} />;
+        return (
+          <NewArrivalsView 
+            onProductSelect={handleProductSelect} 
+            products={activeProducts}
+            savedItems={savedItems}
+            onToggleSave={handleToggleSave}
+            onNavigate={handleNavigate}
+            userRole={userRole}
+            isLoggedIn={isLoggedIn}
+          />
+        );
+      case 'NEW_ARRIVALS_MANAGE':
+        return (
+          <NewArrivalsManageView 
+            products={products}
+            onAddProduct={handleAddProduct}
+            onUpdateProduct={handleUpdateProduct}
+            onDeleteProduct={handleDeleteProduct}
+            userRole={userRole}
+            onNavigate={handleNavigate}
+          />
+        );
       case 'DESIGNERS':
         return <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />;
       case 'VENDOR_PROFILE':
@@ -355,7 +429,9 @@ const App: React.FC = () => {
             vendor={selectedVendor} 
             onProductSelect={handleProductSelect}
             onNavigate={handleNavigate}
-            products={activeProducts}
+            products={activeProducts.filter(p => !p.isNewSeason)}
+            savedItems={savedItems}
+            onToggleSave={handleToggleSave}
           />
         ) : <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />;
       case 'PRODUCT_DETAIL':
@@ -368,13 +444,17 @@ const App: React.FC = () => {
             onBack={() => handleNavigate('MARKETPLACE')}
             onViewDesigner={() => associatedVendor && handleDesignerSelect(associatedVendor.name)}
             featureFlags={featureFlags}
+            savedItems={savedItems}
+            onToggleSave={handleToggleSave}
           />
         ) : (
             <MarketplaceView 
                 onNavigate={handleNavigate} 
                 onProductSelect={handleProductSelect} 
-                products={activeProducts}
+                products={activeProducts.filter(p => !p.isNewSeason)}
                 vendors={vendors}
+                savedItems={savedItems}
+                onToggleSave={handleToggleSave}
             />
         );
       case 'VENDOR_DASHBOARD':
@@ -425,7 +505,7 @@ const App: React.FC = () => {
           />
         );
       case 'PRICING':
-        return <PricingView onNavigate={handleNavigate} onRegister={() => handleAuthNavigation('REGISTER', UserRole.VENDOR)} />;
+        return <PricingView onNavigate={handleNavigate} onRegister={(plan) => handleAuthNavigation('REGISTER', UserRole.VENDOR, plan)} />;
       case 'ABOUT':
         return <AboutView onNavigate={handleNavigate} cmsContent={cmsContent} />;
       default:
@@ -449,6 +529,8 @@ const App: React.FC = () => {
       cart={cart}
       isCartOpen={isCartOpen}
       setIsCartOpen={setIsCartOpen}
+      isSavedOpen={isSavedOpen}
+      setIsSavedOpen={setIsSavedOpen}
       onUpdateCartItem={handleUpdateCartItem}
       onRemoveFromCart={handleRemoveFromCart}
       onNavigate={handleNavigate}

@@ -170,6 +170,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return [];
   }, [products, role, vendors, currentUser]);
 
+  const weeklyUploads = useMemo(() => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    return myProducts.filter(p => p.createdAt && new Date(p.createdAt) > oneWeekAgo).length;
+  }, [myProducts]);
+  
+  const canUpload = role === UserRole.ADMIN || weeklyUploads < 20;
+
   const totalRevenue = useMemo(() => myOrders.reduce((sum, order) => sum + order.total, 0), [myOrders]);
   const totalSales = myOrders.length;
 
@@ -296,7 +304,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
               stock: Number(productForm.stock) || 0,
               sizes: Array.isArray(productForm.sizes) ? productForm.sizes : (typeof productForm.sizes === 'string' ? (productForm.sizes as string).split(',').map((s: string) => s.trim()) : ['S', 'M', 'L']),
               isNewSeason: !!productForm.isNewSeason,
-              isPreOrder: !!productForm.isPreOrder
+              isPreOrder: !!productForm.isPreOrder,
+              createdAt: productForm.createdAt || new Date().toISOString()
           };
 
           if (productForm.id) {
@@ -1238,12 +1247,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </button>
                      </div>
                      {onAddProduct && (
-                         <button 
-                            onClick={() => openProductForm()}
-                            className="bg-luxury-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-luxury-gold transition-colors shadow-lg"
-                         >
-                             <Plus size={16} /> <span className="hidden md:inline">Add New Piece</span>
-                         </button>
+                         <div className="flex flex-col items-end gap-1 w-full md:w-auto">
+                             <button 
+                                onClick={() => canUpload ? openProductForm() : alert("Weekly upload limit reached (20/20).")}
+                                disabled={!canUpload}
+                                className={`w-full md:w-auto px-6 py-3 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors shadow-lg ${canUpload ? 'bg-luxury-black text-white hover:bg-luxury-gold' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                             >
+                                 <Plus size={16} /> Add New Piece
+                             </button>
+                             {role === UserRole.VENDOR && (
+                                <span className={`text-[10px] hidden md:block ${!canUpload ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                                    {canUpload ? `${20 - weeklyUploads} uploads left this week` : 'Limit Reached (20/20)'}
+                                </span>
+                             )}
+                         </div>
                      )}
                  </div>
                  
@@ -1989,6 +2006,160 @@ export const Dashboard: React.FC<DashboardProps> = ({
        <div className={`transition-all duration-300 md:ml-64 p-4 md:p-12`}>
            {renderContent()}
        </div>
+
+       {/* Product Form Modal */}
+       {isProductFormOpen && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsProductFormOpen(false)} />
+               <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl animate-slide-up rounded-sm">
+                   <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-20">
+                       <h2 className="text-xl font-serif italic">{productForm.id ? 'Edit Product' : 'Add New Piece'}</h2>
+                       <button onClick={() => setIsProductFormOpen(false)} className="hover:rotate-90 transition-transform">
+                           <X size={24} />
+                       </button>
+                   </div>
+
+                   <div className="p-8 space-y-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           {/* Image Upload */}
+                           <div className="space-y-2">
+                               <label className="text-[10px] font-bold uppercase text-gray-400">Product Image</label>
+                               <div className="aspect-[3/4] bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center relative group cursor-pointer hover:border-luxury-gold transition-colors">
+                                   {productForm.image ? (
+                                       <img src={productForm.image} alt="Preview" className="w-full h-full object-cover" />
+                                   ) : (
+                                       <div className="text-gray-400 flex flex-col items-center">
+                                           <ImageIcon size={32} className="mb-2" />
+                                           <span className="text-xs uppercase tracking-wide">Upload Image</span>
+                                       </div>
+                                   )}
+                                   <input 
+                                       type="file" 
+                                       accept="image/*"
+                                       onChange={(e) => {
+                                           const file = e.target.files?.[0];
+                                           if (file) {
+                                               const reader = new FileReader();
+                                               reader.onloadend = () => setProductForm({...productForm, image: reader.result as string});
+                                               reader.readAsDataURL(file);
+                                           }
+                                       }}
+                                       className="absolute inset-0 opacity-0 cursor-pointer"
+                                   />
+                               </div>
+                           </div>
+
+                           {/* Fields */}
+                           <div className="space-y-4">
+                               <div>
+                                   <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Product Name</label>
+                                   <input 
+                                       value={productForm.name || ''}
+                                       onChange={e => setProductForm({...productForm, name: e.target.value})}
+                                       className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                       placeholder="e.g. Silk Evening Gown"
+                                   />
+                               </div>
+                               
+                               <div>
+                                   <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Designer / Brand</label>
+                                   <input 
+                                       value={productForm.designer || ''}
+                                       onChange={e => setProductForm({...productForm, designer: e.target.value})}
+                                       className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                       placeholder="Brand Name"
+                                       disabled={role === UserRole.VENDOR}
+                                   />
+                               </div>
+
+                               <div className="grid grid-cols-2 gap-4">
+                                   <div>
+                                       <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Price ($)</label>
+                                       <input 
+                                           type="number"
+                                           value={productForm.price || ''}
+                                           onChange={e => setProductForm({...productForm, price: Number(e.target.value)})}
+                                           className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                           placeholder="0.00"
+                                       />
+                                   </div>
+                                   <div>
+                                       <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Stock</label>
+                                       <input 
+                                           type="number"
+                                           value={productForm.stock || ''}
+                                           onChange={e => setProductForm({...productForm, stock: Number(e.target.value)})}
+                                           className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                           placeholder="0"
+                                       />
+                                   </div>
+                               </div>
+
+                               <div>
+                                   <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Category</label>
+                                   <select 
+                                       value={productForm.category || ''}
+                                       onChange={e => setProductForm({...productForm, category: e.target.value})}
+                                       className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                   >
+                                       <option value="">Select...</option>
+                                       <option value="Dresses">Dresses</option>
+                                       <option value="Outerwear">Outerwear</option>
+                                       <option value="Tops">Tops</option>
+                                       <option value="Bottoms">Bottoms</option>
+                                       <option value="Accessories">Accessories</option>
+                                       <option value="Footwear">Footwear</option>
+                                   </select>
+                               </div>
+
+                               <div className="flex items-center gap-2 pt-2">
+                                   <input 
+                                       type="checkbox" 
+                                       id="isPreOrder"
+                                       checked={productForm.isPreOrder || false}
+                                       onChange={e => setProductForm({...productForm, isPreOrder: e.target.checked})}
+                                       className="accent-black"
+                                   />
+                                   <label htmlFor="isPreOrder" className="text-xs text-gray-600 cursor-pointer select-none">Available for Pre-Order</label>
+                               </div>
+                               
+                               <div className="bg-gray-50 p-3 rounded-sm border border-gray-100 mt-2">
+                                   <p className="text-[10px] text-gray-500">
+                                       <span className="font-bold">Note:</span> To upload "New Arrivals", please use the <button onClick={() => { setIsProductFormOpen(false); onNavigate('NEW_ARRIVALS_MANAGE'); }} className="underline text-black hover:text-luxury-gold">Manage New Arrivals</button> page. Items uploaded here are added to your standard collection.
+                                   </p>
+                               </div>
+                           </div>
+                       </div>
+
+                       <div>
+                           <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Description</label>
+                           <textarea 
+                               value={productForm.description || ''}
+                               onChange={e => setProductForm({...productForm, description: e.target.value})}
+                               className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none bg-gray-50 h-24 resize-none"
+                               placeholder="Product details..."
+                           />
+                       </div>
+
+                       <div className="pt-6 border-t border-gray-100 flex justify-end gap-4">
+                           <button 
+                               onClick={() => setIsProductFormOpen(false)}
+                               className="px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-gray-50 transition-colors"
+                           >
+                               Cancel
+                           </button>
+                           <button 
+                               onClick={handleSaveProduct}
+                               disabled={isSavingProduct}
+                               className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50 flex items-center gap-2"
+                           >
+                               {isSavingProduct ? <Loader size={16} className="animate-spin" /> : (productForm.id ? 'Save Changes' : 'Add to Collection')}
+                           </button>
+                       </div>
+                   </div>
+               </div>
+           </div>
+       )}
     </div>
   );
 };

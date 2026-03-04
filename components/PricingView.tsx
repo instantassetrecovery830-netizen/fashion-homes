@@ -5,11 +5,12 @@ import { ViewState } from '../types';
 
 interface PricingViewProps {
   onNavigate: (view: ViewState) => void;
-  onRegister: () => void;
+  onRegister: (plan?: 'Atelier' | 'Maison' | 'Couture') => void;
 }
 
 const PLANS = [
   {
+    id: 'Atelier',
     name: "The Essential",
     price: "$15",
     period: "/ month",
@@ -24,6 +25,7 @@ const PLANS = [
     highlight: false
   },
   {
+    id: 'Maison',
     name: "The Insider",
     price: "$90",
     period: "/ 6 months",
@@ -39,6 +41,7 @@ const PLANS = [
     highlight: false
   },
   {
+    id: 'Couture',
     name: "The Collector",
     price: "$165",
     period: "/ year",
@@ -108,7 +111,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate, onRegister
               </div>
 
               <button 
-                onClick={onRegister}
+                onClick={() => onRegister(plan.id as 'Atelier' | 'Maison' | 'Couture')}
                 className={`w-full py-4 text-xs font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-colors ${
                   plan.highlight 
                     ? 'bg-white text-black hover:bg-luxury-gold hover:text-white' 

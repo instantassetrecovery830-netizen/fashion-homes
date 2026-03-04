@@ -55,7 +55,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
   // Only show vendors that are both active (subscribed) and verified by admin
   const activeVendors = vendors.filter(v => v.subscriptionStatus === 'ACTIVE' && v.verificationStatus === 'VERIFIED');
-  const spotlightProducts = products.slice(0, 3); // Display first 3 real products
+  const spotlightProducts = products.filter(p => !p.isNewSeason).slice(0, 3); // Display first 3 real products (excluding new arrivals)
 
   // Safe access to CMS content
   const hero = cmsContent?.hero || {
@@ -143,6 +143,49 @@ export const LandingView: React.FC<LandingViewProps> = ({
               >
                 Dashboard
               </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* New Arrivals Section */}
+      <section className="py-16 md:py-24 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex justify-between items-end mb-8 md:mb-12">
+             <div>
+                <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-luxury-taupe mb-2 block">Fresh From The Atelier</span>
+                <h2 className="text-2xl md:text-4xl font-serif italic text-luxury-black">New Arrivals</h2>
+             </div>
+             <button onClick={() => onNavigate('MARKETPLACE')} className="text-[10px] md:text-xs uppercase border-b border-black pb-1 hover:text-luxury-gold hover:border-luxury-gold transition-colors text-luxury-black">View All</button>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+            {products.filter(p => p.isNewSeason).slice(0, 4).map((product) => (
+              <div key={product.id} className="group cursor-pointer" onClick={() => onNavigate('MARKETPLACE')}>
+                <div className="relative overflow-hidden mb-4 aspect-[3/4] bg-gray-50">
+                  <img 
+                    src={product.image} 
+                    alt={product.name} 
+                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out"
+                  />
+                  <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-black text-[9px] font-bold px-2 py-1 uppercase tracking-wide">
+                    New Season
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-white/90 backdrop-blur-md border-t border-gray-100">
+                      <button className="w-full bg-black text-white py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors">
+                          View Details
+                      </button>
+                  </div>
+                </div>
+                <h3 className="font-bold text-xs uppercase tracking-wide mb-1 text-gray-400">{product.designer}</h3>
+                <p className="font-serif text-sm md:text-base italic text-luxury-black mb-1 truncate">{product.name}</p>
+                <p className="text-xs font-medium text-luxury-black">${product.price}</p>
+              </div>
+            ))}
+            {products.filter(p => p.isNewSeason).length === 0 && (
+                <div className="col-span-full py-12 text-center text-gray-400 border border-dashed border-gray-200 rounded-sm">
+                    <p>New season collections are arriving soon.</p>
+                </div>
             )}
           </div>
         </div>

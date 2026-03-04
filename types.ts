@@ -58,6 +58,7 @@ export interface Product {
   sizes: string[];
   isPreOrder?: boolean;
   releaseDate?: string; // ISO string for The Drop
+  createdAt?: string; // ISO string for upload tracking
 }
 
 export type SubscriptionStatus = 'ACTIVE' | 'INACTIVE';

@@ -42,8 +42,13 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
     return products.filter(p => p.isNewSeason && p.designer === userName);
   }, [products, userRole, currentUser]);
 
-  const uploadCount = myNewArrivals.length;
-  const canUpload = userRole === UserRole.ADMIN || uploadCount < 3;
+  const uploadCount = useMemo(() => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    return myNewArrivals.filter(p => p.createdAt && new Date(p.createdAt) > oneWeekAgo).length;
+  }, [myNewArrivals]);
+
+  const canUpload = userRole === UserRole.ADMIN || uploadCount < 20;
 
   const handleImageUpload = (file: File) => {
     const reader = new FileReader();
@@ -79,7 +84,8 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
         stock: Number(formData.stock) || 1,
         sizes: formData.sizes || ['S', 'M', 'L'],
         isNewSeason: true, 
-        isPreOrder: !!formData.isPreOrder
+        isPreOrder: !!formData.isPreOrder,
+        createdAt: formData.createdAt || new Date().toISOString()
       };
 
       if (formData.id) {
@@ -133,16 +139,16 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
           <div>
             <button 
-                onClick={() => onNavigate('MARKETPLACE')}
+                onClick={() => onNavigate('NEW_ARRIVALS')}
                 className="flex items-center gap-2 text-gray-500 hover:text-black mb-4 transition-colors text-xs uppercase tracking-widest"
             >
-                <ArrowLeft size={16} /> Back to Market
+                <ArrowLeft size={16} /> Back to New Arrivals
             </button>
             <h1 className="text-3xl md:text-4xl font-serif italic mb-2">Manage New Arrivals</h1>
             <p className="text-gray-500 text-sm">
               {userRole === UserRole.ADMIN 
                 ? "Manage all new season drops." 
-                : `You have used ${uploadCount} of 3 available slots.`}
+                : `You have used ${uploadCount} of 20 weekly uploads.`}
             </p>
           </div>
 
@@ -166,8 +172,8 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
         {!canUpload && userRole !== UserRole.ADMIN && (
             <div className="bg-yellow-50 border border-yellow-100 p-4 mb-8 flex items-center gap-3 text-yellow-800 rounded-sm">
                 <AlertCircle size={20} />
-                <span className="text-xs font-bold uppercase tracking-wide">Upload Limit Reached</span>
-                <span className="text-sm">You have reached the maximum of 3 New Arrivals. Please delete or edit an existing item.</span>
+                <span className="text-xs font-bold uppercase tracking-wide">Weekly Limit Reached</span>
+                <span className="text-sm">You have reached the maximum of 20 uploads for this week.</span>
             </div>
         )}
 

@@ -11,9 +11,10 @@ interface AuthViewProps {
   cmsContent?: LandingPageContent;
   initialMode?: 'LOGIN' | 'REGISTER';
   initialRole?: UserRole;
+  initialPlan?: 'Atelier' | 'Maison' | 'Couture';
 }
 
-export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsContent, initialMode = 'LOGIN', initialRole = UserRole.BUYER }) => {
+export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsContent, initialMode = 'LOGIN', initialRole = UserRole.BUYER, initialPlan }) => {
   const [isRegister, setIsRegister] = useState(initialMode === 'REGISTER');
   const [isResetingPassword, setIsResetingPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>(initialRole);
@@ -153,7 +154,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                     location: 'Unknown',
                     coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=200',
                     email: user.email,
-                    subscriptionPlan: 'Atelier',
+                    subscriptionPlan: initialPlan || 'Atelier',
                     website: '',
                     instagram: '',
                     twitter: ''
@@ -255,7 +256,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                     location: 'Unknown',
                     coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070',
                     email: user.email || '',
-                    subscriptionPlan: 'Atelier'
+                    subscriptionPlan: initialPlan || 'Atelier'
                 };
                 await createVendorInDb(newVendor);
             } else {
