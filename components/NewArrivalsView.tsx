@@ -1,23 +1,34 @@
 
 import React from 'react';
 import { Heart } from 'lucide-react';
-import { Product } from '../types';
+import { Product, UserRole } from '../types';
 
 interface NewArrivalsViewProps {
   onProductSelect: (product: Product) => void;
   products: Product[];
   savedItems?: Product[];
   onToggleSave?: (product: Product) => void;
+  onNavigate: (view: any) => void;
+  userRole: UserRole;
+  isLoggedIn: boolean;
 }
 
-export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ onProductSelect, products, savedItems = [], onToggleSave }) => {
+export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ 
+  onProductSelect, 
+  products, 
+  savedItems = [], 
+  onToggleSave,
+  onNavigate,
+  userRole,
+  isLoggedIn
+}) => {
   const newArrivals = products.filter(p => p.isNewSeason);
   const isSaved = (productId: string) => savedItems.some(p => p.id === productId);
 
   return (
     <div className="min-h-screen pt-12 pb-24 animate-fade-in">
       {/* Editorial Header */}
-      <div className="max-w-7xl mx-auto px-6 mb-16">
+      <div className="max-w-7xl mx-auto px-6 mb-16 relative">
         <div className="flex flex-col items-center text-center space-y-6">
           <span className="text-xs font-bold uppercase tracking-[0.3em] text-luxury-gold">Just Landed</span>
           <h1 className="text-5xl md:text-7xl font-serif italic">New Season</h1>
@@ -25,6 +36,14 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ onProductSelec
             The latest drops from our curated selection of avant-garde designers. 
             Discover the silhouettes defining this season's narrative.
           </p>
+          
+          {/* Manage Button */}
+          <button
+            onClick={() => isLoggedIn ? onNavigate('NEW_ARRIVALS_MANAGE') : onNavigate('AUTH')}
+            className="mt-8 bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors shadow-lg"
+          >
+            {isLoggedIn ? 'Add New Piece' : 'Sign in to Add New Piece'}
+          </button>
         </div>
       </div>
 

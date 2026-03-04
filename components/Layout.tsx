@@ -63,9 +63,11 @@ export const Layout: React.FC<LayoutProps> = ({
   
   // Notification State
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [activeToast, setActiveToast] = useState<AppNotification | null>(null);
   const unreadCount = notifications.filter(n => !n.read).length;
   const notifDropdownRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   
   // Track the latest notification ID to detect new ones
   const latestNotificationIdRef = useRef<string | null>(null);
@@ -115,11 +117,14 @@ export const Layout: React.FC<LayoutProps> = ({
     }
   }, [isCartOpen]);
 
-  // Click outside listener for notification dropdown
+  // Click outside listener for notification and user dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -404,50 +409,54 @@ export const Layout: React.FC<LayoutProps> = ({
                   )}
               </div>
 
-              {/* User / Auth Menu (Desktop) */}
-              <div className="relative group hidden md:block">
+              {/* User / Auth Menu */}
+              <div className="relative" ref={userMenuRef}>
                 {isLoggedIn ? (
                   <>
-                    <User 
-                      size={20} 
-                      className="cursor-pointer transition-colors hover:text-luxury-gold"
-                      onClick={() => onNavigate('PROFILE_SETTINGS')}
-                    />
+                    <button 
+                      onClick={() => setShowUserMenu(!showUserMenu)}
+                      className="hover:text-luxury-gold transition-colors flex items-center"
+                    >
+                      <User size={20} />
+                    </button>
                     
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-200 text-luxury-black">
-                      <div className="p-4 border-b border-gray-50">
-                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signed in as</p>
-                        <p className="font-bold text-sm">{role}</p>
-                      </div>
-                      
-                      <button
-                        onClick={handleDashboardClick}
-                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <Settings size={14} /> Dashboard
-                      </button>
+                    {showUserMenu && (
+                      <div className="absolute right-0 top-full mt-4 w-64 bg-white border border-gray-100 shadow-xl z-50 animate-slide-up text-luxury-black rounded-sm">
+                        <div className="p-4 border-b border-gray-50">
+                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signed in as</p>
+                          <p className="font-bold text-sm truncate">{auth.currentUser?.email}</p>
+                          <p className="text-[10px] text-luxury-gold font-bold uppercase tracking-widest mt-1">{role}</p>
+                        </div>
+                        
+                        <button
+                          onClick={() => { handleDashboardClick(); setShowUserMenu(false); }}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <Settings size={14} /> Dashboard
+                        </button>
 
-                      <button
-                        onClick={() => onNavigate('PROFILE_SETTINGS')}
-                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <User size={14} /> Profile Settings
-                      </button>
-                      
-                      <button
-                        onClick={() => onNavigate('NEW_ARRIVALS_MANAGE')}
-                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <Shirt size={14} /> Manage New Arrivals
-                      </button>
-                      
-                      <button
-                        onClick={onLogout}
-                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-500"
-                      >
-                        <LogOut size={14} /> Sign Out
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => { onNavigate('PROFILE_SETTINGS'); setShowUserMenu(false); }}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <User size={14} /> Profile Settings
+                        </button>
+                        
+                        <button
+                          onClick={() => { onNavigate('NEW_ARRIVALS_MANAGE'); setShowUserMenu(false); }}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <Shirt size={14} /> Manage New Arrivals
+                        </button>
+                        
+                        <button
+                          onClick={() => { onLogout(); setShowUserMenu(false); }}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-500 border-t border-gray-50"
+                        >
+                          <LogOut size={14} /> Sign Out
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <button 
@@ -461,7 +470,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
               {/* Saved Items (Heart) */}
               <div 
-                className="relative cursor-pointer hover:text-luxury-gold transition-colors hidden md:block" 
+                className="relative cursor-pointer hover:text-luxury-gold transition-colors" 
                 onClick={() => setIsSavedOpen(true)}
               >
                 <Heart size={20} fill={savedItems.length > 0 ? "currentColor" : "none"} className={savedItems.length > 0 ? "text-luxury-gold" : ""} />
@@ -472,8 +481,9 @@ export const Layout: React.FC<LayoutProps> = ({
                 )}
               </div>
 
+              {/* Cart Bag */}
               <div 
-                className="relative cursor-pointer hover:text-luxury-gold transition-colors hidden md:block" 
+                className="relative cursor-pointer hover:text-luxury-gold transition-colors" 
                 onClick={() => setIsCartOpen(true)}
               >
                 <ShoppingBag size={20} />

@@ -617,6 +617,9 @@ const App: React.FC = () => {
                 products={activeProducts}
                 savedItems={savedItems}
                 onToggleSave={handleToggleSave}
+                onNavigate={handleNavigate}
+                userRole={userRole}
+                isLoggedIn={isLoggedIn}
             />
           </Suspense>
         );

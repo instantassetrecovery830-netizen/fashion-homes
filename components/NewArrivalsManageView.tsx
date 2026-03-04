@@ -158,7 +158,7 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            <Plus size={16} /> Add New Arrival
+            <Plus size={16} /> Add New Piece
           </button>
         </div>
 

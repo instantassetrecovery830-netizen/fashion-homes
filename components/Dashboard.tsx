@@ -445,6 +445,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                  </div>
              )}
              
+             {/* New Arrivals Management Card */}
+             <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => onNavigate('NEW_ARRIVALS_MANAGE')}>
+                <div className="flex items-center justify-between mb-4">
+                   <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 group-hover:text-luxury-gold transition-colors">New Arrivals</h3>
+                   <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold group-hover:bg-luxury-gold group-hover:text-white transition-colors"><Shirt size={20} /></div>
+                </div>
+                <p className="text-xl font-serif italic mb-2">Manage Drops</p>
+                <p className="text-xs text-gray-400 flex items-center gap-1">
+                    {role === UserRole.ADMIN ? 'Unlimited Access' : '3 Slots Available'} <ArrowUpRight size={12} />
+                </p>
+             </div>
+
              {/* KPIs */}
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
