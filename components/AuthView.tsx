@@ -276,6 +276,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             } else {
                 // Send Verification Email
                 await sendEmailVerification(user);
+                
+                // Enforce "Do not sign them in automatically" - Sign out immediately
+                await signOut(auth);
+
                 // Show Verification Screen immediately
                 setVerificationEmail(user.email || email);
                 setVerificationNeeded(true);
@@ -287,6 +291,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
 
             // Check verification status
             if (!user.emailVerified) {
+                // Enforce "Do not sign them in automatically" if not verified
+                await signOut(auth);
+                
                 setVerificationEmail(user.email || email);
                 setVerificationNeeded(true);
                 return; 
@@ -359,7 +366,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 <button 
                     onClick={handleCheckVerification}
                     disabled={isLoading}
-                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-3 flex justify-center items-center gap-2 disabled:opacity-70"
+                    className="w-full bg-white border border-gray-200 text-black py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-gray-50 transition-colors mb-3 flex justify-center items-center gap-2 disabled:opacity-70"
                 >
                     {isLoading ? <Loader className="animate-spin" size={16} /> : "I've Verified My Email"}
                 </button>
@@ -372,9 +379,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                         setVerificationEmail('');
                         setError(null);
                     }}
-                    className="w-full bg-white border border-gray-200 text-black py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-gray-50 transition-colors mb-6 flex justify-center items-center gap-2"
+                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-6 flex justify-center items-center gap-2"
                 >
-                    Sign Out & Log In
+                    Log In
                 </button>
                 
                 <div className="bg-gray-50 p-4 rounded-sm">
