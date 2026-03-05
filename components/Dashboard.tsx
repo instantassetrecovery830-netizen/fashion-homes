@@ -43,6 +43,7 @@ interface DashboardProps {
   followedVendors?: Vendor[];
   onToggleFollow?: (vendor: Vendor) => Promise<void>;
   onDesignerClick?: (designerName: string) => void;
+  followers?: Follower[];
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -68,7 +69,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   initialTab,
   followedVendors = [],
   onToggleFollow,
-  onDesignerClick
+  onDesignerClick,
+  followers = []
 }) => {
   const [activeTab, setActiveTab] = useState(initialTab || 'OVERVIEW');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -351,10 +353,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'SUBSCRIPTION', label: 'Subscription', icon: CreditCard, roles: [UserRole.VENDOR] },
       { id: 'SHIPPING', label: 'Delivery', icon: Truck, roles: [UserRole.VENDOR] },
       { id: 'CUSTOMERS', label: 'Customers', icon: Users, roles: [UserRole.ADMIN] },
+      { id: 'FOLLOWERS', label: 'Followers', icon: Users, roles: [UserRole.VENDOR] },
       { id: 'VENDORS', label: 'Ateliers', icon: Store, roles: [UserRole.ADMIN] },
       { id: 'MESSAGES', label: 'Messages', icon: Inbox, roles: [UserRole.ADMIN] },
       { id: 'CMS', label: 'Content', icon: FileText, roles: [UserRole.ADMIN] },
-      { id: 'FOLLOWING', label: 'Following', icon: Heart, roles: [UserRole.BUYER] },
+      { id: 'FOLLOWING', label: 'Following', icon: Heart, roles: [UserRole.BUYER, UserRole.VENDOR] },
       { id: 'NEW_ARRIVALS_FEED', label: 'New Arrivals', icon: Sparkles, roles: [UserRole.BUYER] },
       { id: 'PROFILE', label: 'Settings', icon: Settings, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
     ];
@@ -1318,6 +1321,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
                  )}
              </div>
          );
+
+      case 'FOLLOWERS':
+          return (
+              <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
+                  <div className="flex items-center justify-between">
+                      <h2 className="text-3xl font-serif italic">Your Followers</h2>
+                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                          <Menu size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-100 rounded-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                          <table className="w-full text-left text-sm">
+                              <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-medium border-b border-gray-100">
+                                  <tr>
+                                      <th className="p-4">Name</th>
+                                      <th className="p-4">Location</th>
+                                      <th className="p-4">Joined</th>
+                                      <th className="p-4 text-right">Purchases</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-50">
+                                  {followers.map((follower) => (
+                                      <tr key={follower.id} className="hover:bg-gray-50 transition-colors">
+                                          <td className="p-4 font-medium flex items-center gap-3">
+                                              <img src={follower.avatar} alt={follower.name} className="w-8 h-8 rounded-full object-cover" />
+                                              {follower.name}
+                                          </td>
+                                          <td className="p-4 text-gray-500">{follower.location}</td>
+                                          <td className="p-4 text-gray-500">{new Date(follower.joined).toLocaleDateString()}</td>
+                                          <td className="p-4 text-right font-medium">{follower.purchases}</td>
+                                      </tr>
+                                  ))}
+                                  {followers.length === 0 && (
+                                      <tr>
+                                          <td colSpan={4} className="p-8 text-center text-gray-400">
+                                              No followers yet.
+                                          </td>
+                                      </tr>
+                                  )}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+          );
 
       case 'CUSTOMERS':
           return (

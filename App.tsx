@@ -17,7 +17,8 @@ import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, Us
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
-  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb
+  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb,
+  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, fetchVendorFollowers
 } from './services/dataService.ts';
 import { searchProductsByImage } from './services/geminiService.ts';
 import { Loader } from 'lucide-react';
@@ -38,6 +39,7 @@ const App: React.FC = () => {
   const [authInitialMode, setAuthInitialMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [authInitialRole, setAuthInitialRole] = useState<UserRole>(UserRole.BUYER);
   const [authInitialPlan, setAuthInitialPlan] = useState<'Atelier' | 'Maison' | 'Couture' | undefined>(undefined);
+  const [currentUser, setCurrentUser] = useState<User | Vendor | null>(null);
 
   // Data State
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -58,9 +60,36 @@ const App: React.FC = () => {
   });
   const [isSavedOpen, setIsSavedOpen] = useState(false);
 
+  // Followed Vendors State
+  const [followedVendors, setFollowedVendors] = useState<Vendor[]>([]);
+  const [followers, setFollowers] = useState<any[]>([]);
+
   useEffect(() => {
     localStorage.setItem('myfitstore_saved', JSON.stringify(savedItems));
   }, [savedItems]);
+
+  // Fetch followed vendors and followers when currentUser changes
+  useEffect(() => {
+    const loadSocialData = async () => {
+      if (currentUser) {
+        // Load who the user follows
+        const followed = await fetchUserFollowedVendors(currentUser.id);
+        setFollowedVendors(followed);
+
+        // If user is a Vendor, load their followers
+        if (userRole === UserRole.VENDOR) {
+            const vendorFollowers = await fetchVendorFollowers(currentUser.id);
+            setFollowers(vendorFollowers);
+        } else {
+            setFollowers([]);
+        }
+      } else {
+        setFollowedVendors([]);
+        setFollowers([]);
+      }
+    };
+    loadSocialData();
+  }, [currentUser, userRole]);
 
   // Handle Shared Outfits via URL
   useEffect(() => {
@@ -95,6 +124,38 @@ const App: React.FC = () => {
       }
       return [...prev, product];
     });
+  };
+
+  const handleToggleFollow = async (vendor: Vendor) => {
+      if (!currentUser) return;
+
+      const isFollowing = followedVendors.some(v => v.id === vendor.id);
+      
+      // Optimistic Update
+      setFollowedVendors(prev => {
+          if (isFollowing) {
+              return prev.filter(v => v.id !== vendor.id);
+          }
+          return [...prev, vendor];
+      });
+
+      if (isFollowing) {
+          await removeFollowerFromDb(currentUser.id, vendor.id);
+      } else {
+          // Add follower
+          const newFollower = {
+              id: crypto.randomUUID(),
+              name: currentUser.name,
+              avatar: currentUser.avatar,
+              location: currentUser.location || 'Unknown',
+              joined: new Date().toISOString(),
+              purchases: 0, // Default
+              style: 'Eclectic', // Default or fetch from profile
+              vendorId: vendor.id,
+              followerId: currentUser.id
+          };
+          await addFollowerToDb(newFollower);
+      }
   };
 
   // Initialize DB and Fetch Data
@@ -143,6 +204,18 @@ const App: React.FC = () => {
           const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me'];
           if (adminEmails.includes(user.email?.toLowerCase() || '')) {
               setUserRole(UserRole.ADMIN);
+              // For admin, we can create a dummy user object or fetch if exists
+              const currentUsers = await fetchUsers();
+              const dbUser = currentUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
+              setCurrentUser(dbUser || {
+                  id: user.uid,
+                  name: 'Admin',
+                  email: user.email!,
+                  role: UserRole.ADMIN,
+                  avatar: 'https://ui-avatars.com/api/?name=Admin',
+                  joined: new Date().toISOString(),
+                  status: 'ACTIVE'
+              } as User);
           } else {
               // Check if user has an assigned role in the Users table
               const currentUsers = await fetchUsers();
@@ -150,6 +223,7 @@ const App: React.FC = () => {
 
               if (dbUser && dbUser.role) {
                   setUserRole(dbUser.role);
+                  setCurrentUser(dbUser);
               } else {
                   // Fallback to Vendor check
                   const currentVendors = await fetchVendors();
@@ -157,8 +231,20 @@ const App: React.FC = () => {
                   
                   if (matchingVendor) {
                       setUserRole(UserRole.VENDOR);
+                      setCurrentUser(matchingVendor);
                   } else {
                       setUserRole(UserRole.BUYER);
+                      // If user not found in DB but logged in (e.g. just registered), create a temporary user object
+                      // In a real app, registration flow would create the user record first.
+                      setCurrentUser({
+                          id: user.uid,
+                          name: user.displayName || 'User',
+                          email: user.email!,
+                          role: UserRole.BUYER,
+                          avatar: user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`,
+                          joined: new Date().toISOString(),
+                          status: 'ACTIVE'
+                      } as User);
                   }
               }
           }
@@ -166,11 +252,13 @@ const App: React.FC = () => {
           // User exists but is not verified
           setIsLoggedIn(false);
           setUserRole(UserRole.BUYER);
+          setCurrentUser(null);
           setCurrentView('AUTH');
         }
       } else {
         setIsLoggedIn(false);
         setUserRole(UserRole.BUYER);
+        setCurrentUser(null);
       }
     });
 
@@ -441,6 +529,8 @@ const App: React.FC = () => {
             products={activeProducts.filter(p => !isEffectiveNewArrival(p))}
             savedItems={savedItems}
             onToggleSave={handleToggleSave}
+            onToggleFollow={handleToggleFollow}
+            isFollowing={followedVendors.some(v => v.id === selectedVendor.id)}
           />
         ) : <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />;
       case 'PRODUCT_DETAIL':
@@ -489,6 +579,10 @@ const App: React.FC = () => {
             cmsContent={cmsContent}
             onUpdateCMSContent={handleUpdateCMSContent}
             contactSubmissions={contactSubmissions}
+            followedVendors={followedVendors}
+            onToggleFollow={handleToggleFollow}
+            onDesignerClick={handleDesignerSelect}
+            followers={followers}
           />
         );
       case 'PROFILE_SETTINGS':
@@ -511,6 +605,9 @@ const App: React.FC = () => {
             cmsContent={cmsContent}
             onUpdateCMSContent={handleUpdateCMSContent}
             contactSubmissions={contactSubmissions}
+            followedVendors={followedVendors}
+            onToggleFollow={handleToggleFollow}
+            onDesignerClick={handleDesignerSelect}
           />
         );
       case 'PRICING':
