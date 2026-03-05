@@ -78,7 +78,7 @@ export const Layout: React.FC<LayoutProps> = ({
   const [customerEmail, setCustomerEmail] = useState('');
   
   // --- PAYSTACK CONFIGURATION ---
-  const PAYSTACK_PUBLIC_KEY = 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; 
+  const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; 
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
 
