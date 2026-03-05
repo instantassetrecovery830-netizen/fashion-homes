@@ -18,7 +18,7 @@ import {
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb,
-  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, fetchVendorFollowers
+  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, fetchVendorFollowers, fetchVendorFollowerCount
 } from './services/dataService.ts';
 import { searchProductsByImage } from './services/geminiService.ts';
 import { Loader } from 'lucide-react';
@@ -33,6 +33,7 @@ const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [selectedVendorFollowerCount, setSelectedVendorFollowerCount] = useState<number>(0);
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string | null>(null);
   
   // Auth Navigation State
@@ -138,6 +139,11 @@ const App: React.FC = () => {
           }
           return [...prev, vendor];
       });
+
+      // Update count if viewing the vendor
+      if (selectedVendor && selectedVendor.id === vendor.id) {
+          setSelectedVendorFollowerCount(prev => isFollowing ? prev - 1 : prev + 1);
+      }
 
       if (isFollowing) {
           await removeFollowerFromDb(currentUser.id, vendor.id);
@@ -314,10 +320,12 @@ const App: React.FC = () => {
     setIsCartOpen(false);
   };
 
-  const handleDesignerSelect = (designerName: string) => {
+  const handleDesignerSelect = async (designerName: string) => {
     const vendor = vendors.find(v => v.name === designerName);
     if (vendor) {
       setSelectedVendor(vendor);
+      const count = await fetchVendorFollowerCount(vendor.id);
+      setSelectedVendorFollowerCount(count);
       handleNavigate('VENDOR_PROFILE');
     } else {
       setSelectedDesignerFilter(designerName);
@@ -531,6 +539,7 @@ const App: React.FC = () => {
             onToggleSave={handleToggleSave}
             onToggleFollow={handleToggleFollow}
             isFollowing={followedVendors.some(v => v.id === selectedVendor.id)}
+            followerCount={selectedVendorFollowerCount}
           />
         ) : <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />;
       case 'PRODUCT_DETAIL':
@@ -608,6 +617,7 @@ const App: React.FC = () => {
             followedVendors={followedVendors}
             onToggleFollow={handleToggleFollow}
             onDesignerClick={handleDesignerSelect}
+            followers={followers}
           />
         );
       case 'PRICING':

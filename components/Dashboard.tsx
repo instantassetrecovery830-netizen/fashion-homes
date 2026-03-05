@@ -356,7 +356,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'FOLLOWERS', label: 'Followers', icon: Users, roles: [UserRole.VENDOR] },
       { id: 'VENDORS', label: 'Ateliers', icon: Store, roles: [UserRole.ADMIN] },
       { id: 'MESSAGES', label: 'Messages', icon: Inbox, roles: [UserRole.ADMIN] },
-      { id: 'CMS', label: 'Content', icon: FileText, roles: [UserRole.ADMIN] },
+      { id: 'STORE_DESIGN', label: 'Design Store', icon: Palette, roles: [UserRole.ADMIN] },
       { id: 'FOLLOWING', label: 'Following', icon: Heart, roles: [UserRole.BUYER, UserRole.VENDOR] },
       { id: 'NEW_ARRIVALS_FEED', label: 'New Arrivals', icon: Sparkles, roles: [UserRole.BUYER] },
       { id: 'PROFILE', label: 'Settings', icon: Settings, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
@@ -927,11 +927,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     />
                                 </div>
                                 <div className="relative">
-                                    <Twitter size={14} className="absolute left-0 top-3 text-gray-400" />
+                                    <Video size={14} className="absolute left-0 top-3 text-gray-400" />
                                     <input 
-                                        placeholder="Twitter Handle"
-                                        value={storefrontForm.twitter || ''}
-                                        onChange={(e) => setStorefrontForm({...storefrontForm, twitter: e.target.value})}
+                                        placeholder="TikTok Handle"
+                                        value={storefrontForm.tiktok || ''}
+                                        onChange={(e) => setStorefrontForm({...storefrontForm, tiktok: e.target.value})}
                                         className="w-full border-b border-gray-200 py-2 pl-6 text-sm focus:border-black outline-none bg-transparent"
                                     />
                                 </div>
@@ -1685,11 +1685,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
           );
 
-      case 'CMS':
+      case 'STORE_DESIGN':
           return (
               <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-7xl">
                   <div className="flex items-center justify-between">
-                      <h2 className="text-3xl font-serif italic">Content Management</h2>
+                      <h2 className="text-3xl font-serif italic">Store Design</h2>
                       <div className="flex gap-4">
                           <button 
                               onClick={handleCMSUpdate}
@@ -1707,6 +1707,82 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           {/* Left Column */}
                           <div className="space-y-6">
+                              {/* Theme Settings */}
+                              <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
+                                  <button 
+                                    onClick={() => setExpandedSection(expandedSection === 'theme' ? null : 'theme')}
+                                    className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
+                                  >
+                                    <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><Palette size={14} /> Theme Settings</span>
+                                    <ChevronDown size={16} className={`transition-transform ${expandedSection === 'theme' ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  
+                                  {expandedSection === 'theme' && (
+                                    <div className="p-6 space-y-4 border-t border-gray-100">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Primary Color</label>
+                                                <div className="flex items-center gap-2">
+                                                    <input 
+                                                        type="color"
+                                                        value={cmsForm.theme?.primaryColor || '#000000'}
+                                                        onChange={e => setCmsForm({...cmsForm, theme: {...(cmsForm.theme || {}), primaryColor: e.target.value} as any})}
+                                                        className="w-8 h-8 rounded-full overflow-hidden border-0 p-0 cursor-pointer"
+                                                    />
+                                                    <input 
+                                                        value={cmsForm.theme?.primaryColor || '#000000'}
+                                                        onChange={e => setCmsForm({...cmsForm, theme: {...(cmsForm.theme || {}), primaryColor: e.target.value} as any})}
+                                                        className="flex-1 border border-gray-200 p-2 text-xs focus:border-black outline-none font-mono uppercase"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Accent Color</label>
+                                                <div className="flex items-center gap-2">
+                                                    <input 
+                                                        type="color"
+                                                        value={cmsForm.theme?.accentColor || '#D4AF37'}
+                                                        onChange={e => setCmsForm({...cmsForm, theme: {...(cmsForm.theme || {}), accentColor: e.target.value} as any})}
+                                                        className="w-8 h-8 rounded-full overflow-hidden border-0 p-0 cursor-pointer"
+                                                    />
+                                                    <input 
+                                                        value={cmsForm.theme?.accentColor || '#D4AF37'}
+                                                        onChange={e => setCmsForm({...cmsForm, theme: {...(cmsForm.theme || {}), accentColor: e.target.value} as any})}
+                                                        className="flex-1 border border-gray-200 p-2 text-xs focus:border-black outline-none font-mono uppercase"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Font Family</label>
+                                                <select 
+                                                    value={cmsForm.theme?.fontFamily || 'Serif'}
+                                                    onChange={e => setCmsForm({...cmsForm, theme: {...(cmsForm.theme || {}), fontFamily: e.target.value as any} as any})}
+                                                    className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white"
+                                                >
+                                                    <option value="Serif">Serif (Editorial)</option>
+                                                    <option value="Sans">Sans (Modern)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Border Radius</label>
+                                                <select 
+                                                    value={cmsForm.theme?.borderRadius || 'sm'}
+                                                    onChange={e => setCmsForm({...cmsForm, theme: {...(cmsForm.theme || {}), borderRadius: e.target.value as any} as any})}
+                                                    className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white"
+                                                >
+                                                    <option value="none">None (Sharp)</option>
+                                                    <option value="sm">Small (Subtle)</option>
+                                                    <option value="md">Medium (Friendly)</option>
+                                                    <option value="full">Full (Pill)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                  )}
+                              </div>
+
                               {/* Hero Section */}
                               <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
                                   <button 

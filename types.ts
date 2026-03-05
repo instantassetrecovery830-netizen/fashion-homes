@@ -216,7 +216,16 @@ export interface AuthPageContent {
   registerImage: string;
 }
 
+export interface ThemeSettings {
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  fontFamily: 'Serif' | 'Sans';
+  borderRadius: 'none' | 'sm' | 'md' | 'lg' | 'full';
+}
+
 export interface LandingPageContent {
+  theme?: ThemeSettings;
   hero: {
     videoUrl: string;
     posterUrl: string;

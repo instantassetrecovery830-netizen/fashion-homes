@@ -10,6 +10,13 @@ const MOCK_PRODUCTS: Product[] = [];
 const MOCK_FOLLOWERS: Follower[] = [];
 
 const DEFAULT_CMS_CONTENT: LandingPageContent = {
+  theme: {
+    primaryColor: '#000000',
+    secondaryColor: '#FFFFFF',
+    accentColor: '#D4AF37', // Gold
+    fontFamily: 'Serif',
+    borderRadius: 'sm'
+  },
   hero: {
     videoUrl: "https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4",
     posterUrl: "https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop",
@@ -374,6 +381,16 @@ export const getVendorByEmail = async (email: string): Promise<Vendor | null> =>
     } catch (e) {
         console.error(e);
         return null;
+    }
+};
+
+export const fetchVendorFollowerCount = async (vendorId: string): Promise<number> => {
+    try {
+        const { rows } = await pool.query('SELECT COUNT(*) FROM followers WHERE vendorId = $1', [vendorId]);
+        return parseInt(rows[0].count, 10);
+    } catch (e) {
+        console.error("Error fetching follower count:", e);
+        return 0;
     }
 };
 

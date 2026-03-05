@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { BadgeCheck, MapPin, Users, Star, ArrowLeft, Heart, Share2, Instagram, Twitter, Globe, Check, X, Link, Facebook, Mail } from 'lucide-react';
+import { BadgeCheck, MapPin, Users, Star, ArrowLeft, Heart, Share2, Instagram, Twitter, Globe, Check, X, Link, Facebook, Mail, Video } from 'lucide-react';
 import { Vendor, Product, ViewState } from '../types';
 
 interface VendorProfileViewProps {
@@ -12,6 +12,7 @@ interface VendorProfileViewProps {
   onToggleSave?: (product: Product) => void;
   onToggleFollow?: (vendor: Vendor) => Promise<void>;
   isFollowing?: boolean;
+  followerCount?: number;
 }
 
 export const VendorProfileView: React.FC<VendorProfileViewProps> = ({ 
@@ -22,7 +23,8 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
   savedItems = [], 
   onToggleSave,
   onToggleFollow,
-  isFollowing = false
+  isFollowing = false,
+  followerCount = 0
 }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -205,9 +207,9 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
               <div>
                 <h1 className={`text-3xl md:text-5xl font-serif italic mb-2 ${currentTheme.text}`}>{vendor.name}</h1>
                 <div className={`flex items-center gap-4 text-sm ${currentTheme.subText}`}>
-                  <span className="flex items-center gap-1"><MapPin size={14} /> Paris, France</span>
-                  <span className="flex items-center gap-1"><Users size={14} /> {isFollowing ? '12.5K' : '12.4K'} Followers</span>
-                  <span className="flex items-center gap-1"><Star size={14} className={`fill-current ${currentTheme.accent}`} /> 4.9 Rating</span>
+                  <span className="flex items-center gap-1"><MapPin size={14} /> {vendor.location || 'Global'}</span>
+                  <span className="flex items-center gap-1"><Users size={14} /> {followerCount} Followers</span>
+                  {/* <span className="flex items-center gap-1"><Star size={14} className={`fill-current ${currentTheme.accent}`} /> 4.9 Rating</span> */}
                 </div>
               </div>
               <div className="flex gap-3">
@@ -238,9 +240,9 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
             </p>
 
             <div className={`flex gap-6 border-t ${currentTheme.border} pt-6`}>
-              <a href="#" className={`${currentTheme.subText} hover:${currentTheme.text} transition-colors`}><Instagram size={20} /></a>
-              <a href="#" className={`${currentTheme.subText} hover:${currentTheme.text} transition-colors`}><Twitter size={20} /></a>
-              <a href="#" className={`${currentTheme.subText} hover:${currentTheme.text} transition-colors`}><Globe size={20} /></a>
+              <a href={vendor.instagram || "#"} className={`${currentTheme.subText} hover:${currentTheme.text} transition-colors`}><Instagram size={20} /></a>
+              <a href={vendor.tiktok || "#"} className={`${currentTheme.subText} hover:${currentTheme.text} transition-colors`}><Video size={20} /></a>
+              <a href={vendor.website || "#"} className={`${currentTheme.subText} hover:${currentTheme.text} transition-colors`}><Globe size={20} /></a>
             </div>
           </div>
         </div>
