@@ -1615,6 +1615,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                   <th className="p-6">Brand</th>
                                   <th className="p-6">Email</th>
                                   <th className="p-6">Plan</th>
+                                  <th className="p-6">Followers</th>
+                                  <th className="p-6">Following</th>
                                   <th className="p-6">Verification</th>
                                   <th className="p-6">Subscription</th>
                                   <th className="p-6">Actions</th>
@@ -1633,6 +1635,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                       <td className="p-6 text-gray-600">{vendor.email}</td>
                                       <td className="p-6">
                                           <span className="bg-gray-100 px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wide">{vendor.subscriptionPlan}</span>
+                                      </td>
+                                      <td className="p-6 font-mono font-bold text-sm">
+                                          {followers.filter(f => f.vendorId === vendor.id).length}
+                                      </td>
+                                      <td className="p-6 font-mono font-bold text-sm">
+                                          {followers.filter(f => f.followerId === vendor.id).length}
                                       </td>
                                       <td className="p-6">
                                           <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full flex w-fit items-center gap-1 ${

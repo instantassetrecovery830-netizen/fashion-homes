@@ -120,6 +120,7 @@ export interface Follower {
   purchases: number;
   style: string;
   vendorId: string;
+  followerId?: string;
 }
 
 export interface WaitlistEntry {

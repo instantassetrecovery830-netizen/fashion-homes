@@ -8,7 +8,7 @@ import {
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
-  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb
+  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers
 } from '../services/dataService.ts';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
@@ -59,6 +59,7 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [contactSubmissions, setContactSubmissions] = useState<ContactSubmission[]>([]);
   const [cmsContent, setCmsContent] = useState<LandingPageContent | undefined>(undefined);
+  const [allFollowers, setAllFollowers] = useState<Follower[]>([]);
   // Removed blocking isLoadingData state
 
   // Visual Search State
@@ -82,17 +83,19 @@ const App: React.FC = () => {
       const currentUserId = auth.currentUser?.uid;
       
       // Load heavy data in parallel
-      const [dbOrders, dbUsers, dbContacts, dbNotifications] = await Promise.all([
+      const [dbOrders, dbUsers, dbContacts, dbNotifications, dbFollowers] = await Promise.all([
         fetchOrders(),
         fetchUsers(),
         fetchContactSubmissions(),
-        fetchNotifications(currentUserId)
+        fetchNotifications(currentUserId),
+        fetchAllFollowers()
       ]);
 
       setOrders(dbOrders);
       setAllUsers(dbUsers);
       setContactSubmissions(dbContacts);
       setNotifications(dbNotifications);
+      setAllFollowers(dbFollowers);
 
       if (currentUserId) {
           const follows = await fetchUserFollowedVendors(currentUserId);
@@ -126,10 +129,10 @@ const App: React.FC = () => {
       }
     }
 
-    // Real-time: Poll for general data updates every 30 seconds
+    // Real-time: Poll for general data updates every 5 seconds
     const pollInterval = setInterval(() => {
         refreshData();
-    }, 30000);
+    }, 5000);
 
     return () => clearInterval(pollInterval);
   }, []);
@@ -332,10 +335,29 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [allUsers, vendors]); // Depend on data to ensure correct role assignment
 
-  // Derived State: Active Products (only from active vendors who are verified)
+  // Derived State: Active Products (only from active vendors who are verified OR Admins)
   const activeProducts = products.filter(product => {
+      // 1. Check if it belongs to a Vendor
       const vendor = vendors.find(v => v.name === product.designer);
-      return vendor ? (vendor.subscriptionStatus === 'ACTIVE' && vendor.verificationStatus === 'VERIFIED') : true; 
+      if (vendor) {
+          return vendor.subscriptionStatus === 'ACTIVE' && vendor.verificationStatus === 'VERIFIED';
+      }
+
+      // 2. If not a vendor, check if it belongs to an Admin
+      // We check if the designer name matches any user with ADMIN role
+      const author = allUsers.find(u => u.name === product.designer || (u.email && u.email.split('@')[0] === product.designer));
+      if (author && author.role === UserRole.ADMIN) {
+          return true;
+      }
+      
+      // 3. Allow if it's explicitly one of the hardcoded admin emails (fallback)
+      const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me', 'mikelarry00764@proton.me'];
+      // We don't have the email on the product, only the name. 
+      // But if the name matches the email prefix of an admin, we can allow it.
+      const isAdminEmailPrefix = adminEmails.some(email => email.split('@')[0] === product.designer);
+      if (isAdminEmailPrefix) return true;
+
+      return false; 
   });
 
   // Feature Flags Management
@@ -720,6 +742,7 @@ const App: React.FC = () => {
               followedVendors={followedVendors}
               onToggleFollow={handleToggleFollow}
               onDesignerClick={handleDesignerSelect}
+              followers={allFollowers}
             />
           </Suspense>
         );

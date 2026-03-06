@@ -415,6 +415,16 @@ export const fetchVendorFollowers = async (vendorId: string): Promise<Follower[]
     }
 };
 
+export const fetchAllFollowers = async (): Promise<Follower[]> => {
+    try {
+        const { rows } = await pool.query('SELECT * FROM followers');
+        return rows as Follower[];
+    } catch (e) {
+        console.error(e);
+        return [];
+    }
+};
+
 export const fetchUserFollowedVendors = async (userId: string): Promise<Vendor[]> => {
     try {
         // Find vendors that the user (followerId) is following

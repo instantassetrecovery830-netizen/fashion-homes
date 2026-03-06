@@ -37,13 +37,15 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
             Discover the silhouettes defining this season's narrative.
           </p>
           
-          {/* Manage Button */}
-          <button
-            onClick={() => isLoggedIn ? onNavigate('NEW_ARRIVALS_MANAGE') : onNavigate('AUTH')}
-            className="mt-8 w-full md:w-auto bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors shadow-lg"
-          >
-            {isLoggedIn ? 'Add New Piece' : 'Sign in to Add New Piece'}
-          </button>
+          {/* Manage Button - Only for Vendors and Admins */}
+          {userRole !== UserRole.BUYER && (
+            <button
+              onClick={() => isLoggedIn ? onNavigate('NEW_ARRIVALS_MANAGE') : onNavigate('AUTH')}
+              className="mt-8 w-full md:w-auto bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors shadow-lg"
+            >
+              {isLoggedIn ? 'Add New Piece' : 'Sign in to Add New Piece'}
+            </button>
+          )}
         </div>
       </div>
 
