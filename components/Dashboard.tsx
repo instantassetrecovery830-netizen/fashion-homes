@@ -115,6 +115,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const productImageInputRef = useRef<HTMLInputElement>(null);
 
   // Update active tab if initialTab changes
@@ -243,7 +244,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
   };
 
-  const handleImageUpload = (file: File, type: 'AVATAR' | 'COVER' | 'GALLERY', index?: number) => {
+  const handleImageUpload = (file: File, type: 'AVATAR' | 'COVER' | 'GALLERY' | 'VIDEO', index?: number) => {
       const reader = new FileReader();
       reader.onloadend = () => {
           const result = reader.result as string;
@@ -252,6 +253,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   setStorefrontForm({ ...storefrontForm, avatar: result });
               } else if (type === 'COVER') {
                   setStorefrontForm({ ...storefrontForm, coverImage: result });
+              } else if (type === 'VIDEO') {
+                  setStorefrontForm({ ...storefrontForm, videoUrl: result });
               } else if (type === 'GALLERY') {
                    // If index is provided, replace. If not (or -1), add.
                    const currentGallery = [...(storefrontForm.gallery || [])];
@@ -300,7 +303,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               designer: currentVendor?.name || productForm.designer || 'MyFitStore',
               price: Number(productForm.price),
               category: productForm.category,
-              image: productForm.image || 'https://via.placeholder.com/400x600',
+              image: productForm.images?.[0] || productForm.image || 'https://via.placeholder.com/400x600',
+              images: productForm.images || (productForm.image ? [productForm.image] : []),
+              video: productForm.video,
               description: productForm.description || '',
               rating: productForm.rating || 5,
               stock: Number(productForm.stock) || 0,
@@ -900,6 +905,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Video Upload */}
+                        <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                                <Video size={14} /> Brand Video
+                            </h3>
+                            <div className="aspect-video bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center relative group cursor-pointer hover:border-luxury-gold transition-colors rounded-sm">
+                                {storefrontForm.videoUrl ? (
+                                    <div className="relative w-full h-full">
+                                        <video src={storefrontForm.videoUrl} controls className="w-full h-full object-cover" />
+                                        <button 
+                                            onClick={() => setStorefrontForm({...storefrontForm, videoUrl: undefined})}
+                                            className="absolute top-2 right-2 bg-white/80 p-2 rounded-full text-red-500 hover:bg-white z-10"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="text-gray-400 flex flex-col items-center">
+                                        <Video size={32} className="mb-2" />
+                                        <span className="text-[10px] uppercase tracking-wide font-bold text-center px-2">Upload Video</span>
+                                        <span className="text-[9px] text-gray-300 mt-1">MP4, WebM (Max 10MB)</span>
+                                    </div>
+                                )}
+                                {!storefrontForm.videoUrl && (
+                                    <input 
+                                        type="file" 
+                                        accept="video/*"
+                                        ref={videoInputRef}
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                if (file.size > 10 * 1024 * 1024) {
+                                                    alert("Video file is too large. Please upload a video smaller than 10MB.");
+                                                    return;
+                                                }
+                                                handleImageUpload(file, 'VIDEO');
+                                            }
+                                        }}
+                                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                    />
+                                )}
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-4">
+                                Upload a brand video to be displayed in your store gallery.
+                            </p>
                         </div>
 
                         {/* Social Links */}
@@ -2214,30 +2266,106 @@ export const Dashboard: React.FC<DashboardProps> = ({
                    <div className="p-8 space-y-6">
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                            {/* Image Upload */}
-                           <div className="space-y-2">
-                               <label className="text-[10px] font-bold uppercase text-gray-400">Product Image</label>
-                               <div className="aspect-[3/4] bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center relative group cursor-pointer hover:border-luxury-gold transition-colors">
-                                   {productForm.image ? (
-                                       <img src={productForm.image} alt="Preview" className="w-full h-full object-cover" />
+                           <div className="col-span-1 md:col-span-2 space-y-4">
+                               <label className="text-[10px] font-bold uppercase text-gray-400">Product Images (First image is cover)</label>
+                               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                   {/* Existing Images */}
+                                   {(productForm.images && productForm.images.length > 0 ? productForm.images : (productForm.image ? [productForm.image] : [])).map((img, idx) => (
+                                       <div key={idx} className="aspect-[3/4] bg-gray-50 border border-gray-200 relative group rounded-sm overflow-hidden">
+                                           <img src={img} alt={`Product ${idx}`} className="w-full h-full object-cover" />
+                                           <button 
+                                               type="button"
+                                               onClick={() => {
+                                                   const newImages = productForm.images ? [...productForm.images] : (productForm.image ? [productForm.image] : []);
+                                                   newImages.splice(idx, 1);
+                                                   setProductForm(prev => ({...prev, images: newImages, image: newImages[0] || ''}));
+                                               }}
+                                               className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white z-10"
+                                           >
+                                               <X size={14} />
+                                           </button>
+                                           {idx === 0 && (
+                                               <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[8px] font-bold uppercase text-center py-1">
+                                                   Main Cover
+                                               </div>
+                                           )}
+                                       </div>
+                                   ))}
+                                   
+                                   {/* Add New Image Button */}
+                                   <div className="aspect-[3/4] bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center relative group cursor-pointer hover:border-luxury-gold transition-colors rounded-sm">
+                                       <div className="text-gray-400 flex flex-col items-center">
+                                           <Plus size={24} className="mb-2" />
+                                           <span className="text-[10px] uppercase tracking-wide font-bold text-center px-2">Add Image</span>
+                                       </div>
+                                       <input 
+                                           type="file" 
+                                           accept="image/*"
+                                           multiple
+                                           onChange={(e) => {
+                                               if (e.target.files) {
+                                                   Array.from(e.target.files).forEach((file: File) => {
+                                                       const reader = new FileReader();
+                                                       reader.onloadend = () => {
+                                                           setProductForm(prev => {
+                                                               const currentImages = prev.images ? [...prev.images] : (prev.image ? [prev.image] : []);
+                                                               const newImages = [...currentImages, reader.result as string];
+                                                               return { ...prev, images: newImages, image: newImages[0] };
+                                                           });
+                                                       };
+                                                       reader.readAsDataURL(file);
+                                                   });
+                                               }
+                                           }}
+                                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                       />
+                                   </div>
+                               </div>
+                           </div>
+
+                           {/* Video Upload */}
+                           <div className="col-span-1 md:col-span-2 space-y-4">
+                               <label className="text-[10px] font-bold uppercase text-gray-400">Product Video (Optional)</label>
+                               <div className="aspect-video bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center relative group cursor-pointer hover:border-luxury-gold transition-colors rounded-sm">
+                                   {productForm.video ? (
+                                       <div className="relative w-full h-full">
+                                           <video src={productForm.video} controls className="w-full h-full object-cover" />
+                                           <button 
+                                               type="button"
+                                               onClick={() => setProductForm(prev => ({...prev, video: undefined}))}
+                                               className="absolute top-2 right-2 bg-white/80 p-2 rounded-full text-red-500 hover:bg-white z-10"
+                                           >
+                                               <X size={16} />
+                                           </button>
+                                       </div>
                                    ) : (
                                        <div className="text-gray-400 flex flex-col items-center">
-                                           <ImageIcon size={32} className="mb-2" />
-                                           <span className="text-xs uppercase tracking-wide">Upload Image</span>
+                                           <Video size={32} className="mb-2" />
+                                           <span className="text-[10px] uppercase tracking-wide font-bold text-center px-2">Upload Video</span>
+                                           <span className="text-[9px] text-gray-300 mt-1">MP4, WebM (Max 10MB)</span>
                                        </div>
                                    )}
-                                   <input 
-                                       type="file" 
-                                       accept="image/*"
-                                       onChange={(e) => {
-                                           const file = e.target.files?.[0];
-                                           if (file) {
-                                               const reader = new FileReader();
-                                               reader.onloadend = () => setProductForm({...productForm, image: reader.result as string});
-                                               reader.readAsDataURL(file);
-                                           }
-                                       }}
-                                       className="absolute inset-0 opacity-0 cursor-pointer"
-                                   />
+                                   {!productForm.video && (
+                                       <input 
+                                           type="file" 
+                                           accept="video/*"
+                                           onChange={(e) => {
+                                               const file = e.target.files?.[0];
+                                               if (file) {
+                                                   if (file.size > 10 * 1024 * 1024) {
+                                                       alert("Video file is too large. Please upload a video smaller than 10MB.");
+                                                       return;
+                                                   }
+                                                   const reader = new FileReader();
+                                                   reader.onloadend = () => {
+                                                       setProductForm(prev => ({ ...prev, video: reader.result as string }));
+                                                   };
+                                                   reader.readAsDataURL(file);
+                                               }
+                                           }}
+                                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                       />
+                                   )}
                                </div>
                            </div>
 

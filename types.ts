@@ -51,6 +51,8 @@ export interface Product {
   price: number;
   category: string;
   image: string;
+  images?: string[];
+  video?: string;
   description: string;
   rating: number;
   isNewSeason?: boolean;
@@ -106,6 +108,7 @@ export interface Vendor {
   kycDocuments?: KycDocuments;
   visualTheme?: 'MINIMALIST' | 'DARK' | 'GOLD';
   gallery?: string[];
+  videoUrl?: string;
 }
 
 export interface Follower {

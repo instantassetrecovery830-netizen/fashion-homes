@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler, Heart } from 'lucide-react';
+import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler, Heart, Video } from 'lucide-react';
 import { Product, Vendor } from '../types.ts';
 import { getStyleMatch } from '../services/geminiService.ts';
 
@@ -29,7 +29,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   const [measurements, setMeasurements] = useState('');
   const [styleTip, setStyleTip] = useState<string | null>(null);
   const [loadingStyle, setLoadingStyle] = useState(false);
-  const [activeImage, setActiveImage] = useState(product.image);
+  const [activeImage, setActiveImage] = useState(product.images?.[0] || product.image);
 
   // Reviews State
   const [reviews, setReviews] = useState<Review[]>([
@@ -42,20 +42,21 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   const isSaved = savedItems.some(p => p.id === product.id);
 
   useEffect(() => {
-    setActiveImage(product.image);
+    setActiveImage(product.images?.[0] || product.image);
     setSelectedSize(null);
     setMeasurements('');
     setSizeError(false);
     setStyleTip(null);
   }, [product]);
 
-  // Generate mock additional images for the gallery
-  const galleryImages = [
-    product.image,
-    `https://picsum.photos/seed/${product.id}detail1/800/1200`,
-    `https://picsum.photos/seed/${product.id}detail2/800/1200`,
-    `https://picsum.photos/seed/${product.id}detail3/800/1200`,
-  ];
+  // Use product images if available, otherwise fallback to main image
+  const galleryImages = product.images && product.images.length > 0 
+    ? [...product.images] 
+    : [product.image];
+
+  if (product.video) {
+      galleryImages.push(product.video);
+  }
 
   const handleStyleMatch = async () => {
     setLoadingStyle(true);
@@ -99,11 +100,22 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
           <div className="space-y-4">
             {/* Main Image */}
             <div className="aspect-[3/4] overflow-hidden bg-gray-50 cursor-zoom-in relative group">
-              <img 
-                src={activeImage} 
-                alt={product.name} 
-                className="w-full h-full object-cover hover:scale-110 transition-transform duration-700 ease-out" 
-              />
+              {activeImage === product.video ? (
+                  <video 
+                    src={activeImage} 
+                    controls 
+                    autoPlay 
+                    loop 
+                    muted 
+                    className="w-full h-full object-cover" 
+                  />
+              ) : (
+                  <img 
+                    src={activeImage} 
+                    alt={product.name} 
+                    className="w-full h-full object-cover hover:scale-110 transition-transform duration-700 ease-out" 
+                  />
+              )}
               {product.isPreOrder && (
                  <div className="absolute top-4 left-4 bg-luxury-gold text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
                    <Clock size={12} /> Pre-Order
@@ -122,13 +134,20 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
                 <button 
                   key={idx}
                   onClick={() => setActiveImage(img)}
-                  className={`aspect-[3/4] bg-gray-50 overflow-hidden transition-all duration-300 ${
+                  className={`aspect-[3/4] bg-gray-50 overflow-hidden transition-all duration-300 relative ${
                     activeImage === img 
                       ? 'ring-1 ring-black ring-offset-2 opacity-100' 
                       : 'opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                  {img === product.video ? (
+                      <div className="w-full h-full flex items-center justify-center bg-black/10">
+                          <Video size={24} className="text-white drop-shadow-md relative z-10" />
+                          <video src={img} className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                      </div>
+                  ) : (
+                      <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                  )}
                 </button>
               ))}
             </div>

@@ -92,7 +92,9 @@ const initSchema = async () => {
             twitter TEXT,
             paymentMethods JSONB,
             kycDocuments JSONB,
-            visualTheme TEXT
+            visualTheme TEXT,
+            gallery JSONB,
+            videoUrl TEXT
         )`,
         `CREATE TABLE IF NOT EXISTS products (
             id TEXT PRIMARY KEY,
@@ -106,7 +108,9 @@ const initSchema = async () => {
             isNewSeason BOOLEAN,
             stock INTEGER,
             sizes JSONB,
-            isPreOrder BOOLEAN
+            isPreOrder BOOLEAN,
+            images JSONB,
+            video TEXT
         )`,
         `CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
@@ -200,6 +204,7 @@ const initSchema = async () => {
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS kycDocuments JSONB`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS visualTheme TEXT`,
         `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS gallery JSONB`,
+        `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS videoUrl TEXT`,
         
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS verificationStatus TEXT`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`,
@@ -214,6 +219,8 @@ const initSchema = async () => {
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS rating NUMERIC`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS isNewSeason BOOLEAN`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS releaseDate TEXT`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS video TEXT`,
         
         `ALTER TABLE products ALTER COLUMN sizes TYPE JSONB USING to_jsonb(sizes)`,
         
@@ -281,7 +288,8 @@ export const fetchVendors = async (): Promise<Vendor[]> => {
             visualTheme: row.visualtheme,
             facebook: row.facebook,
             tiktok: row.tiktok,
-            gallery: row.gallery || []
+            gallery: row.gallery || [],
+            videoUrl: row.videourl
         })) as Vendor[];
     } catch (e) {
         console.error(e);
@@ -298,6 +306,8 @@ export const fetchProducts = async (): Promise<Product[]> => {
             rating: Number(row.rating),
             stock: Number(row.stock),
             sizes: row.sizes, // JSONB is auto-parsed by node-postgres
+            images: row.images || [],
+            video: row.video,
             isNewSeason: row.isnewseason,
             isPreOrder: row.ispreorder,
             releaseDate: row.releasedate
@@ -374,7 +384,8 @@ export const getVendorByEmail = async (email: string): Promise<Vendor | null> =>
                 visualTheme: row.visualtheme,
                 facebook: row.facebook,
                 tiktok: row.tiktok,
-                gallery: row.gallery || []
+                gallery: row.gallery || [],
+                videoUrl: row.videourl
             } as Vendor;
         }
         return null;
@@ -425,7 +436,8 @@ export const fetchUserFollowedVendors = async (userId: string): Promise<Vendor[]
             visualTheme: row.visualtheme,
             facebook: row.facebook,
             tiktok: row.tiktok,
-            gallery: row.gallery || []
+            gallery: row.gallery || [],
+            videoUrl: row.videourl
         })) as Vendor[];
     } catch (e) {
         console.error("Error fetching followed vendors:", e);
@@ -472,9 +484,9 @@ export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> =>
 export const addProductToDb = async (product: Product) => {
     try {
         await pool.query(
-            `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder, releaseDate)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-            [product.id, product.name, product.designer, product.price, product.category, product.image, product.description, product.rating, product.isNewSeason, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null]
+            `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder, releaseDate, images, video)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+            [product.id, product.name, product.designer, product.price, product.category, product.image, product.description, product.rating, product.isNewSeason, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null, JSON.stringify(product.images || []), product.video || null]
         );
     } catch (e) {
         console.error("Add Product Failed", e);
@@ -484,8 +496,8 @@ export const addProductToDb = async (product: Product) => {
 export const updateProductInDb = async (product: Product) => {
     try {
         await pool.query(
-            `UPDATE products SET name=$1, price=$2, category=$3, image=$4, description=$5, stock=$6, sizes=$7, isPreOrder=$8, releaseDate=$9 WHERE id=$10`,
-            [product.name, product.price, product.category, product.image, product.description, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null, product.id]
+            `UPDATE products SET name=$1, price=$2, category=$3, image=$4, description=$5, stock=$6, sizes=$7, isPreOrder=$8, releaseDate=$9, images=$10, video=$11 WHERE id=$12`,
+            [product.name, product.price, product.category, product.image, product.description, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null, JSON.stringify(product.images || []), product.video || null, product.id]
         );
     } catch (e) {
         console.error("Update Product Failed", e);
@@ -509,12 +521,12 @@ export const updateVendorInDb = async (vendor: Vendor) => {
                 name=$1, bio=$2, avatar=$3, verificationStatus=$4, subscriptionStatus=$5, 
                 location=$6, coverImage=$7, email=$8, subscriptionPlan=$9, 
                 website=$10, instagram=$11, twitter=$12, kycDocuments=$13, visualTheme=$14,
-                facebook=$15, tiktok=$16, gallery=$17
-             WHERE id=$18`,
+                facebook=$15, tiktok=$16, gallery=$17, videoUrl=$18
+             WHERE id=$19`,
             [vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus,
              vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan,
              vendor.website, vendor.instagram, vendor.twitter, JSON.stringify(vendor.kycDocuments), vendor.visualTheme,
-             vendor.facebook, vendor.tiktok, JSON.stringify(vendor.gallery || []), vendor.id]
+             vendor.facebook, vendor.tiktok, JSON.stringify(vendor.gallery || []), vendor.videoUrl, vendor.id]
         );
     } catch (e) {
         console.error("Update Vendor Failed", e);
@@ -527,9 +539,9 @@ export const createVendorInDb = async (vendor: Vendor) => {
         const check = await pool.query('SELECT id FROM vendors WHERE id = $1', [vendor.id]);
         if (check.rows.length === 0) {
             await pool.query(
-                `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, visualTheme)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-                [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.visualTheme || 'MINIMALIST']
+                `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, visualTheme, videoUrl)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.visualTheme || 'MINIMALIST', vendor.videoUrl]
             );
         }
     } catch (e) {

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, ArrowLeft, RefreshCw, Briefcase, ShoppingBag } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types.ts';
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail } from '../services/firebase.ts';
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail, setMockUser } from '../services/firebase.ts';
 import { createVendorInDb, createUserInDb, getUserByEmail, getVendorByEmail } from '../services/dataService.ts';
 
 interface AuthViewProps {
@@ -338,6 +338,61 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     } catch(e) {
          console.error(e);
          setError("Failed to check verification status.");
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  const handleDevLogin = async () => {
+    setIsLoading(true);
+    try {
+        // Create a mock user based on selected role
+        const mockUser = {
+            uid: `dev_${selectedRole.toLowerCase()}_${Date.now()}`,
+            email: `dev_${selectedRole.toLowerCase()}@example.com`,
+            displayName: `Dev ${selectedRole}`,
+            emailVerified: true,
+            photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200'
+        };
+
+        // Set in Firebase wrapper
+        setMockUser(mockUser);
+        
+        // Ensure DB entry exists for this mock user so dashboard works
+        if (selectedRole === UserRole.VENDOR) {
+             await createVendorInDb({
+                id: mockUser.uid,
+                name: "Dev Atelier",
+                bio: 'Developer Test Account',
+                avatar: mockUser.photoURL,
+                verificationStatus: 'VERIFIED',
+                subscriptionStatus: 'ACTIVE',
+                location: 'Dev Environment',
+                coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=200',
+                email: mockUser.email,
+                subscriptionPlan: 'Couture',
+                website: '',
+                instagram: '',
+                twitter: ''
+            });
+        } else {
+             await createUserInDb({
+                id: mockUser.uid,
+                name: mockUser.displayName,
+                email: mockUser.email,
+                role: selectedRole,
+                avatar: mockUser.photoURL,
+                status: 'ACTIVE'
+            });
+        }
+
+        // Route user (will trigger onLogin via onAuthStateChanged in App.tsx)
+        // But we can also call onLogin directly to be safe
+        onLogin(selectedRole);
+
+    } catch (e) {
+        console.error("Dev login failed", e);
+        setError("Dev login failed");
     } finally {
         setIsLoading(false);
     }
@@ -702,8 +757,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 </div>
                 
                 <div className="mt-12 text-center">
-                     <button onClick={() => onNavigate('LANDING')} className="text-[10px] text-gray-300 uppercase tracking-widest hover:text-black transition-colors">
+                     <button onClick={() => onNavigate('LANDING')} className="text-[10px] text-gray-300 uppercase tracking-widest hover:text-black transition-colors block mx-auto mb-4">
                          Back to Store
+                     </button>
+                     
+                     <button 
+                        onClick={handleDevLogin}
+                        className="text-[9px] text-gray-200 uppercase tracking-widest hover:text-red-500 transition-colors"
+                     >
+                        Developer Access (Preview Mode)
                      </button>
                 </div>
             </div>

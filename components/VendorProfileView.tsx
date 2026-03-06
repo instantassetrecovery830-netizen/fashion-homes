@@ -248,7 +248,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
         </div>
 
         {/* Moodboard / Gallery Section */}
-        {vendor.gallery && vendor.gallery.length > 0 && (
+        {((vendor.gallery && vendor.gallery.length > 0) || vendor.videoUrl) && (
             <div className="py-16">
                 <div className="flex items-center gap-4 mb-8">
                     <div className={`h-px flex-1 ${currentTheme.border.replace('border', 'bg')}`} />
@@ -256,7 +256,18 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                     <div className={`h-px flex-1 ${currentTheme.border.replace('border', 'bg')}`} />
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {vendor.gallery.map((img, idx) => (
+                    {vendor.videoUrl && (
+                        <div className="aspect-square bg-gray-100 overflow-hidden group relative col-span-2 row-span-2">
+                            <video 
+                                src={vendor.videoUrl} 
+                                className="w-full h-full object-cover"
+                                controls
+                                muted
+                                loop
+                            />
+                        </div>
+                    )}
+                    {vendor.gallery?.map((img, idx) => (
                         <div key={idx} className="aspect-square bg-gray-100 overflow-hidden group">
                             <img 
                                 src={img} 
