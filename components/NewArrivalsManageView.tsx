@@ -85,7 +85,8 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
         sizes: formData.sizes || ['S', 'M', 'L'],
         isNewSeason: true, 
         isPreOrder: !!formData.isPreOrder,
-        createdAt: formData.createdAt || new Date().toISOString()
+        createdAt: formData.createdAt || new Date().toISOString(),
+        dropDate: formData.dropDate
       };
 
       if (formData.id) {
@@ -366,6 +367,16 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
                             className="accent-black"
                         />
                         <label htmlFor="isPreOrder" className="text-xs text-gray-600 cursor-pointer select-none">Available for Pre-Order</label>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Drop Date (Countdown)</label>
+                      <input 
+                        type="datetime-local"
+                        value={formData.dropDate || ''}
+                        onChange={e => setFormData({...formData, dropDate: e.target.value})}
+                        className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                      />
                     </div>
                   </div>
                 </div>

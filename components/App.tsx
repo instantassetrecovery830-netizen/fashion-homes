@@ -8,7 +8,7 @@ import {
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
-  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers
+  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct
 } from '../services/dataService.ts';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
@@ -456,6 +456,11 @@ const App: React.FC = () => {
   };
 
   // Saved Items Handler
+  const handleVote = async (product: Product) => {
+    await voteForProduct(product.id);
+    await refreshData();
+  };
+
   const handleToggleSave = (product: Product) => {
     setSavedItems(prev => {
       const exists = prev.find(p => p.id === product.id);
@@ -642,6 +647,7 @@ const App: React.FC = () => {
                 onNavigate={handleNavigate}
                 userRole={userRole}
                 isLoggedIn={isLoggedIn}
+                onVote={handleVote}
             />
           </Suspense>
         );

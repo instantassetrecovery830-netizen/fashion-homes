@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Heart } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Heart, ThumbsUp, Clock, ShoppingBag } from 'lucide-react';
 import { Product, UserRole } from '../types';
 
 interface NewArrivalsViewProps {
@@ -11,6 +11,7 @@ interface NewArrivalsViewProps {
   onNavigate: (view: any) => void;
   userRole: UserRole;
   isLoggedIn: boolean;
+  onVote?: (product: Product) => void;
 }
 
 export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ 
@@ -20,10 +21,51 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
   onToggleSave,
   onNavigate,
   userRole,
-  isLoggedIn
+  isLoggedIn,
+  onVote
 }) => {
   const newArrivals = products.filter(p => p.isNewSeason);
   const isSaved = (productId: string) => savedItems.some(p => p.id === productId);
+
+  // Countdown Timer Logic
+  const calculateTimeLeft = (dropDate?: string) => {
+      if (!dropDate) return { days: 0, hours: 0, minutes: 0 };
+      const difference = +new Date(dropDate) - +new Date();
+      if (difference > 0) {
+          return {
+              days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+              hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+              minutes: Math.floor((difference / 1000 / 60) % 60),
+          };
+      }
+      return { days: 0, hours: 0, minutes: 0 };
+  };
+
+  const [timeLeft, setTimeLeft] = useState<{ [key: string]: any }>({});
+
+  useEffect(() => {
+      const timer = setInterval(() => {
+          const newTimeLeft: { [key: string]: any } = {};
+          newArrivals.forEach(product => {
+              if (product.dropDate) {
+                  newTimeLeft[product.id] = calculateTimeLeft(product.dropDate);
+              }
+          });
+          setTimeLeft(newTimeLeft);
+      }, 60000); // Update every minute
+
+      // Initial calculation
+      const initialTimeLeft: { [key: string]: any } = {};
+      newArrivals.forEach(product => {
+          if (product.dropDate) {
+              initialTimeLeft[product.id] = calculateTimeLeft(product.dropDate);
+          }
+      });
+      setTimeLeft(initialTimeLeft);
+
+      return () => clearInterval(timer);
+  }, [newArrivals]);
+
 
   return (
     <div className="min-h-screen pt-12 pb-24 animate-fade-in">
@@ -33,8 +75,7 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
           <span className="text-xs font-bold uppercase tracking-[0.3em] text-luxury-gold">Just Landed</span>
           <h1 className="text-5xl md:text-7xl font-serif italic">New Season</h1>
           <p className="max-w-xl text-gray-500 font-light leading-relaxed">
-            The latest drops from our curated selection of avant-garde designers. 
-            Discover the silhouettes defining this season's narrative.
+            Vote for your favorite pieces to drop faster. Pre-order now to secure your size.
           </p>
           
           {/* Manage Button - Only for Vendors and Admins */}
@@ -51,29 +92,41 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
 
       {/* Grid */}
       <div className="max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-20">
           {newArrivals.map((product) => (
             <div 
               key={product.id} 
-              className="group cursor-pointer"
+              className="group cursor-pointer flex flex-col h-full"
               onClick={() => onProductSelect(product)}
             >
               <div className="relative aspect-[3/4] overflow-hidden bg-gray-100 mb-6">
                 <img 
                   src={product.image} 
                   alt={product.name} 
-                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                 />
                 
+                {/* Countdown Overlay */}
+                {product.dropDate && timeLeft[product.id] && (timeLeft[product.id].days > 0 || timeLeft[product.id].hours > 0) && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-md text-white p-3 flex justify-center items-center gap-4">
+                        <div className="text-center">
+                            <span className="block text-lg font-bold font-mono leading-none">{timeLeft[product.id].days}</span>
+                            <span className="text-[8px] uppercase tracking-wider opacity-70">Days</span>
+                        </div>
+                        <div className="text-center">
+                            <span className="block text-lg font-bold font-mono leading-none">{timeLeft[product.id].hours}</span>
+                            <span className="text-[8px] uppercase tracking-wider opacity-70">Hrs</span>
+                        </div>
+                        <div className="text-center">
+                            <span className="block text-lg font-bold font-mono leading-none">{timeLeft[product.id].minutes}</span>
+                            <span className="text-[8px] uppercase tracking-wider opacity-70">Mins</span>
+                        </div>
+                    </div>
+                )}
+
                 <span className="absolute top-4 left-4 bg-white text-black text-[10px] font-bold px-2 py-1 uppercase tracking-wide">
                     New Season
                 </span>
-
-                <div className="absolute inset-0 bg-black/10 transition-opacity duration-500 opacity-0 group-hover:opacity-100 flex items-end justify-center pb-8">
-                  <button className="bg-white text-black text-xs font-bold uppercase tracking-widest px-8 py-3 hover:bg-luxury-black hover:text-white transition-all duration-500 shadow-xl transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100">
-                    Quick View
-                  </button>
-                </div>
                 
                 <button 
                     onClick={(e) => { e.stopPropagation(); onToggleSave && onToggleSave(product); }}
@@ -83,12 +136,35 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
                 </button>
               </div>
 
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest mb-1">{product.designer}</h3>
-                  <p className="font-serif text-gray-600 italic group-hover:text-black transition-colors">{product.name}</p>
+              <div className="flex-1 flex flex-col">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-widest mb-1 text-gray-500">{product.designer}</h3>
+                    <h2 className="font-serif text-xl italic mb-2">{product.name}</h2>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs font-bold bg-gray-100 px-2 py-1 rounded-full" title="Votes">
+                      <ThumbsUp size={12} /> {product.votes || 0}
+                  </div>
                 </div>
-                <span className="text-sm font-medium">${product.price}</span>
+
+                <p className="text-sm text-gray-600 leading-relaxed mb-6 line-clamp-3 flex-1">
+                    {product.description}
+                </p>
+
+                <div className="flex gap-3 mt-auto">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onVote && onVote(product); }}
+                        className="flex-1 border border-black py-3 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-2"
+                    >
+                        <ThumbsUp size={14} /> Vote to Drop
+                    </button>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onProductSelect(product); }}
+                        className="flex-1 bg-luxury-gold text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-md"
+                    >
+                        <ShoppingBag size={14} /> Pre-Order
+                    </button>
+                </div>
               </div>
             </div>
           ))}

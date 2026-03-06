@@ -110,7 +110,10 @@ const initSchema = async () => {
             sizes JSONB,
             isPreOrder BOOLEAN,
             images JSONB,
-            video TEXT
+            video TEXT,
+            createdAt TEXT,
+            votes INTEGER DEFAULT 0,
+            dropDate TEXT
         )`,
         `CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
@@ -638,6 +641,14 @@ export const updateUserInDb = async (user: User) => {
 };
 
 // --- WRITE OPERATIONS (CMS) ---
+
+export const voteForProduct = async (productId: string) => {
+    try {
+        await pool.query('UPDATE products SET votes = COALESCE(votes, 0) + 1 WHERE id = $1', [productId]);
+    } catch (e) {
+        console.error("Error voting for product:", e);
+    }
+};
 
 export const updateLandingContentInDb = async (content: LandingPageContent) => {
     try {
