@@ -224,6 +224,9 @@ const initSchema = async () => {
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS releaseDate TEXT`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS video TEXT`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS createdAt TEXT`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS votes INTEGER DEFAULT 0`,
+        `ALTER TABLE products ADD COLUMN IF NOT EXISTS dropDate TEXT`,
         
         `ALTER TABLE products ALTER COLUMN sizes TYPE JSONB USING to_jsonb(sizes)`,
         
@@ -313,7 +316,10 @@ export const fetchProducts = async (): Promise<Product[]> => {
             video: row.video,
             isNewSeason: row.isnewseason,
             isPreOrder: row.ispreorder,
-            releaseDate: row.releasedate
+            releaseDate: row.releasedate,
+            createdAt: row.createdat,
+            dropDate: row.dropdate,
+            votes: row.votes || 0
         })) as Product[];
     } catch (e) {
         console.error(e);
@@ -497,9 +503,9 @@ export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> =>
 export const addProductToDb = async (product: Product) => {
     try {
         await pool.query(
-            `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder, releaseDate, images, video)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-            [product.id, product.name, product.designer, product.price, product.category, product.image, product.description, product.rating, product.isNewSeason, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null, JSON.stringify(product.images || []), product.video || null]
+            `INSERT INTO products (id, name, designer, price, category, image, description, rating, isNewSeason, stock, sizes, isPreOrder, releaseDate, images, video, createdAt, votes, dropDate)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+            [product.id, product.name, product.designer, product.price, product.category, product.image, product.description, product.rating, product.isNewSeason, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null, JSON.stringify(product.images || []), product.video || null, product.createdAt || new Date().toISOString(), product.votes || 0, product.dropDate || null]
         );
     } catch (e) {
         console.error("Add Product Failed", e);
@@ -509,8 +515,8 @@ export const addProductToDb = async (product: Product) => {
 export const updateProductInDb = async (product: Product) => {
     try {
         await pool.query(
-            `UPDATE products SET name=$1, price=$2, category=$3, image=$4, description=$5, stock=$6, sizes=$7, isPreOrder=$8, releaseDate=$9, images=$10, video=$11 WHERE id=$12`,
-            [product.name, product.price, product.category, product.image, product.description, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null, JSON.stringify(product.images || []), product.video || null, product.id]
+            `UPDATE products SET name=$1, price=$2, category=$3, image=$4, description=$5, stock=$6, sizes=$7, isPreOrder=$8, releaseDate=$9, images=$10, video=$11, dropDate=$12 WHERE id=$13`,
+            [product.name, product.price, product.category, product.image, product.description, product.stock, JSON.stringify(product.sizes), product.isPreOrder, product.releaseDate || null, JSON.stringify(product.images || []), product.video || null, product.dropDate || null, product.id]
         );
     } catch (e) {
         console.error("Update Product Failed", e);
