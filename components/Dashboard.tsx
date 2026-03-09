@@ -363,7 +363,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'MESSAGES', label: 'Messages', icon: Inbox, roles: [UserRole.ADMIN] },
       { id: 'STORE_DESIGN', label: 'Design Store', icon: Palette, roles: [UserRole.ADMIN] },
       { id: 'FOLLOWING', label: 'Following', icon: Heart, roles: [UserRole.BUYER, UserRole.VENDOR] },
-      { id: 'NEW_ARRIVALS_FEED', label: 'New Arrivals', icon: Sparkles, roles: [UserRole.BUYER] },
       { id: 'PROFILE', label: 'Settings', icon: Settings, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
     ];
 

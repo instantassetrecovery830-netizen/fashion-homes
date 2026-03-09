@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Heart, ThumbsUp, Clock, ShoppingBag } from 'lucide-react';
 import { Product, UserRole } from '../types';
 
@@ -24,7 +24,7 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
   isLoggedIn,
   onVote
 }) => {
-  const newArrivals = products.filter(p => p.isNewSeason);
+  const newArrivals = useMemo(() => products.filter(p => p.isNewSeason), [products]);
   const isSaved = (productId: string) => savedItems.some(p => p.id === productId);
 
   // Countdown Timer Logic
