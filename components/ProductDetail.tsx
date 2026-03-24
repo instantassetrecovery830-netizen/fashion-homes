@@ -32,10 +32,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   const [activeImage, setActiveImage] = useState(product.images?.[0] || product.image);
 
   // Reviews State
-  const [reviews, setReviews] = useState<Review[]>([
-    { id: 'r1', author: 'Elena K.', rating: 5, text: 'The fabric quality is unmatched. Fits perfectly.', date: '2 days ago' },
-    { id: 'r2', author: 'Marc D.', rating: 4, text: 'Stunning silhouette, though the sleeves are slightly long.', date: '1 week ago' }
-  ]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [newReview, setNewReview] = useState('');
   const [newRating, setNewRating] = useState(5);
 
