@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check } from 'lucide-react';
+import { ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check, ThumbsUp } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService.ts';
 import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types.ts';
 
@@ -13,6 +13,8 @@ interface LandingViewProps {
   onDesignerClick: (designerName: string) => void;
   cmsContent?: LandingPageContent;
   onAuthRequest?: (mode: 'LOGIN' | 'REGISTER', role: UserRole) => void;
+  onVote?: (product: Product) => void;
+  userVotes?: string[];
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({ 
@@ -23,7 +25,9 @@ export const LandingView: React.FC<LandingViewProps> = ({
   products = [],
   onDesignerClick,
   cmsContent,
-  onAuthRequest
+  onAuthRequest,
+  onVote,
+  userVotes
 }) => {
   const [trend, setTrend] = useState<TrendAnalysis | null>(null);
   const [loadingTrend, setLoadingTrend] = useState(false);
@@ -173,10 +177,26 @@ export const LandingView: React.FC<LandingViewProps> = ({
                   <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-black text-[9px] font-bold px-2 py-1 uppercase tracking-wide">
                     New Season
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-white/90 backdrop-blur-md border-t border-gray-100">
-                      <button className="w-full bg-black text-white py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors">
+                  <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-white/90 backdrop-blur-md border-t border-gray-100 flex gap-2">
+                      <button className="flex-1 bg-black text-white py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors">
                           View Details
                       </button>
+                      {onVote && (
+                          <button 
+                              onClick={(e) => { e.stopPropagation(); onVote(product); }}
+                              disabled={userVotes?.includes(product.id)}
+                              className={`px-3 py-2 border transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                                  userVotes?.includes(product.id)
+                                  ? 'bg-luxury-gold text-white border-luxury-gold opacity-100'
+                                  : 'bg-white text-black border-black hover:bg-black hover:text-white'
+                              }`}
+                          >
+                              <ThumbsUp size={12} fill={userVotes?.includes(product.id) ? "currentColor" : "none"} />
+                              <span className="text-[9px] font-bold uppercase tracking-widest">
+                                  {userVotes?.includes(product.id) ? 'Voted' : 'Vote'}
+                              </span>
+                          </button>
+                      )}
                   </div>
                 </div>
                 <h3 className="font-bold text-xs uppercase tracking-wide mb-1 text-gray-400">{product.designer}</h3>

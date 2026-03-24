@@ -255,6 +255,13 @@ const initSchema = async () => {
             password TEXT,
             uid TEXT,
             email_verified BOOLEAN DEFAULT FALSE
+        )`,
+        `CREATE TABLE IF NOT EXISTS product_votes (
+            id TEXT PRIMARY KEY,
+            userId TEXT,
+            productId TEXT,
+            votedAt TEXT,
+            UNIQUE(userId, productId)
         )`
     ];
 
@@ -735,11 +742,32 @@ export const deleteUserFromDb = async (userId: string) => {
 
 // --- WRITE OPERATIONS (CMS) ---
 
-export const voteForProduct = async (productId: string) => {
+export const voteForProduct = async (productId: string, userId: string) => {
     try {
+        // Check if user already voted
+        const { rows } = await pool.query('SELECT id FROM product_votes WHERE userId = $1 AND productId = $2', [userId, productId]);
+        if (rows.length > 0) return;
+
+        // Insert vote
+        await pool.query(
+            'INSERT INTO product_votes (id, userId, productId, votedAt) VALUES ($1, $2, $3, $4)',
+            [crypto.randomUUID(), userId, productId, new Date().toISOString()]
+        );
+
+        // Update product vote count
         await pool.query('UPDATE products SET votes = COALESCE(votes, 0) + 1 WHERE id = $1', [productId]);
     } catch (e) {
         console.error("Error voting for product:", e);
+    }
+};
+
+export const fetchUserVotes = async (userId: string): Promise<string[]> => {
+    try {
+        const { rows } = await pool.query('SELECT productId FROM product_votes WHERE userId = $1', [userId]);
+        return rows.map(row => row.productid);
+    } catch (e) {
+        console.error("Error fetching user votes:", e);
+        return [];
     }
 };
 

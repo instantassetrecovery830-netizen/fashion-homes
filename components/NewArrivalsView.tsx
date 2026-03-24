@@ -12,6 +12,7 @@ interface NewArrivalsViewProps {
   userRole: UserRole;
   isLoggedIn: boolean;
   onVote?: (product: Product) => void;
+  userVotes?: string[];
 }
 
 export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ 
@@ -22,7 +23,8 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
   onNavigate,
   userRole,
   isLoggedIn,
-  onVote
+  onVote,
+  userVotes = []
 }) => {
   const newArrivals = useMemo(() => products.filter(p => p.isNewSeason), [products]);
   const isSaved = (productId: string) => savedItems.some(p => p.id === productId);
@@ -154,9 +156,10 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
                 <div className="flex gap-3 mt-auto">
                     <button 
                         onClick={(e) => { e.stopPropagation(); onVote && onVote(product); }}
-                        className="flex-1 border border-black py-3 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-2"
+                        disabled={userVotes.includes(product.id)}
+                        className={`flex-1 border border-black py-3 text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 ${userVotes.includes(product.id) ? 'bg-black text-white cursor-not-allowed opacity-70' : 'hover:bg-black hover:text-white'}`}
                     >
-                        <ThumbsUp size={14} /> Vote to Drop
+                        <ThumbsUp size={14} /> {userVotes.includes(product.id) ? 'Voted' : 'Vote to Drop'}
                     </button>
                     <button 
                         onClick={(e) => { e.stopPropagation(); onProductSelect(product); }}

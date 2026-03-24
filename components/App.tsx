@@ -8,7 +8,7 @@ import {
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, deleteUserFromDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
-  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct,
+  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct, fetchUserVotes,
   fetchCartItems, addCartItemToDb, updateCartItemInDb, removeCartItemFromDb, clearCartInDb,
   fetchSavedItems, addSavedItemToDb, removeSavedItemFromDb
 } from '../services/dataService.ts';
@@ -40,9 +40,11 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
   const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | Vendor | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [savedItems, setSavedItems] = useState<Product[]>([]);
   const [followedVendors, setFollowedVendors] = useState<Vendor[]>([]);
+  const [userVotes, setUserVotes] = useState<string[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSavedOpen, setIsSavedOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -67,6 +69,8 @@ const App: React.FC = () => {
   // Visual Search State
   const [visualSearchResults, setVisualSearchResults] = useState<Product[] | null>(null);
 
+  const currentUserId = currentUser?.id;
+
   // Initialize DB and Fetch Data - Non-blocking
   const refreshData = async () => {
     try {
@@ -81,7 +85,7 @@ const App: React.FC = () => {
       setVendors(dbVendors);
       setProducts(dbProducts);
 
-      // Fetch user-specific data (Notifications, Orders, Follows)
+      // Fetch user-specific data (Notifications, Orders, Follows, Votes)
       const currentUserId = auth.currentUser?.uid;
       
       // Load heavy data in parallel
@@ -100,8 +104,12 @@ const App: React.FC = () => {
       setAllFollowers(dbFollowers);
 
       if (currentUserId) {
-          const follows = await fetchUserFollowedVendors(currentUserId);
+          const [follows, votes] = await Promise.all([
+              fetchUserFollowedVendors(currentUserId),
+              fetchUserVotes(currentUserId)
+          ]);
           setFollowedVendors(follows);
+          setUserVotes(votes);
       }
 
     } catch (error) {
@@ -319,9 +327,20 @@ const App: React.FC = () => {
           const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me', 'mikelarry00764@proton.me'];
           if (adminEmails.includes(user.email?.toLowerCase() || '')) {
               setUserRole(UserRole.ADMIN);
+              // Fetch user object for admin
+              const currentUsers = await fetchUsers();
+              const dbUser = currentUsers.find(u => u.email.toLowerCase() === user.email?.toLowerCase());
+              setCurrentUser(dbUser || {
+                  id: user.uid,
+                  name: 'Admin',
+                  email: user.email!,
+                  role: UserRole.ADMIN,
+                  avatar: 'https://ui-avatars.com/api/?name=Admin',
+                  joined: new Date().toISOString(),
+                  status: 'ACTIVE'
+              } as User);
           } else {
               // Check if user has an assigned role in the Users table
-              // We might need to fetch users if not yet loaded in the background
               let currentUsers = allUsers;
               if (currentUsers.length === 0) {
                  currentUsers = await fetchUsers();
@@ -331,6 +350,7 @@ const App: React.FC = () => {
 
               if (dbUser && dbUser.role) {
                   setUserRole(dbUser.role);
+                  setCurrentUser(dbUser);
               } else {
                   // Fallback to Vendor check
                   let currentVendors = vendors;
@@ -341,8 +361,18 @@ const App: React.FC = () => {
                   
                   if (matchingVendor) {
                       setUserRole(UserRole.VENDOR);
+                      setCurrentUser(matchingVendor);
                   } else {
                       setUserRole(UserRole.BUYER);
+                      setCurrentUser({
+                          id: user.uid,
+                          name: user.displayName || 'User',
+                          email: user.email!,
+                          role: UserRole.BUYER,
+                          avatar: user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`,
+                          joined: new Date().toISOString(),
+                          status: 'ACTIVE'
+                      } as User);
                   }
               }
           }
@@ -350,11 +380,13 @@ const App: React.FC = () => {
           // User exists but is not verified
           setIsLoggedIn(false);
           setUserRole(UserRole.BUYER);
+          setCurrentUser(null);
           setCurrentView('AUTH');
         }
       } else {
         setIsLoggedIn(false);
         setUserRole(UserRole.BUYER);
+        setCurrentUser(null);
         setNotifications([]); // Clear notifications on logout
         setFollowedVendors([]);
       }
@@ -362,6 +394,15 @@ const App: React.FC = () => {
 
     return () => unsubscribe();
   }, [allUsers, vendors]); // Depend on data to ensure correct role assignment
+
+  // Helper to check if a product is effectively a "New Arrival" (isNewSeason AND created within last 7 days)
+  const isEffectiveNewArrival = (product: Product) => {
+      if (!product.isNewSeason) return false;
+      if (!product.createdAt) return false;
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      return new Date(product.createdAt) > oneWeekAgo;
+  };
 
   // Derived State: Active Products (only from active vendors who are verified OR Admins)
   const activeProducts = products.filter(product => {
@@ -503,8 +544,12 @@ const App: React.FC = () => {
 
   // Saved Items Handler
   const handleVote = async (product: Product) => {
-    await voteForProduct(product.id);
-    await refreshData();
+    if (!currentUser) return;
+    if (userVotes.includes(product.id)) return;
+
+    await voteForProduct(product.id, currentUser.id);
+    setProducts(products.map(p => p.id === product.id ? { ...p, votes: (p.votes || 0) + 1 } : p));
+    setUserVotes([...userVotes, product.id]);
   };
 
   const handleToggleSave = async (product: Product) => {
@@ -645,7 +690,7 @@ const App: React.FC = () => {
   };
 
   // View Routing
-  const renderView = () => {
+  const renderView = (): React.ReactElement => {
     if (currentView === 'AUTH') {
       return (
         <Suspense fallback={<LoadingFallback />}>
@@ -678,10 +723,12 @@ const App: React.FC = () => {
             isLoggedIn={isLoggedIn} 
             userRole={userRole} 
             vendors={vendors}
-            products={activeProducts}
+            products={activeProducts.map(p => ({...p, isNewSeason: isEffectiveNewArrival(p)}))}
             onDesignerClick={handleDesignerSelect}
             cmsContent={cmsContent}
             onAuthRequest={handleAuthNavigation}
+            onVote={handleVote}
+            userVotes={userVotes}
           />
         );
       case 'MARKETPLACE':
@@ -705,13 +752,14 @@ const App: React.FC = () => {
           <Suspense fallback={<LoadingFallback />}>
             <NewArrivalsView 
                 onProductSelect={handleProductSelect} 
-                products={activeProducts}
+                products={activeProducts.filter(p => isEffectiveNewArrival(p))}
                 savedItems={savedItems}
                 onToggleSave={handleToggleSave}
                 onNavigate={handleNavigate}
                 userRole={userRole}
                 isLoggedIn={isLoggedIn}
                 onVote={handleVote}
+                userVotes={userVotes}
             />
           </Suspense>
         );
