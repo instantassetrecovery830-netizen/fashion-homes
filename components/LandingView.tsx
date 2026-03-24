@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check, ThumbsUp } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService.ts';
 import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types.ts';
@@ -43,38 +43,41 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
   useEffect(() => {
     const fetchTrend = async () => {
+      if (trend) return; // Don't refetch if we already have it
       setLoadingTrend(true);
       const data = await generateSeasonalTrend();
       setTrend(data);
       setLoadingTrend(false);
     };
     fetchTrend();
-  }, []);
+  }, [trend]);
 
-  const handleDashboardClick = () => {
+  const handleDashboardClick = useCallback(() => {
     if (userRole === UserRole.ADMIN) onNavigate('ADMIN_PANEL');
     else if (userRole === UserRole.VENDOR) onNavigate('VENDOR_DASHBOARD');
     else onNavigate('BUYER_DASHBOARD');
-  };
+  }, [userRole, onNavigate]);
 
   // Only show vendors that are both active (subscribed) and verified by admin
-  const activeVendors = vendors.filter(v => v.subscriptionStatus === 'ACTIVE' && v.verificationStatus === 'VERIFIED');
-  const spotlightProducts = products.filter(p => !p.isNewSeason).slice(0, 3); // Display first 3 real products (excluding new arrivals)
+  const activeVendors = useMemo(() => vendors.filter(v => v.subscriptionStatus === 'ACTIVE' && v.verificationStatus === 'VERIFIED'), [vendors]);
+  const spotlightProducts = useMemo(() => products.filter(p => !p.isNewSeason).slice(0, 3), [products]); // Display first 3 real products (excluding new arrivals)
 
   // Safe access to CMS content
-  const hero = cmsContent?.hero || {
+  const hero = useMemo(() => cmsContent?.hero || {
     videoUrl: "https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4",
     posterUrl: "https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop",
     subtitle: "The New Vanguard",
     titleLine1: "DIGITAL",
     titleLine2: "AVANT-GARDE",
     buttonText: "Shop Collection"
-  };
+  }, [cmsContent]);
   
-  const marqueeText = cmsContent?.marquee?.text || "Lagos • Accra • Nairobi • Cape Town • Heritage Reimagined • Pan-African Aesthetics";
-  const marqueeItems = marqueeText.split("•").map(s => s.trim()).filter(Boolean);
+  const marqueeItems = useMemo(() => {
+    const marqueeText = cmsContent?.marquee?.text || "Lagos • Accra • Nairobi • Cape Town • Heritage Reimagined • Pan-African Aesthetics";
+    return marqueeText.split("•").map(s => s.trim()).filter(Boolean);
+  }, [cmsContent]);
 
-  const campaign = cmsContent?.campaign || {
+  const campaign = useMemo(() => cmsContent?.campaign || {
     subtitle: "The Campaign",
     title: "Urban Chronicles",
     image1: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887&auto=format&fit=crop",
@@ -82,10 +85,10 @@ export const LandingView: React.FC<LandingViewProps> = ({
     image3: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop",
     image4: "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886&auto=format&fit=crop",
     overlayText1: "Street Edition"
-  };
+  }, [cmsContent]);
 
-  const designersSection = cmsContent?.designers || { subtitle: "The Ateliers", title: "Shop by Designer" };
-  const spotlightSection = cmsContent?.spotlight || { title: "Editor's Picks" };
+  const designersSection = useMemo(() => cmsContent?.designers || { subtitle: "The Ateliers", title: "Shop by Designer" }, [cmsContent]);
+  const spotlightSection = useMemo(() => cmsContent?.spotlight || { title: "Editor's Picks" }, [cmsContent]);
 
   return (
     <div className="w-full">

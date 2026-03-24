@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ShoppingBag, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight, Instagram, Twitter, Facebook, Heart, Share2, Copy, Shirt } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
@@ -78,16 +78,16 @@ export const Layout: React.FC<LayoutProps> = ({
   const [customerEmail, setCustomerEmail] = useState('');
   
   // --- PAYSTACK CONFIGURATION ---
-  const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; 
+  const PAYSTACK_PUBLIC_KEY = useMemo(() => import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', []); 
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
+  const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + item.price, 0), [cart]);
 
-  const paystackConfig = {
+  const paystackConfig = useMemo(() => ({
     reference: (new Date()).getTime().toString(),
     email: customerEmail,
     amount: cartTotal * 100, // Paystack expects amount in kobo (or lowest currency unit)
     publicKey: PAYSTACK_PUBLIC_KEY,
-  };
+  }), [customerEmail, cartTotal, PAYSTACK_PUBLIC_KEY]);
 
   // Initialize Paystack hook
   // @ts-ignore - Types might not resolve perfectly in all envs without install
@@ -154,7 +154,7 @@ export const Layout: React.FC<LayoutProps> = ({
       }
   }, [notifications]);
 
-  const handleNotificationClick = async (notif: AppNotification) => {
+  const handleNotificationClick = useCallback(async (notif: AppNotification) => {
       if (!notif.read) {
           await markNotificationRead(notif.id);
           if (onRefreshNotifications) onRefreshNotifications();
@@ -164,27 +164,27 @@ export const Layout: React.FC<LayoutProps> = ({
           onNavigate(notif.link as ViewState);
           setShowNotifications(false);
       }
-  };
+  }, [onRefreshNotifications, onNavigate]);
 
-  const markAllRead = async () => {
+  const markAllRead = useCallback(async () => {
       const unread = notifications.filter(n => !n.read);
       for (const n of unread) {
           await markNotificationRead(n.id);
       }
       if (onRefreshNotifications) onRefreshNotifications();
-  };
+  }, [notifications, onRefreshNotifications]);
 
-  const handleDashboardClick = () => {
+  const handleDashboardClick = useCallback(() => {
     if (role === UserRole.ADMIN) onNavigate('ADMIN_PANEL');
     else if (role === UserRole.VENDOR) onNavigate('VENDOR_DASHBOARD');
     else onNavigate('BUYER_DASHBOARD');
-  };
+  }, [role, onNavigate]);
 
-  const handleCameraClick = () => {
+  const handleCameraClick = useCallback(() => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onVisualSearch) {
       setIsSearching(true);
@@ -195,9 +195,9 @@ export const Layout: React.FC<LayoutProps> = ({
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     }
-  };
+  }, [onVisualSearch]);
 
-  const handleProceedToPayment = () => {
+  const handleProceedToPayment = useCallback(() => {
     // Validate Pre-Orders
     const hasInvalidPreOrder = cart.some(item => 
       item.isPreOrder && (!item.measurements || item.measurements.length < 5)
@@ -216,9 +216,9 @@ export const Layout: React.FC<LayoutProps> = ({
     }
 
     setCheckoutStep('PAYMENT');
-  };
+  }, [cart, isLoggedIn, onAuthRequest, onNavigate, setIsCartOpen]);
 
-  const handleShareSaved = () => {
+  const handleShareSaved = useCallback(() => {
       if (savedItems.length === 0) return;
       const ids = savedItems.map(p => p.id).join(',');
       const shareUrl = `${window.location.origin}${window.location.pathname}?outfit=${ids}`;
@@ -227,10 +227,10 @@ export const Layout: React.FC<LayoutProps> = ({
           setCopiedLink(true);
           setTimeout(() => setCopiedLink(false), 2000);
       });
-  };
+  }, [savedItems]);
 
   // Called when Paystack success callback fires
-  const onPaystackSuccess = async (reference: any) => {
+  const onPaystackSuccess = useCallback(async (reference: any) => {
     setIsProcessingCheckout(true);
 
     const newOrder: Order = {
@@ -258,14 +258,14 @@ export const Layout: React.FC<LayoutProps> = ({
     } finally {
         setIsProcessingCheckout(false);
     }
-  };
+  }, [customerEmail, cartTotal, cart, onPlaceOrder, setIsCartOpen, handleDashboardClick]);
 
-  const onPaystackClose = () => {
+  const onPaystackClose = useCallback(() => {
       console.log('Payment closed');
       setIsProcessingCheckout(false);
-  };
+  }, []);
 
-  const handleFinalizeOrder = () => {
+  const handleFinalizeOrder = useCallback(() => {
     if (!customerEmail) {
         alert("Please enter your email address for the receipt.");
         return;
@@ -273,7 +273,7 @@ export const Layout: React.FC<LayoutProps> = ({
     setIsProcessingCheckout(true);
     // @ts-ignore
     initializePayment(onPaystackSuccess, onPaystackClose);
-  };
+  }, [customerEmail, initializePayment, onPaystackSuccess, onPaystackClose]);
 
   // Logic for Nav Appearance
   const isNavTransparent = currentView === 'LANDING' && !isScrolled;

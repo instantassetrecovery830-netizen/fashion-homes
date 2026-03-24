@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo, useCallback, useRef } from 'react';
 import { Layout } from './Layout.tsx';
 import { LandingView } from './LandingView.tsx';
 import { Loader } from 'lucide-react';
@@ -68,11 +68,14 @@ const App: React.FC = () => {
 
   // Visual Search State
   const [visualSearchResults, setVisualSearchResults] = useState<Product[] | null>(null);
+  const isRefreshingRef = useRef(false);
 
   const currentUserId = currentUser?.id;
 
   // Initialize DB and Fetch Data - Non-blocking
-  const refreshData = async () => {
+  const refreshData = useCallback(async (force = false) => {
+    if (isRefreshingRef.current && !force) return;
+    isRefreshingRef.current = true;
     try {
       // Prioritize content visible on landing
       const [dbContent, dbVendors, dbProducts] = await Promise.all([
@@ -114,28 +117,32 @@ const App: React.FC = () => {
 
     } catch (error) {
       console.error("Failed to refresh data", error);
+    } finally {
+      isRefreshingRef.current = false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Initial Load
     const initData = async () => {
       try {
         await seedDatabase();
-        await refreshData();
+        await refreshData(true);
       } catch (error) {
         console.error("Database initialization failed.", error);
       }
     };
     initData();
 
-    // Real-time: Poll for general data updates every 5 seconds
+    // Real-time: Poll for general data updates every 15 seconds (reduced frequency for better performance)
     const pollInterval = setInterval(() => {
-        refreshData();
-    }, 5000);
+        if (document.visibilityState === 'visible') {
+            refreshData();
+        }
+    }, 15000);
 
     return () => clearInterval(pollInterval);
-  }, []);
+  }, [refreshData]);
 
   // Load user specific data when auth state changes
   useEffect(() => {
@@ -396,16 +403,16 @@ const App: React.FC = () => {
   }, [allUsers, vendors]); // Depend on data to ensure correct role assignment
 
   // Helper to check if a product is effectively a "New Arrival" (isNewSeason AND created within last 7 days)
-  const isEffectiveNewArrival = (product: Product) => {
+  const isEffectiveNewArrival = useCallback((product: Product) => {
       if (!product.isNewSeason) return false;
       if (!product.createdAt) return false;
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       return new Date(product.createdAt) > oneWeekAgo;
-  };
+  }, []);
 
   // Derived State: Active Products (only from active vendors who are verified OR Admins)
-  const activeProducts = products.filter(product => {
+  const activeProducts = useMemo(() => products.filter(product => {
       // 1. Check if it belongs to a Vendor
       const vendor = vendors.find(v => v.name === product.designer);
       if (vendor) {
@@ -427,7 +434,7 @@ const App: React.FC = () => {
       if (isAdminEmailPrefix) return true;
 
       return false; 
-  });
+  }), [products, vendors, allUsers]);
 
   // Feature Flags Management
   const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({
@@ -438,7 +445,7 @@ const App: React.FC = () => {
   });
 
   // Handlers
-  const handleNavigate = (view: ViewState) => {
+  const handleNavigate = useCallback((view: ViewState) => {
     if (view === 'AUTH') {
         // Reset defaults if navigating generically
         setAuthInitialMode('LOGIN');
@@ -452,18 +459,18 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'auto' });
     setIsCartOpen(false);
     setIsSavedOpen(false);
-  };
+  }, [currentView]);
 
-  const handleAuthNavigation = (mode: 'LOGIN' | 'REGISTER', role: UserRole) => {
+  const handleAuthNavigation = useCallback((mode: 'LOGIN' | 'REGISTER', role: UserRole) => {
     setAuthInitialMode(mode);
     setAuthInitialRole(role);
     setCurrentView('AUTH');
     window.scrollTo({ top: 0, behavior: 'auto' });
     setIsCartOpen(false);
     setIsSavedOpen(false);
-  };
+  }, []);
 
-  const handleDesignerSelect = (designerName: string) => {
+  const handleDesignerSelect = useCallback((designerName: string) => {
     const vendor = vendors.find(v => v.name === designerName);
     if (vendor) {
       setSelectedVendor(vendor);
@@ -472,9 +479,9 @@ const App: React.FC = () => {
       setSelectedDesignerFilter(designerName);
       handleNavigate('MARKETPLACE');
     }
-  };
+  }, [vendors, handleNavigate]);
 
-  const handleLogin = (role: UserRole) => {
+  const handleLogin = useCallback((role: UserRole) => {
     setUserRole(role);
     if (role === UserRole.ADMIN) {
       handleNavigate('ADMIN_PANEL');
@@ -485,23 +492,23 @@ const App: React.FC = () => {
     } else {
       handleNavigate('MARKETPLACE');
     }
-  };
+  }, [handleNavigate]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await signOut(auth);
       handleNavigate('LANDING');
     } catch (error) {
       console.error("Logout Error:", error);
     }
-  };
+  }, [handleNavigate]);
 
-  const handleProductSelect = (product: Product) => {
+  const handleProductSelect = useCallback((product: Product) => {
     setSelectedProduct(product);
     handleNavigate('PRODUCT_DETAIL');
-  };
+  }, [handleNavigate]);
 
-  const handleAddToCart = async (product: Product, size: string, measurements?: string) => {
+  const handleAddToCart = useCallback(async (product: Product, size: string, measurements?: string) => {
     const newItem: CartItem = {
       ...product,
       quantity: 1,
@@ -509,68 +516,86 @@ const App: React.FC = () => {
       measurements: measurements || ''
     };
     
+    // Optimistic UI update
+    setCart(prev => [...prev, newItem]);
+    setIsCartOpen(true);
+
     if (currentUserId) {
       const cartItemId = await addCartItemToDb(currentUserId, newItem);
       if (cartItemId) {
-        newItem.cartItemId = cartItemId;
+        setCart(prev => prev.map(item => 
+            (item.id === product.id && item.size === size) ? { ...item, cartItemId } : item
+        ));
       }
     }
-    
-    setCart([...cart, newItem]);
-    setIsCartOpen(true);
-  };
+  }, [currentUserId]);
 
-  const handleUpdateCartItem = async (index: number, updates: Partial<CartItem>) => {
-    const newCart = [...cart];
-    newCart[index] = { ...newCart[index], ...updates };
+  const handleUpdateCartItem = useCallback(async (index: number, updates: Partial<CartItem>) => {
+    // Optimistic UI update
+    setCart(prev => {
+        const newCart = [...prev];
+        if (newCart[index]) {
+            newCart[index] = { ...newCart[index], ...updates };
+        }
+        return newCart;
+    });
     
-    if (currentUserId && newCart[index].cartItemId) {
-      await updateCartItemInDb(newCart[index].cartItemId!, newCart[index].quantity, newCart[index].size);
+    const item = cart[index];
+    if (currentUserId && item?.cartItemId) {
+      await updateCartItemInDb(item.cartItemId!, (updates.quantity !== undefined ? updates.quantity : item.quantity), (updates.size !== undefined ? updates.size : item.size));
     }
-    
-    setCart(newCart);
-  };
+  }, [cart, currentUserId]);
 
-  const handleRemoveFromCart = async (index: number) => {
-    const newCart = [...cart];
-    const removedItem = newCart.splice(index, 1)[0];
+  const handleRemoveFromCart = useCallback(async (index: number) => {
+    const removedItem = cart[index];
     
-    if (currentUserId && removedItem.cartItemId) {
+    // Optimistic UI update
+    setCart(prev => prev.filter((_, i) => i !== index));
+    
+    if (currentUserId && removedItem?.cartItemId) {
       await removeCartItemFromDb(removedItem.cartItemId);
     }
-    
-    setCart(newCart);
-  };
+  }, [cart, currentUserId]);
 
   // Saved Items Handler
-  const handleVote = async (product: Product) => {
+  const handleVote = useCallback(async (product: Product) => {
     if (!currentUser) return;
     if (userVotes.includes(product.id)) return;
 
-    await voteForProduct(product.id, currentUser.id);
-    setProducts(products.map(p => p.id === product.id ? { ...p, votes: (p.votes || 0) + 1 } : p));
-    setUserVotes([...userVotes, product.id]);
-  };
+    // Optimistic UI update
+    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, votes: (p.votes || 0) + 1 } : p));
+    setUserVotes(prev => [...prev, product.id]);
 
-  const handleToggleSave = async (product: Product) => {
+    try {
+        await voteForProduct(product.id, currentUser.id);
+    } catch (error) {
+        // Rollback on error
+        setProducts(prev => prev.map(p => p.id === product.id ? { ...p, votes: Math.max(0, (p.votes || 1) - 1) } : p));
+        setUserVotes(prev => prev.filter(id => id !== product.id));
+    }
+  }, [currentUser, userVotes]);
+
+  const handleToggleSave = useCallback(async (product: Product) => {
     const exists = savedItems.find(p => p.id === product.id);
     
     if (exists) {
+      // Optimistic UI update
+      setSavedItems(prev => prev.filter(p => p.id !== product.id));
       if (currentUserId) {
         await removeSavedItemFromDb(currentUserId, product.id);
       }
-      setSavedItems(prev => prev.filter(p => p.id !== product.id));
     } else {
+      // Optimistic UI update
+      setSavedItems(prev => [...prev, product]);
+      setIsSavedOpen(true); // Open drawer when saving for better feedback
       if (currentUserId) {
         await addSavedItemToDb(currentUserId, product.id);
       }
-      setIsSavedOpen(true); // Open drawer when saving for better feedback
-      setSavedItems(prev => [...prev, product]);
     }
-  };
+  }, [savedItems, currentUserId]);
 
   // Follow Vendor Handler
-  const handleToggleFollow = async (vendor: Vendor) => {
+  const handleToggleFollow = useCallback(async (vendor: Vendor) => {
       const currentUser = auth.currentUser;
       if (!currentUser) {
           handleAuthNavigation('LOGIN', UserRole.BUYER);
@@ -599,9 +624,10 @@ const App: React.FC = () => {
               vendorId: vendor.id,
               followerId: followerId
           };
+
           await addFollowerToDb(newFollower);
       }
-  };
+  }, [followedVendors, handleAuthNavigation]);
 
   // --- VISUAL SEARCH HANDLER ---
   const handleVisualSearch = async (file: File) => {

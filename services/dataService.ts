@@ -310,7 +310,13 @@ const initSchema = async () => {
         
         `ALTER TABLE products ALTER COLUMN sizes TYPE JSONB USING to_jsonb(sizes)`,
         
-        `ALTER TABLE followers ADD COLUMN IF NOT EXISTS followerId TEXT`
+        `ALTER TABLE followers ADD COLUMN IF NOT EXISTS followerId TEXT`,
+        
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customerName TEXT`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS date TEXT`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS total NUMERIC`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS status TEXT`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS items JSONB`
     ];
 
     for (const m of migrations) {

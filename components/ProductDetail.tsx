@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler, Heart, Video } from 'lucide-react';
 import { Product, Vendor } from '../types.ts';
 import { getStyleMatch } from '../services/geminiService.ts';
@@ -39,7 +39,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   const [newReview, setNewReview] = useState('');
   const [newRating, setNewRating] = useState(5);
 
-  const isSaved = savedItems.some(p => p.id === product.id);
+  const isSaved = useMemo(() => savedItems.some(p => p.id === product.id), [savedItems, product.id]);
 
   useEffect(() => {
     setActiveImage(product.images?.[0] || product.image);
@@ -50,31 +50,34 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   }, [product]);
 
   // Use product images if available, otherwise fallback to main image
-  const galleryImages = product.images && product.images.length > 0 
-    ? [...product.images] 
-    : [product.image];
+  const galleryImages = useMemo(() => {
+    const images = product.images && product.images.length > 0 
+      ? [...product.images] 
+      : [product.image];
 
-  if (product.video) {
-      galleryImages.push(product.video);
-  }
+    if (product.video) {
+        images.push(product.video);
+    }
+    return images;
+  }, [product.images, product.image, product.video]);
 
-  const handleStyleMatch = async () => {
+  const handleStyleMatch = useCallback(async () => {
     setLoadingStyle(true);
     const tip = await getStyleMatch(product.name);
     setStyleTip(tip);
     setLoadingStyle(false);
-  };
+  }, [product.name]);
 
-  const handleAddToCartClick = () => {
+  const handleAddToCartClick = useCallback(() => {
     if (!selectedSize) {
       setSizeError(true);
       return;
     }
     setSizeError(false);
     onAddToCart(product, selectedSize, measurements);
-  };
+  }, [selectedSize, product, measurements, onAddToCart]);
 
-  const handleReviewSubmit = (e: React.FormEvent) => {
+  const handleReviewSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!newReview.trim()) return;
     const review: Review = {
@@ -84,9 +87,9 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
       text: newReview,
       date: 'Just now'
     };
-    setReviews([review, ...reviews]);
+    setReviews(prev => [review, ...prev]);
     setNewReview('');
-  };
+  }, [newReview, newRating]);
 
   return (
     <div className="min-h-screen bg-white animate-fade-in pb-20 md:pb-0">

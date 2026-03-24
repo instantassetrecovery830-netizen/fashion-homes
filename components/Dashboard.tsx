@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { OverviewView } from './DashboardTabs/OverviewView';
 import { KycView } from './DashboardTabs/KycView';
@@ -191,7 +191,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const canUpload = role === UserRole.ADMIN || weeklyUploads < 20;
 
   const totalRevenue = useMemo(() => myOrders.reduce((sum, order) => sum + order.total, 0), [myOrders]);
-  const totalSales = myOrders.length;
+  const totalSales = useMemo(() => myOrders.length, [myOrders]);
 
   // Chart Data Preparation
   const revenueData = useMemo(() => {
@@ -213,7 +213,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [myOrders]);
   
   // Handlers for Profile
-  const handlePasswordUpdate = async (e: React.FormEvent) => {
+  const handlePasswordUpdate = useCallback(async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newPassword) return;
       try {
@@ -225,16 +225,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
       } catch (err: any) {
           setPasswordMsg('Error updating password: ' + err.message);
       }
-  };
+  }, [newPassword]);
 
-  const handleCMSUpdate = async () => {
+  const handleCMSUpdate = useCallback(async () => {
       if (cmsForm && onUpdateCMSContent) {
           await onUpdateCMSContent(cmsForm);
           alert("Landing page updated successfully.");
       }
-  };
+  }, [cmsForm, onUpdateCMSContent]);
 
-  const handleStorefrontSave = async () => {
+  const handleStorefrontSave = useCallback(async () => {
     if (storefrontForm && setVendors) {
         try {
             await setVendors([storefrontForm]);
@@ -244,16 +244,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
             alert("Failed to update storefront.");
         }
     }
-  };
+  }, [storefrontForm, setVendors]);
 
-  const handleVerifyVendor = async (vendor: Vendor, status: 'VERIFIED' | 'REJECTED') => {
+  const handleVerifyVendor = useCallback(async (vendor: Vendor, status: 'VERIFIED' | 'REJECTED') => {
       if (setVendors) {
           await setVendors([{ ...vendor, verificationStatus: status }]);
           setSelectedVendorForReview(null);
       }
-  };
+  }, [setVendors]);
 
-  const handleImageUpload = (file: File, type: 'AVATAR' | 'COVER' | 'GALLERY' | 'VIDEO', index?: number) => {
+  const handleImageUpload = useCallback((file: File, type: 'AVATAR' | 'COVER' | 'GALLERY' | 'VIDEO', index?: number) => {
       const reader = new FileReader();
       reader.onloadend = () => {
           const result = reader.result as string;
@@ -277,26 +277,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
           }
       };
       reader.readAsDataURL(file);
-  };
+  }, [storefrontForm]);
 
-  const removeFromGallery = (index: number) => {
+  const removeFromGallery = useCallback((index: number) => {
       if (storefrontForm && storefrontForm.gallery) {
           const newGallery = [...storefrontForm.gallery];
           newGallery.splice(index, 1);
           setStorefrontForm({ ...storefrontForm, gallery: newGallery });
       }
-  };
+  }, [storefrontForm]);
 
   // Product Management Handlers
-  const handleProductImageUpload = (file: File) => {
+  const handleProductImageUpload = useCallback((file: File) => {
       const reader = new FileReader();
       reader.onloadend = () => {
           setProductForm(prev => ({ ...prev, image: reader.result as string }));
       };
       reader.readAsDataURL(file);
-  };
+  }, []);
 
-  const handleSaveProduct = async () => {
+  const handleSaveProduct = useCallback(async () => {
       if (!productForm.name || !productForm.price || !productForm.category) {
           alert("Please fill in all required fields.");
           return;
@@ -308,10 +308,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           
           const newProduct: Product = {
               id: productForm.id || `prod_${Date.now()}`,
-              name: productForm.name,
+              name: productForm.name!,
               designer: currentVendor?.name || productForm.designer || 'MyFitStore',
               price: Number(productForm.price),
-              category: productForm.category,
+              category: productForm.category!,
               image: productForm.images?.[0] || productForm.image || 'https://via.placeholder.com/400x600',
               images: productForm.images || (productForm.image ? [productForm.image] : []),
               video: productForm.video,
@@ -338,9 +338,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       } finally {
           setIsSavingProduct(false);
       }
-  };
+  }, [productForm, onUpdateProduct, onAddProduct, role, vendors, currentUser]);
 
-  const handleSaveVendor = async () => {
+  const handleSaveVendor = useCallback(async () => {
       if (!vendorForm || !vendorForm.name || !vendorForm.email) {
           alert("Name and Email are required.");
           return;
@@ -350,8 +350,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       try {
           const newVendor: Vendor = {
               id: vendorForm.id || `vendor_${Date.now()}`,
-              name: vendorForm.name,
-              email: vendorForm.email,
+              name: vendorForm.name!,
+              email: vendorForm.email!,
               bio: vendorForm.bio || '',
               avatar: vendorForm.avatar || 'https://via.placeholder.com/150',
               coverImage: vendorForm.coverImage || 'https://via.placeholder.com/1200x400',
@@ -379,7 +379,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       } finally {
           setIsSavingVendor(false);
       }
-  };
+  }, [vendorForm, setVendors, onAddVendor]);
 
   const openProductForm = (product?: Product) => {
       if (product) {

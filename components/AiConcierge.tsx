@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, X, Send, Sparkles, Loader, User } from 'lucide-react';
 import { ChatMessage, Product } from '../types.ts';
 import { createConciergeChat } from '../services/geminiService.ts';
@@ -58,7 +58,7 @@ export const AiConcierge: React.FC<AiConciergeProps> = ({ products }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen]);
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
+  const handleSendMessage = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputValue.trim() || !chatSession.current) return;
 
@@ -105,7 +105,7 @@ export const AiConcierge: React.FC<AiConciergeProps> = ({ products }) => {
     } finally {
       setIsTyping(false);
     }
-  };
+  }, [inputValue, auth.currentUser]);
 
   if (!chatSession.current) return null; // Don't render until ready
 

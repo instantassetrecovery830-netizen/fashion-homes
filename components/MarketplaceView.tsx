@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Filter, ChevronDown, Heart, Camera, X } from 'lucide-react';
 import { Product, ViewState, Vendor } from '../types.ts';
 
@@ -45,13 +45,13 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
     return ['All Designers', ...unique.sort()];
   }, [products]);
 
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = useMemo(() => products.filter(p => {
     const matchesCategory = activeCategory === 'All' || p.category === activeCategory;
     const matchesDesigner = activeDesigner === 'All Designers' || p.designer === activeDesigner;
     return matchesCategory && matchesDesigner;
-  });
+  }), [products, activeCategory, activeDesigner]);
 
-  const isSaved = (productId: string) => savedItems.some(p => p.id === productId);
+  const isSaved = useCallback((productId: string) => savedItems.some(p => p.id === productId), [savedItems]);
 
   return (
     <div className="min-h-screen pt-4 md:pt-12 pb-24">
