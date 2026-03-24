@@ -16,7 +16,7 @@ import { AiConcierge } from './components/AiConcierge.tsx';
 import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission } from './types.ts';
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
-  addProductToDb, updateProductInDb, deleteProductFromDb,
+  addProductToDb, updateProductInDb, deleteProductFromDb, voteForProduct,
   updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb,
   fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, fetchVendorFollowers, fetchVendorFollowerCount
 } from './services/dataService.ts';
@@ -162,6 +162,11 @@ const App: React.FC = () => {
           };
           await addFollowerToDb(newFollower);
       }
+  };
+
+  const handleVote = async (product: Product) => {
+      await voteForProduct(product.id);
+      setProducts(products.map(p => p.id === product.id ? { ...p, votes: (p.votes || 0) + 1 } : p));
   };
 
   // Initialize DB and Fetch Data
@@ -513,6 +518,7 @@ const App: React.FC = () => {
             onNavigate={handleNavigate}
             userRole={userRole}
             isLoggedIn={isLoggedIn}
+            onVote={handleVote}
           />
         );
       case 'NEW_ARRIVALS_MANAGE':

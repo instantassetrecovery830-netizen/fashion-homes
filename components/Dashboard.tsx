@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
 import { OverviewView } from './DashboardTabs/OverviewView';
+import { KycView } from './DashboardTabs/KycView';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend
@@ -405,6 +406,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'FINANCE', label: 'Finance', icon: Wallet, roles: [UserRole.VENDOR] },
       { id: 'MARKETING', label: 'Marketing', icon: Tag, roles: [UserRole.VENDOR] },
       { id: 'SUBSCRIPTION', label: 'Subscription', icon: CreditCard, roles: [UserRole.VENDOR] },
+      { id: 'KYC', label: 'KYC Verification', icon: ShieldCheck, roles: [UserRole.VENDOR] },
       { id: 'SHIPPING', label: 'Delivery', icon: Truck, roles: [UserRole.VENDOR] },
       { id: 'CUSTOMERS', label: 'Customers', icon: Users, roles: [UserRole.ADMIN] },
       { id: 'FOLLOWERS', label: 'Followers', icon: Users, roles: [UserRole.VENDOR] },
@@ -477,6 +479,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             totalSales={totalSales}
             myProducts={myProducts}
             revenueData={revenueData}
+          />
+        );
+
+      case 'KYC':
+        const currentVendor = vendors.find(v => v.email === currentUser?.email);
+        if (!currentVendor) return null;
+        return (
+          <KycView 
+            vendor={currentVendor}
+            onUpdateVendor={async (v) => {
+                if (setVendors) {
+                    await setVendors(vendors.map(vendor => vendor.id === v.id ? v : vendor));
+                }
+            }}
           />
         );
 

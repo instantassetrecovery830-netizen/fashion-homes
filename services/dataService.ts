@@ -1,6 +1,6 @@
 
 import { pool } from './db.ts';
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus, Follower, AppNotification, WaitlistEntry } from '../types.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus, Follower, AppNotification, WaitlistEntry, CartItem, ChatMessage } from '../types.ts';
 
 // --- PRODUCTION CONFIGURATION ---
 
