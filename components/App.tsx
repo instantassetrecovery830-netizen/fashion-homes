@@ -7,7 +7,7 @@ import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, Us
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
-  updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
+  updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, deleteUserFromDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
   fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct,
   fetchCartItems, addCartItemToDb, updateCartItemInDb, removeCartItemFromDb, clearCartInDb,
   fetchSavedItems, addSavedItemToDb, removeSavedItemFromDb
@@ -611,6 +611,11 @@ const App: React.FC = () => {
       await refreshData();
   };
 
+  const handleDeleteUser = async (userId: string) => {
+      await deleteUserFromDb(userId);
+      await refreshData();
+  };
+
   const handleUpdateOrderStatus = async (orderId: string, status: Order['status']) => {
     await updateOrderStatusInDb(orderId, status);
     await refreshData();
@@ -801,6 +806,7 @@ const App: React.FC = () => {
               onDeleteProduct={handleDeleteProduct}
               onProductSelect={handleProductSelect}
               onUpdateUser={handleUpdateUser}
+              onDeleteUser={handleDeleteUser}
               cmsContent={cmsContent}
               onUpdateCMSContent={handleUpdateCMSContent}
               contactSubmissions={contactSubmissions}
@@ -831,6 +837,7 @@ const App: React.FC = () => {
               onDeleteProduct={handleDeleteProduct}
               onProductSelect={handleProductSelect}
               onUpdateUser={handleUpdateUser}
+              onDeleteUser={handleDeleteUser}
               cmsContent={cmsContent}
               onUpdateCMSContent={handleUpdateCMSContent}
               contactSubmissions={contactSubmissions}

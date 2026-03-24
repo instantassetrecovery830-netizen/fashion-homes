@@ -725,6 +725,14 @@ export const updateUserInDb = async (user: User) => {
     }
 };
 
+export const deleteUserFromDb = async (userId: string) => {
+    try {
+        await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    } catch (e) {
+        console.error("Delete User Failed", e);
+    }
+};
+
 // --- WRITE OPERATIONS (CMS) ---
 
 export const voteForProduct = async (productId: string) => {
