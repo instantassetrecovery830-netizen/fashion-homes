@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, Sparkles, Loader, Diamond, UserPlus } from 'lucide-react';
+import { ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService.ts';
 import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types.ts';
 
@@ -130,10 +130,12 @@ export const LandingView: React.FC<LandingViewProps> = ({
             )}
             
             <button 
-              onClick={() => onNavigate('PRICING')}
+              onClick={() => {
+                document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth' });
+              }}
               className="group relative inline-flex items-center justify-center gap-2 px-8 py-3 md:py-4 bg-black/40 backdrop-blur-md border border-white/30 text-white text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 w-full sm:w-auto sm:min-w-[200px]"
             >
-              <Diamond size={12} /> Membership
+              <Diamond size={12} /> {hero.secondaryButtonText || 'Membership'}
             </button>
 
             {isLoggedIn && (
@@ -382,6 +384,73 @@ export const LandingView: React.FC<LandingViewProps> = ({
           )}
         </div>
       </section>
+
+      {/* Pricing Section */}
+      {cmsContent?.pricing && (
+        <section id="pricing-section" className="py-24 bg-luxury-cream">
+          <div className="max-w-7xl mx-auto px-6 mb-20 text-center">
+            <span className="text-xs font-bold uppercase tracking-[0.3em] text-luxury-gold mb-4 block">{cmsContent.pricing.subtitle}</span>
+            <h2 className="text-4xl md:text-6xl font-serif italic mb-6">{cmsContent.pricing.title}</h2>
+            <p className="max-w-2xl mx-auto text-gray-500 font-light text-lg">
+              {cmsContent.pricing.description}
+            </p>
+          </div>
+
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {cmsContent.pricing.plans.map((plan, index) => (
+                <div 
+                  key={index} 
+                  className={`relative p-8 md:p-12 flex flex-col transition-all duration-500 hover:-translate-y-2 ${
+                    plan.highlight 
+                      ? 'bg-luxury-black text-white shadow-2xl scale-105 z-10' 
+                      : 'bg-white text-luxury-black border border-gray-100 shadow-sm hover:shadow-xl'
+                  }`}
+                >
+                  {plan.highlight && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-luxury-gold text-white px-4 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full flex items-center gap-1 shadow-lg">
+                      <Diamond size={12} fill="currentColor" /> Best Value
+                    </div>
+                  )}
+                  
+                  <div className="mb-8">
+                    <h3 className="text-2xl font-serif italic mb-2">{plan.name}</h3>
+                    <div className="flex items-baseline gap-1 mb-4">
+                      <span className="text-4xl font-bold">{plan.price}</span>
+                      <span className={`text-xs uppercase tracking-wide ${plan.highlight ? 'text-gray-400' : 'text-gray-500'}`}>{plan.period}</span>
+                    </div>
+                    <p className={`text-sm leading-relaxed ${plan.highlight ? 'text-gray-300' : 'text-gray-500'}`}>
+                      {plan.description}
+                    </p>
+                  </div>
+
+                  <div className="flex-1 space-y-4 mb-8">
+                    {plan.features.map((feature, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className={`mt-0.5 p-0.5 rounded-full ${plan.highlight ? 'bg-luxury-gold text-black' : 'bg-gray-100 text-black'}`}>
+                          <Check size={10} strokeWidth={3} />
+                        </div>
+                        <span className="text-sm font-medium">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button 
+                    onClick={() => onAuthRequest ? onAuthRequest('REGISTER', UserRole.VENDOR) : onNavigate('AUTH')}
+                    className={`w-full py-4 text-xs font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-colors ${
+                      plan.highlight 
+                        ? 'bg-white text-black hover:bg-luxury-gold hover:text-white' 
+                        : 'bg-black text-white hover:bg-luxury-gold'
+                    }`}
+                  >
+                    {plan.cta} <ArrowRight size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 };

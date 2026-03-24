@@ -5,10 +5,6 @@ import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Ve
 // --- PRODUCTION CONFIGURATION ---
 
 // Empty mock data for production environment
-const MOCK_VENDORS: Vendor[] = [];
-const MOCK_PRODUCTS: Product[] = [];
-const MOCK_FOLLOWERS: Follower[] = [];
-
 const DEFAULT_CMS_CONTENT: LandingPageContent = {
   theme: {
     primaryColor: '#000000',
@@ -23,7 +19,8 @@ const DEFAULT_CMS_CONTENT: LandingPageContent = {
     subtitle: "The New Vanguard",
     titleLine1: "DIGITAL",
     titleLine2: "AVANT-GARDE",
-    buttonText: "Shop Collection"
+    buttonText: "Shop Collection",
+    secondaryButtonText: "View Membership"
   },
   marquee: {
     text: "Lagos • Accra • Nairobi • Cape Town • Heritage Reimagined • Pan-African Aesthetics"
@@ -68,6 +65,60 @@ const DEFAULT_CMS_CONTENT: LandingPageContent = {
   auth: {
     loginImage: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2070",
     registerImage: "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=2574"
+  },
+  pricing: {
+    title: "Unlock Privilege",
+    subtitle: "MyFitStore Membership",
+    description: "Select your tier to access the MyFitStore ecosystem. Elevate your experience with exclusive drops, personalized curation, and white-glove service.",
+    plans: [
+      {
+        id: 'Atelier',
+        name: "The Essential",
+        price: "$15",
+        period: "/ month",
+        description: "Curated access to the digital marketplace and seasonal trends.",
+        features: [
+          "Access to all New Arrivals",
+          "Standard Shipping Rates",
+          "Basic Trend Forecasts",
+          "Member-only Newsletter"
+        ],
+        cta: "Join Monthly",
+        highlight: false
+      },
+      {
+        id: 'Maison',
+        name: "The Insider",
+        price: "$90",
+        period: "/ 6 months",
+        description: "Priority access for the dedicated fashion enthusiast.",
+        features: [
+          "24h Early Access to Drops",
+          "Priority Shipping",
+          "AI Style Curator Access",
+          "Private Sale Invites",
+          "Exclusive Editorial Content"
+        ],
+        cta: "Select Semi-Annual",
+        highlight: false
+      },
+      {
+        id: 'Couture',
+        name: "The Collector",
+        price: "$165",
+        period: "/ year",
+        description: "The ultimate luxury experience with white-glove service.",
+        features: [
+          "All Insider Features",
+          "Free Global Express Shipping",
+          "Dedicated Personal Stylist",
+          "Custom Sizing Requests",
+          "VIP Event Invitations"
+        ],
+        cta: "Become a Collector",
+        highlight: true
+      }
+    ]
   }
 };
 
@@ -175,6 +226,28 @@ const initSchema = async () => {
             email TEXT,
             productId TEXT,
             date TEXT
+        )`,
+        `CREATE TABLE IF NOT EXISTS cart_items (
+            id TEXT PRIMARY KEY,
+            userId TEXT,
+            productId TEXT,
+            quantity INTEGER,
+            size TEXT,
+            measurements TEXT,
+            addedAt TEXT
+        )`,
+        `CREATE TABLE IF NOT EXISTS saved_items (
+            id TEXT PRIMARY KEY,
+            userId TEXT,
+            productId TEXT,
+            savedAt TEXT
+        )`,
+        `CREATE TABLE IF NOT EXISTS chat_messages (
+            id TEXT PRIMARY KEY,
+            userId TEXT,
+            sender TEXT,
+            text TEXT,
+            timestamp TEXT
         )`,
         // Real-time Authentication Table
         `CREATE TABLE IF NOT EXISTS auth_accounts (
@@ -480,7 +553,13 @@ export const fetchNotifications = async (userId?: string): Promise<AppNotificati
 export const fetchLandingContent = async (): Promise<LandingPageContent> => {
     try {
         const { rows } = await pool.query("SELECT content FROM cms WHERE id = 'main'");
-        if (rows.length > 0) return rows[0].content as LandingPageContent;
+        if (rows.length > 0) {
+            return {
+                ...DEFAULT_CMS_CONTENT,
+                ...(rows[0].content as LandingPageContent),
+                pricing: (rows[0].content as LandingPageContent).pricing || DEFAULT_CMS_CONTENT.pricing
+            };
+        }
         return DEFAULT_CMS_CONTENT;
     } catch (e) {
         console.error(e);
@@ -558,9 +637,9 @@ export const createVendorInDb = async (vendor: Vendor) => {
         const check = await pool.query('SELECT id FROM vendors WHERE id = $1', [vendor.id]);
         if (check.rows.length === 0) {
             await pool.query(
-                `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, visualTheme, videoUrl)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-                [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.visualTheme || 'MINIMALIST', vendor.videoUrl]
+                `INSERT INTO vendors (id, name, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, email, subscriptionPlan, visualTheme, videoUrl, website, instagram, twitter, facebook, tiktok, gallery)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+                [vendor.id, vendor.name, vendor.bio, vendor.avatar, vendor.verificationStatus, vendor.subscriptionStatus, vendor.location, vendor.coverImage, vendor.email, vendor.subscriptionPlan, vendor.visualTheme || 'MINIMALIST', vendor.videoUrl, vendor.website, vendor.instagram, vendor.twitter, vendor.facebook, vendor.tiktok, JSON.stringify(vendor.gallery || [])]
             );
         }
     } catch (e) {
@@ -724,5 +803,158 @@ export const joinWaitlistInDb = async (entry: WaitlistEntry) => {
         );
     } catch (e) {
         console.error("Join Waitlist Failed", e);
+    }
+};
+
+export const fetchCartItems = async (userId: string): Promise<CartItem[]> => {
+    try {
+        const { rows } = await pool.query(`
+            SELECT c.*, p.*, c.id as cartItemId 
+            FROM cart_items c 
+            JOIN products p ON c.productId = p.id 
+            WHERE c.userId = $1 
+            ORDER BY c.addedAt DESC
+        `, [userId]);
+        
+        return rows.map(row => ({
+            ...row,
+            id: row.productid, // Keep product ID as main ID for CartItem
+            cartItemId: row.cartitemid,
+            price: Number(row.price),
+            rating: Number(row.rating),
+            stock: Number(row.stock),
+            sizes: typeof row.sizes === 'string' ? JSON.parse(row.sizes) : row.sizes,
+            images: typeof row.images === 'string' ? JSON.parse(row.images) : row.images,
+            isNewSeason: row.isnewseason,
+            isPreOrder: row.ispreorder,
+            releaseDate: row.releasedate,
+            dropDate: row.dropdate
+        })) as CartItem[];
+    } catch (e) {
+        console.error("Error fetching cart items:", e);
+        return [];
+    }
+};
+
+export const addCartItemToDb = async (userId: string, item: CartItem) => {
+    try {
+        const cartItemId = `cart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await pool.query(
+            `INSERT INTO cart_items (id, userId, productId, quantity, size, measurements, addedAt)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [cartItemId, userId, item.id, item.quantity, item.size, item.measurements || null, new Date().toISOString()]
+        );
+        return cartItemId;
+    } catch (e) {
+        console.error("Add Cart Item Failed", e);
+        return null;
+    }
+};
+
+export const updateCartItemInDb = async (cartItemId: string, quantity: number, size: string) => {
+    try {
+        await pool.query(
+            `UPDATE cart_items SET quantity = $1, size = $2 WHERE id = $3`,
+            [quantity, size, cartItemId]
+        );
+    } catch (e) {
+        console.error("Update Cart Item Failed", e);
+    }
+};
+
+export const removeCartItemFromDb = async (cartItemId: string) => {
+    try {
+        await pool.query('DELETE FROM cart_items WHERE id = $1', [cartItemId]);
+    } catch (e) {
+        console.error("Remove Cart Item Failed", e);
+    }
+};
+
+export const clearCartInDb = async (userId: string) => {
+    try {
+        await pool.query('DELETE FROM cart_items WHERE userId = $1', [userId]);
+    } catch (e) {
+        console.error("Clear Cart Failed", e);
+    }
+};
+
+export const fetchSavedItems = async (userId: string): Promise<Product[]> => {
+    try {
+        const { rows } = await pool.query(`
+            SELECT p.* 
+            FROM saved_items s 
+            JOIN products p ON s.productId = p.id 
+            WHERE s.userId = $1 
+            ORDER BY s.savedAt DESC
+        `, [userId]);
+        
+        return rows.map(row => ({
+            ...row,
+            price: Number(row.price),
+            rating: Number(row.rating),
+            stock: Number(row.stock),
+            sizes: typeof row.sizes === 'string' ? JSON.parse(row.sizes) : row.sizes,
+            images: typeof row.images === 'string' ? JSON.parse(row.images) : row.images,
+            isNewSeason: row.isnewseason,
+            isPreOrder: row.ispreorder,
+            releaseDate: row.releasedate,
+            dropDate: row.dropdate
+        })) as Product[];
+    } catch (e) {
+        console.error("Error fetching saved items:", e);
+        return [];
+    }
+};
+
+export const addSavedItemToDb = async (userId: string, productId: string) => {
+    try {
+        const savedItemId = `saved_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await pool.query(
+            `INSERT INTO saved_items (id, userId, productId, savedAt)
+             VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+            [savedItemId, userId, productId, new Date().toISOString()]
+        );
+    } catch (e) {
+        console.error("Add Saved Item Failed", e);
+    }
+};
+
+export const removeSavedItemFromDb = async (userId: string, productId: string) => {
+    try {
+        await pool.query('DELETE FROM saved_items WHERE userId = $1 AND productId = $2', [userId, productId]);
+    } catch (e) {
+        console.error("Remove Saved Item Failed", e);
+    }
+};
+
+export const fetchChatMessages = async (userId: string): Promise<ChatMessage[]> => {
+    try {
+        const { rows } = await pool.query(`
+            SELECT * FROM chat_messages 
+            WHERE userId = $1 
+            ORDER BY timestamp ASC
+        `, [userId]);
+        
+        return rows.map(row => ({
+            id: row.id,
+            sender: row.sender as 'user' | 'ai',
+            text: row.text,
+            timestamp: new Date(row.timestamp)
+        })) as ChatMessage[];
+    } catch (e) {
+        console.error("Error fetching chat messages:", e);
+        return [];
+    }
+};
+
+export const addChatMessageToDb = async (userId: string, message: ChatMessage) => {
+    try {
+        await pool.query(
+            `INSERT INTO chat_messages (id, userId, sender, text, timestamp)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [message.id, userId, message.sender, message.text, message.timestamp.toISOString()]
+        );
+    } catch (e) {
+        console.error("Add Chat Message Failed", e);
     }
 };

@@ -7,8 +7,10 @@ import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, Us
 import { 
   seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
-  updateVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
-  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct
+  updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
+  fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct,
+  fetchCartItems, addCartItemToDb, updateCartItemInDb, removeCartItemFromDb, clearCartInDb,
+  fetchSavedItems, addSavedItemToDb, removeSavedItemFromDb
 } from '../services/dataService.ts';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
@@ -119,16 +121,6 @@ const App: React.FC = () => {
     };
     initData();
 
-    // Load saved items from local storage
-    const saved = localStorage.getItem('myfitstore_saved');
-    if (saved) {
-      try {
-        setSavedItems(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load saved items", e);
-      }
-    }
-
     // Real-time: Poll for general data updates every 5 seconds
     const pollInterval = setInterval(() => {
         refreshData();
@@ -137,10 +129,46 @@ const App: React.FC = () => {
     return () => clearInterval(pollInterval);
   }, []);
 
-  // Sync saved items to local storage
+  // Load user specific data when auth state changes
   useEffect(() => {
-    localStorage.setItem('myfitstore_saved', JSON.stringify(savedItems));
-  }, [savedItems]);
+    const loadUserData = async () => {
+      if (currentUserId) {
+        const [dbCart, dbSaved] = await Promise.all([
+          fetchCartItems(currentUserId),
+          fetchSavedItems(currentUserId)
+        ]);
+        setCart(dbCart);
+        setSavedItems(dbSaved);
+      } else {
+        // Load from local storage if not logged in
+        const saved = localStorage.getItem('myfitstore_saved');
+        if (saved) {
+          try {
+            setSavedItems(JSON.parse(saved));
+          } catch (e) {
+            console.error("Failed to load saved items", e);
+          }
+        }
+        const localCart = localStorage.getItem('myfitstore_cart');
+        if (localCart) {
+          try {
+            setCart(JSON.parse(localCart));
+          } catch (e) {
+            console.error("Failed to load cart", e);
+          }
+        }
+      }
+    };
+    loadUserData();
+  }, [currentUserId]);
+
+  // Sync saved items and cart to local storage for guests
+  useEffect(() => {
+    if (!currentUserId) {
+      localStorage.setItem('myfitstore_saved', JSON.stringify(savedItems));
+      localStorage.setItem('myfitstore_cart', JSON.stringify(cart));
+    }
+  }, [savedItems, cart, currentUserId]);
 
   // Handle Shared Outfit URL Params
   useEffect(() => {
@@ -432,26 +460,44 @@ const App: React.FC = () => {
     handleNavigate('PRODUCT_DETAIL');
   };
 
-  const handleAddToCart = (product: Product, size: string, measurements?: string) => {
+  const handleAddToCart = async (product: Product, size: string, measurements?: string) => {
     const newItem: CartItem = {
       ...product,
       quantity: 1,
       size: size,
       measurements: measurements || ''
     };
+    
+    if (currentUserId) {
+      const cartItemId = await addCartItemToDb(currentUserId, newItem);
+      if (cartItemId) {
+        newItem.cartItemId = cartItemId;
+      }
+    }
+    
     setCart([...cart, newItem]);
     setIsCartOpen(true);
   };
 
-  const handleUpdateCartItem = (index: number, updates: Partial<CartItem>) => {
+  const handleUpdateCartItem = async (index: number, updates: Partial<CartItem>) => {
     const newCart = [...cart];
     newCart[index] = { ...newCart[index], ...updates };
+    
+    if (currentUserId && newCart[index].cartItemId) {
+      await updateCartItemInDb(newCart[index].cartItemId!, newCart[index].quantity, newCart[index].size);
+    }
+    
     setCart(newCart);
   };
 
-  const handleRemoveFromCart = (index: number) => {
+  const handleRemoveFromCart = async (index: number) => {
     const newCart = [...cart];
-    newCart.splice(index, 1);
+    const removedItem = newCart.splice(index, 1)[0];
+    
+    if (currentUserId && removedItem.cartItemId) {
+      await removeCartItemFromDb(removedItem.cartItemId);
+    }
+    
     setCart(newCart);
   };
 
@@ -461,16 +507,21 @@ const App: React.FC = () => {
     await refreshData();
   };
 
-  const handleToggleSave = (product: Product) => {
-    setSavedItems(prev => {
-      const exists = prev.find(p => p.id === product.id);
-      if (exists) {
-        return prev.filter(p => p.id !== product.id);
-      } else {
-        setIsSavedOpen(true); // Open drawer when saving for better feedback
-        return [...prev, product];
+  const handleToggleSave = async (product: Product) => {
+    const exists = savedItems.find(p => p.id === product.id);
+    
+    if (exists) {
+      if (currentUserId) {
+        await removeSavedItemFromDb(currentUserId, product.id);
       }
-    });
+      setSavedItems(prev => prev.filter(p => p.id !== product.id));
+    } else {
+      if (currentUserId) {
+        await addSavedItemToDb(currentUserId, product.id);
+      }
+      setIsSavedOpen(true); // Open drawer when saving for better feedback
+      setSavedItems(prev => [...prev, product]);
+    }
   };
 
   // Follow Vendor Handler
@@ -550,6 +601,11 @@ const App: React.FC = () => {
     await refreshData();
   };
   
+  const handleAddVendor = async (vendor: Vendor) => {
+    await createVendorInDb(vendor);
+    await refreshData();
+  };
+  
   const handleUpdateUser = async (user: User) => {
       await updateUserInDb(user);
       await refreshData();
@@ -567,6 +623,9 @@ const App: React.FC = () => {
   
   const handlePlaceOrder = async (order: Order) => {
      await createOrderInDb(order);
+     if (currentUserId) {
+       await clearCartInDb(currentUserId);
+     }
      await refreshData();
      setCart([]); 
   };
@@ -732,6 +791,7 @@ const App: React.FC = () => {
               onNavigate={handleNavigate}
               vendors={vendors}
               setVendors={handleSetVendors}
+              onAddVendor={handleAddVendor}
               orders={orders}
               onUpdateOrderStatus={handleUpdateOrderStatus}
               products={products}
@@ -763,6 +823,7 @@ const App: React.FC = () => {
               initialTab="PROFILE"
               vendors={vendors}
               setVendors={handleSetVendors}
+              onAddVendor={handleAddVendor}
               products={products}
               users={allUsers}
               onAddProduct={handleAddProduct}
@@ -781,7 +842,7 @@ const App: React.FC = () => {
       case 'PRICING':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <PricingView onNavigate={handleNavigate} onRegister={() => handleAuthNavigation('REGISTER', UserRole.VENDOR)} />
+            <PricingView onNavigate={handleNavigate} onRegister={() => handleAuthNavigation('REGISTER', UserRole.VENDOR)} cmsContent={cmsContent} />
           </Suspense>
         );
       case 'ABOUT':

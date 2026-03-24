@@ -4,6 +4,8 @@ import { MessageSquare, X, Send, Sparkles, Loader, User } from 'lucide-react';
 import { ChatMessage, Product } from '../types.ts';
 import { createConciergeChat } from '../services/geminiService.ts';
 import { Chat } from '@google/genai';
+import { auth } from '../services/firebase.ts';
+import { fetchChatMessages, addChatMessageToDb } from '../services/dataService.ts';
 
 interface AiConciergeProps {
   products: Product[];
@@ -20,21 +22,36 @@ export const AiConcierge: React.FC<AiConciergeProps> = ({ products }) => {
   const chatSession = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Load chat history if logged in
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (auth.currentUser) {
+        const history = await fetchChatMessages(auth.currentUser.uid);
+        if (history.length > 0) {
+          setMessages(history);
+        }
+      }
+    };
+    loadHistory();
+  }, [auth.currentUser]);
+
   // Initialize Chat Session when products load or component mounts
   useEffect(() => {
     if (products.length > 0 && !chatSession.current) {
       chatSession.current = createConciergeChat(products);
-      // Add initial greeting
-      setMessages([
-        {
-          id: 'init',
-          sender: 'ai',
-          text: "Bonjour. I am your personal digital stylist. How may I assist you with your collection today?",
-          timestamp: new Date()
-        }
-      ]);
+      // Add initial greeting only if no history
+      if (messages.length === 0) {
+        setMessages([
+          {
+            id: 'init',
+            sender: 'ai',
+            text: "Bonjour. I am your personal digital stylist. How may I assist you with your collection today?",
+            timestamp: new Date()
+          }
+        ]);
+      }
     }
-  }, [products]);
+  }, [products, messages.length]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -55,6 +72,10 @@ export const AiConcierge: React.FC<AiConciergeProps> = ({ products }) => {
     setMessages(prev => [...prev, userMsg]);
     setInputValue('');
     setIsTyping(true);
+    
+    if (auth.currentUser) {
+      await addChatMessageToDb(auth.currentUser.uid, userMsg);
+    }
 
     try {
       const result = await chatSession.current.sendMessage({ message: userMsg.text });
@@ -68,6 +89,10 @@ export const AiConcierge: React.FC<AiConciergeProps> = ({ products }) => {
       };
       
       setMessages(prev => [...prev, aiMsg]);
+      
+      if (auth.currentUser) {
+        await addChatMessageToDb(auth.currentUser.uid, aiMsg);
+      }
     } catch (error) {
       console.error("Concierge Error:", error);
       const errorMsg: ChatMessage = {

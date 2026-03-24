@@ -26,6 +26,7 @@ interface DashboardProps {
   onNavigate: (view: ViewState) => void;
   vendors?: Vendor[];
   setVendors?: (vendors: Vendor[]) => Promise<void>;
+  onAddVendor?: (vendor: Vendor) => Promise<void>;
   orders?: Order[];
   onUpdateOrderStatus?: (orderId: string, status: Order['status']) => Promise<void>;
   products?: Product[];
@@ -53,6 +54,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigate,
   vendors = [],
   setVendors,
+  onAddVendor,
   orders = [],
   onUpdateOrderStatus,
   products = [],
@@ -89,6 +91,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [productForm, setProductForm] = useState<Partial<Product>>({});
   const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [vendorForm, setVendorForm] = useState<Partial<Vendor> | null>(null);
+  const [isSavingVendor, setIsSavingVendor] = useState(false);
 
   // Profile State
   const [newPassword, setNewPassword] = useState('');
@@ -328,6 +332,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
           alert("Failed to save product.");
       } finally {
           setIsSavingProduct(false);
+      }
+  };
+
+  const handleSaveVendor = async () => {
+      if (!vendorForm || !vendorForm.name || !vendorForm.email) {
+          alert("Name and Email are required.");
+          return;
+      }
+
+      setIsSavingVendor(true);
+      try {
+          const newVendor: Vendor = {
+              id: vendorForm.id || `vendor_${Date.now()}`,
+              name: vendorForm.name,
+              email: vendorForm.email,
+              bio: vendorForm.bio || '',
+              avatar: vendorForm.avatar || 'https://via.placeholder.com/150',
+              coverImage: vendorForm.coverImage || 'https://via.placeholder.com/1200x400',
+              subscriptionPlan: vendorForm.subscriptionPlan || 'BASIC',
+              subscriptionStatus: vendorForm.subscriptionStatus || 'ACTIVE',
+              verificationStatus: vendorForm.verificationStatus || 'PENDING',
+              location: vendorForm.location || '',
+              website: vendorForm.website || '',
+              instagram: vendorForm.instagram || '',
+              twitter: vendorForm.twitter || ''
+          };
+
+          if (vendorForm.id) {
+              if (setVendors) {
+                  await setVendors([newVendor]);
+              }
+          } else {
+              if (onAddVendor) await onAddVendor(newVendor);
+          }
+          
+          setVendorForm(null);
+      } catch (e) {
+          console.error(e);
+          alert("Failed to save vendor.");
+      } finally {
+          setIsSavingVendor(false);
       }
   };
 
@@ -1604,9 +1649,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
                   <div className="flex items-center justify-between">
                       <h2 className="text-3xl font-serif italic">Atelier Management</h2>
-                      <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
-                          <Menu size={20} />
-                      </button>
+                      <div className="flex gap-4">
+                          <button 
+                              onClick={() => setVendorForm({
+                                  name: '',
+                                  email: '',
+                                  bio: '',
+                                  avatar: '',
+                                  coverImage: '',
+                                  subscriptionPlan: 'BASIC',
+                                  subscriptionStatus: 'ACTIVE',
+                                  verificationStatus: 'PENDING'
+                              })}
+                              className="bg-luxury-black text-white px-6 py-3 rounded-sm text-sm font-bold uppercase tracking-widest hover:bg-gray-800 transition-colors flex items-center gap-2"
+                          >
+                              <Plus size={16} /> Add Vendor
+                          </button>
+                          <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+                              <Menu size={20} />
+                          </button>
+                      </div>
                   </div>
                   
                   <div className="bg-white border border-gray-100 overflow-x-auto rounded-sm shadow-sm">
@@ -1659,6 +1721,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                       </td>
                                       <td className="p-6">
                                           <div className="flex gap-3">
+                                              {setVendors && (
+                                                  <button 
+                                                      onClick={() => setVendorForm(vendor)}
+                                                      className="text-luxury-black hover:bg-gray-50 p-2 rounded-full transition-colors border border-gray-200 hover:border-black"
+                                                      title="Edit Vendor"
+                                                  >
+                                                      <Edit2 size={16} />
+                                                  </button>
+                                              )}
                                               {setVendors && (
                                                   <button 
                                                       onClick={() => setSelectedVendorForReview(vendor)}
@@ -1898,13 +1969,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 />
                                             </div>
                                         </div>
-                                        <div>
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Button Text</label>
-                                            <input 
-                                                value={cmsForm.hero.buttonText}
-                                                onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, buttonText: e.target.value}})}
-                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
-                                            />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Button Text</label>
+                                                <input 
+                                                    value={cmsForm.hero.buttonText}
+                                                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, buttonText: e.target.value}})}
+                                                    className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Secondary Button Text</label>
+                                                <input 
+                                                    value={cmsForm.hero.secondaryButtonText || ''}
+                                                    onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, secondaryButtonText: e.target.value}})}
+                                                    className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                   )}
@@ -2037,6 +2118,148 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                     onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, phone: e.target.value}}})}
                                                     className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                                 />
+                                            </div>
+                                        </div>
+                                    </div>
+                                  )}
+                              </div>
+
+                              {/* Pricing Page */}
+                              <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
+                                  <button 
+                                    onClick={() => setExpandedSection(expandedSection === 'pricing' ? null : 'pricing')}
+                                    className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
+                                  >
+                                    <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><DollarSign size={14} /> Pricing Page</span>
+                                    <ChevronDown size={16} className={`transition-transform ${expandedSection === 'pricing' ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  
+                                  {expandedSection === 'pricing' && cmsForm.pricing && (
+                                    <div className="p-6 space-y-4 border-t border-gray-100">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Title</label>
+                                                <input 
+                                                    value={cmsForm.pricing.title}
+                                                    onChange={e => setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, title: e.target.value}})}
+                                                    className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Subtitle</label>
+                                                <input 
+                                                    value={cmsForm.pricing.subtitle}
+                                                    onChange={e => setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, subtitle: e.target.value}})}
+                                                    className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Description</label>
+                                            <textarea 
+                                                value={cmsForm.pricing.description}
+                                                onChange={e => setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, description: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-24 transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        
+                                        <div className="pt-4 border-t border-gray-100">
+                                            <h4 className="text-xs font-bold uppercase tracking-widest mb-4">Plans</h4>
+                                            <div className="space-y-6">
+                                                {cmsForm.pricing.plans.map((plan, index) => (
+                                                    <div key={index} className="border border-gray-200 p-4 rounded-sm bg-gray-50">
+                                                        <div className="grid grid-cols-2 gap-4 mb-4">
+                                                            <div>
+                                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Plan Name</label>
+                                                                <input 
+                                                                    value={plan.name}
+                                                                    onChange={e => {
+                                                                        const newPlans = [...cmsForm.pricing!.plans];
+                                                                        newPlans[index].name = e.target.value;
+                                                                        setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, plans: newPlans}});
+                                                                    }}
+                                                                    className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Price</label>
+                                                                <input 
+                                                                    value={plan.price}
+                                                                    onChange={e => {
+                                                                        const newPlans = [...cmsForm.pricing!.plans];
+                                                                        newPlans[index].price = e.target.value;
+                                                                        setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, plans: newPlans}});
+                                                                    }}
+                                                                    className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Description</label>
+                                                            <input 
+                                                                value={plan.description}
+                                                                onChange={e => {
+                                                                    const newPlans = [...cmsForm.pricing!.plans];
+                                                                    newPlans[index].description = e.target.value;
+                                                                    setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, plans: newPlans}});
+                                                                }}
+                                                                className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white mb-4"
+                                                            />
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-4 mb-4">
+                                                            <div>
+                                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Period</label>
+                                                                <input 
+                                                                    value={plan.period}
+                                                                    onChange={e => {
+                                                                        const newPlans = [...cmsForm.pricing!.plans];
+                                                                        newPlans[index].period = e.target.value;
+                                                                        setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, plans: newPlans}});
+                                                                    }}
+                                                                    className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">CTA Text</label>
+                                                                <input 
+                                                                    value={plan.cta}
+                                                                    onChange={e => {
+                                                                        const newPlans = [...cmsForm.pricing!.plans];
+                                                                        newPlans[index].cta = e.target.value;
+                                                                        setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, plans: newPlans}});
+                                                                    }}
+                                                                    className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="mb-4 flex items-center gap-2">
+                                                            <input 
+                                                                type="checkbox"
+                                                                checked={plan.highlight}
+                                                                onChange={e => {
+                                                                    const newPlans = [...cmsForm.pricing!.plans];
+                                                                    newPlans[index].highlight = e.target.checked;
+                                                                    setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, plans: newPlans}});
+                                                                }}
+                                                                className="accent-black"
+                                                            />
+                                                            <label className="text-[10px] text-gray-400 uppercase font-bold block">Highlight Plan (Best Value)</label>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Features (comma separated)</label>
+                                                            <textarea 
+                                                                value={plan.features.join(', ')}
+                                                                onChange={e => {
+                                                                    const newPlans = [...cmsForm.pricing!.plans];
+                                                                    newPlans[index].features = e.target.value.split(',').map(f => f.trim()).filter(f => f);
+                                                                    setCmsForm({...cmsForm, pricing: {...cmsForm.pricing!, plans: newPlans}});
+                                                                }}
+                                                                className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white h-20"
+                                                                placeholder="Feature 1, Feature 2, Feature 3"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>
@@ -2483,6 +2706,136 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50 flex items-center gap-2"
                            >
                                {isSavingProduct ? <Loader size={16} className="animate-spin" /> : (productForm.id ? 'Save Changes' : 'Add to Collection')}
+                           </button>
+                       </div>
+                   </div>
+               </div>
+           </div>
+       )}
+
+       {/* Vendor Form Modal */}
+       {vendorForm && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setVendorForm(null)} />
+               <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl animate-slide-up rounded-sm">
+                   <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-20">
+                       <h2 className="text-xl font-serif italic">{vendorForm.id ? 'Edit Vendor' : 'Add New Vendor'}</h2>
+                       <button onClick={() => setVendorForm(null)} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
+                           <X size={20} />
+                       </button>
+                   </div>
+                   
+                   <div className="p-8 space-y-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <div>
+                               <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Brand Name *</label>
+                               <input 
+                                   type="text" 
+                                   value={vendorForm.name || ''}
+                                   onChange={e => setVendorForm({...vendorForm, name: e.target.value})}
+                                   className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                   placeholder="Maison Omega"
+                               />
+                           </div>
+                           <div>
+                               <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Email *</label>
+                               <input 
+                                   type="email" 
+                                   value={vendorForm.email || ''}
+                                   onChange={e => setVendorForm({...vendorForm, email: e.target.value})}
+                                   className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                   placeholder="contact@maisonomega.com"
+                               />
+                           </div>
+                           <div>
+                               <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Location</label>
+                               <input 
+                                   type="text" 
+                                   value={vendorForm.location || ''}
+                                   onChange={e => setVendorForm({...vendorForm, location: e.target.value})}
+                                   className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                   placeholder="Paris, France"
+                               />
+                           </div>
+                           <div>
+                               <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Website</label>
+                               <input 
+                                   type="url" 
+                                   value={vendorForm.website || ''}
+                                   onChange={e => setVendorForm({...vendorForm, website: e.target.value})}
+                                   className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                   placeholder="https://..."
+                               />
+                           </div>
+                           <div>
+                               <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Avatar URL</label>
+                               <input 
+                                   type="url" 
+                                   value={vendorForm.avatar || ''}
+                                   onChange={e => setVendorForm({...vendorForm, avatar: e.target.value})}
+                                   className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                   placeholder="https://..."
+                               />
+                           </div>
+                           <div>
+                               <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Cover Image URL</label>
+                               <input 
+                                   type="url" 
+                                   value={vendorForm.coverImage || ''}
+                                   onChange={e => setVendorForm({...vendorForm, coverImage: e.target.value})}
+                                   className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                   placeholder="https://..."
+                               />
+                           </div>
+                           <div>
+                               <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Subscription Plan</label>
+                               <select 
+                                   value={vendorForm.subscriptionPlan || 'BASIC'}
+                                   onChange={e => setVendorForm({...vendorForm, subscriptionPlan: e.target.value as any})}
+                                   className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                               >
+                                   <option value="BASIC">Basic</option>
+                                   <option value="PRO">Pro</option>
+                                   <option value="ENTERPRISE">Enterprise</option>
+                               </select>
+                           </div>
+                           <div>
+                               <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Verification Status</label>
+                               <select 
+                                   value={vendorForm.verificationStatus || 'PENDING'}
+                                   onChange={e => setVendorForm({...vendorForm, verificationStatus: e.target.value as any})}
+                                   className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                               >
+                                   <option value="PENDING">Pending</option>
+                                   <option value="VERIFIED">Verified</option>
+                                   <option value="REJECTED">Rejected</option>
+                               </select>
+                           </div>
+                       </div>
+
+                       <div>
+                           <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Bio</label>
+                           <textarea 
+                               value={vendorForm.bio || ''}
+                               onChange={e => setVendorForm({...vendorForm, bio: e.target.value})}
+                               className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none bg-gray-50 h-24 resize-none"
+                               placeholder="Brand bio..."
+                           />
+                       </div>
+
+                       <div className="pt-6 border-t border-gray-100 flex justify-end gap-4">
+                           <button 
+                               onClick={() => setVendorForm(null)}
+                               className="px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-gray-50 transition-colors"
+                           >
+                               Cancel
+                           </button>
+                           <button 
+                               onClick={handleSaveVendor}
+                               disabled={isSavingVendor}
+                               className="bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50 flex items-center gap-2"
+                           >
+                               {isSavingVendor ? <Loader size={16} className="animate-spin" /> : (vendorForm.id ? 'Save Changes' : 'Add Vendor')}
                            </button>
                        </div>
                    </div>

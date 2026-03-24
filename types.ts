@@ -133,6 +133,7 @@ export interface WaitlistEntry {
 }
 
 export interface CartItem extends Product {
+  cartItemId?: string;
   quantity: number;
   size: string;
   stock: number;
@@ -222,6 +223,24 @@ export interface AuthPageContent {
   registerImage: string;
 }
 
+export interface PricingPlan {
+  id: string;
+  name: string;
+  price: string;
+  period: string;
+  description: string;
+  features: string[];
+  cta: string;
+  highlight: boolean;
+}
+
+export interface PricingPageContent {
+  title: string;
+  subtitle: string;
+  description: string;
+  plans: PricingPlan[];
+}
+
 export interface ThemeSettings {
   primaryColor: string;
   secondaryColor: string;
@@ -239,6 +258,7 @@ export interface LandingPageContent {
     titleLine1: string;
     titleLine2: string;
     buttonText: string;
+    secondaryButtonText?: string;
   };
   marquee: {
     text: string;
@@ -261,4 +281,5 @@ export interface LandingPageContent {
   };
   about: AboutPageContent;
   auth?: AuthPageContent;
+  pricing?: PricingPageContent;
 }
