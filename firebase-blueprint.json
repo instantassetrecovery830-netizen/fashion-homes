@@ -1,0 +1,92 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email", "description": "User's email" },
+        "displayName": { "type": "string", "description": "User's display name" },
+        "role": { "type": "string", "enum": ["ADMIN", "VENDOR", "BUYER"], "description": "User's role in the system" },
+        "status": { "type": "string", "enum": ["ACTIVE", "SUSPENDED"], "description": "User's account status" },
+        "joined": { "type": "string", "format": "date-time", "description": "Account creation timestamp" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Vendor": {
+      "title": "Vendor",
+      "description": "Vendor/Designer profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "bio": { "type": "string" },
+        "avatar": { "type": "string" },
+        "verificationStatus": { "type": "string", "enum": ["PENDING", "VERIFIED", "REJECTED"] },
+        "subscriptionStatus": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+      },
+      "required": ["id", "name", "email"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Product listing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "designer": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "image": { "type": "string" },
+        "stock": { "type": "integer" }
+      },
+      "required": ["id", "name", "designer", "price", "category"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "total": { "type": "number" },
+        "status": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } }
+      },
+      "required": ["id", "customerName", "date", "total", "status", "items"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profiles"
+    },
+    "/vendors/{vendorId}": {
+      "schema": "Vendor",
+      "description": "Vendor profiles"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product listings"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders"
+    },
+    "/cms/{docId}": {
+      "schema": "object",
+      "description": "CMS content"
+    },
+    "/notifications/{notifId}": {
+      "schema": "object",
+      "description": "User notifications"
+    },
+    "/contacts/{contactId}": {
+      "schema": "object",
+      "description": "Contact form submissions"
+    }
+  }
+}

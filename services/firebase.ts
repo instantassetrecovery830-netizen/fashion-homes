@@ -12,18 +12,12 @@ import {
   signInWithPopup,
   User
 } from "firebase/auth";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBZkNjNGQT0A7sKnWj2dNCJxyvS8d5OxOA",
-  authDomain: "myfitstore2-97079.firebaseapp.com",
-  projectId: "myfitstore2-97079",
-  storageBucket: "myfitstore2-97079.firebasestorage.app",
-  messagingSenderId: "54647664240",
-  appId: "1:54647664240:web:31c452f1c34e3e800e4eb5"
-};
+import { getFirestore } from "firebase/firestore";
+import firebaseConfig from "../firebase-applet-config.json";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 // --- MOCK AUTH IMPLEMENTATION (For Preview/Dev Environments) ---
 let mockUser: User | null = null;

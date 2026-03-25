@@ -408,7 +408,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'SUBSCRIPTION', label: 'Subscription', icon: CreditCard, roles: [UserRole.VENDOR] },
       { id: 'KYC', label: 'KYC Verification', icon: ShieldCheck, roles: [UserRole.VENDOR] },
       { id: 'SHIPPING', label: 'Delivery', icon: Truck, roles: [UserRole.VENDOR] },
-      { id: 'CUSTOMERS', label: 'Customers', icon: Users, roles: [UserRole.ADMIN] },
+      { id: 'USERS', label: 'Users', icon: Users, roles: [UserRole.ADMIN] },
       { id: 'FOLLOWERS', label: 'Followers', icon: Users, roles: [UserRole.VENDOR] },
       { id: 'VENDORS', label: 'Ateliers', icon: Store, roles: [UserRole.ADMIN] },
       { id: 'MESSAGES', label: 'Messages', icon: Inbox, roles: [UserRole.ADMIN] },
@@ -1364,11 +1364,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
           );
 
-      case 'CUSTOMERS':
+      case 'USERS':
           return (
               <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
                   <div className="flex items-center justify-between">
-                      <h2 className="text-3xl font-serif italic">Registered Buyers</h2>
+                      <h2 className="text-3xl font-serif italic">User Management</h2>
                       <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
                           <Menu size={20} />
                       </button>
@@ -1380,29 +1380,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               <tr>
                                   <th className="p-6">User</th>
                                   <th className="p-6">Email</th>
+                                  <th className="p-6">Role</th>
                                   <th className="p-6">Joined</th>
-                                  <th className="p-6">Total Spend</th>
                                   <th className="p-6">Status</th>
-                                  <th className="p-6">Actions</th>
+                                  <th className="p-6 text-right">Actions</th>
                               </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                              {users?.filter(u => u.role === UserRole.BUYER).map(user => (
+                              {users?.map(user => (
                                   <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
                                       <td className="p-6 flex items-center gap-4">
                                           <img src={user.avatar || 'https://via.placeholder.com/32'} className="w-10 h-10 rounded-full object-cover border border-gray-100" alt="" />
                                           <span className="font-medium">{user.name}</span>
                                       </td>
                                       <td className="p-6 text-gray-600">{user.email}</td>
+                                      <td className="p-6">
+                                          <select 
+                                              value={user.role}
+                                              onChange={(e) => onUpdateUser && onUpdateUser({ ...user, role: e.target.value as UserRole })}
+                                              className="bg-transparent border-none text-xs font-bold uppercase tracking-widest focus:ring-0 cursor-pointer hover:text-luxury-gold"
+                                          >
+                                              <option value={UserRole.BUYER}>Buyer</option>
+                                              <option value={UserRole.VENDOR}>Vendor</option>
+                                              <option value={UserRole.ADMIN}>Admin</option>
+                                          </select>
+                                      </td>
                                       <td className="p-6 text-gray-500">{new Date(user.joined).toLocaleDateString()}</td>
-                                      <td className="p-6 font-mono text-luxury-gold font-bold">{user.spend || '$0.00'}</td>
                                       <td className="p-6">
                                           <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full flex w-fit items-center gap-1 ${user.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
                                               {user.status === 'ACTIVE' && <CheckCircle size={10} />}
                                               {user.status}
                                           </span>
                                       </td>
-                                      <td className="p-6">
+                                      <td className="p-6 text-right space-x-2">
                                           {onUpdateUser && (
                                               <button 
                                                   onClick={() => onUpdateUser({ ...user, status: user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' })}
@@ -1413,6 +1423,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                   }`}
                                               >
                                                   {user.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                                              </button>
+                                          )}
+                                          {onDeleteUser && (
+                                              <button 
+                                                  onClick={() => {
+                                                      if (window.confirm(`Are you sure you want to delete user ${user.name}? This action cannot be undone.`)) {
+                                                          onDeleteUser(user.id);
+                                                      }
+                                                  }}
+                                                  className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded text-red-600 hover:bg-red-50 transition-colors"
+                                              >
+                                                  Delete
                                               </button>
                                           )}
                                       </td>

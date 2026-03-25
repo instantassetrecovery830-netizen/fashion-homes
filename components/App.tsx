@@ -5,7 +5,7 @@ import { LandingView } from './LandingView.tsx';
 import { Loader } from 'lucide-react';
 import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission, AppNotification, Follower } from '../types.ts';
 import { 
-  seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
+  seedDatabase, migrateData, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, deleteUserFromDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
   fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct, fetchUserVotes,
@@ -92,12 +92,15 @@ const App: React.FC = () => {
       const currentUserId = auth.currentUser?.uid;
       
       // Load heavy data in parallel
+      // Only fetch admin-only data if user is admin
+      const isAdmin = userRole === UserRole.ADMIN;
+      
       const [dbOrders, dbUsers, dbContacts, dbNotifications, dbFollowers] = await Promise.all([
-        fetchOrders(),
-        fetchUsers(),
-        fetchContactSubmissions(),
+        isAdmin ? fetchOrders() : Promise.resolve([]),
+        isAdmin ? fetchUsers() : Promise.resolve([]),
+        isAdmin ? fetchContactSubmissions() : Promise.resolve([]),
         fetchNotifications(currentUserId),
-        fetchAllFollowers()
+        isAdmin ? fetchAllFollowers() : Promise.resolve([])
       ]);
 
       setOrders(dbOrders);
@@ -127,6 +130,7 @@ const App: React.FC = () => {
     const initData = async () => {
       try {
         await seedDatabase();
+        await migrateData(); // Added migration
         await refreshData(true);
       } catch (error) {
         console.error("Database initialization failed.", error);
