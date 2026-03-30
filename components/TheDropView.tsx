@@ -1,58 +1,53 @@
 
 import React, { useState, useEffect } from 'react';
 import { Timer, ArrowRight, Bell, Lock, CheckCircle, Mail } from 'lucide-react';
-import { Product } from '../types.ts';
+import { Product, DropPageContent } from '../types.ts';
 import { joinWaitlistInDb } from '../services/dataService.ts';
 import { auth } from '../services/firebase.ts';
 
 interface TheDropViewProps {
   products: Product[];
-  onNavigate: (view: any) => void; // Using any to avoid circular import type issues if strict
+  onNavigate: (view: any) => void;
+  cmsContent?: DropPageContent;
 }
 
-export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate }) => {
+export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate, cmsContent }) => {
   const [targetProduct, setTargetProduct] = useState<Product | null>(null);
   const [timeLeft, setTimeLeft] = useState<{ days: number, hours: number, minutes: number, seconds: number }>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [email, setEmail] = useState(auth.currentUser?.email || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
 
-  // MOCK DROP if no real drop exists
-  const MOCK_DROP: Product = {
-      id: 'drop_mystery',
-      name: 'VANTABLACK ETHER COAT',
-      designer: 'MAISON OMEGA',
-      price: 1250,
-      category: 'Outerwear',
-      image: 'https://images.unsplash.com/photo-1536766820879-059fec98ec0a?q=80&w=1974&auto=format&fit=crop',
+  // Use CMS content if provided, otherwise fallback to product-based logic
+  const dropData = cmsContent || {
+      title: 'VANTABLACK ETHER COAT',
+      subtitle: 'MAISON OMEGA',
       description: 'A masterpiece of light absorption. The Vantablack Ether Coat redefines the silhouette with a void-like presence. Highly limited run.',
-      rating: 5,
-      stock: 50,
-      sizes: ['S', 'M', 'L'],
-      releaseDate: new Date(Date.now() + 172800000).toISOString() // 48 hours from now
+      backgroundImage: 'https://images.unsplash.com/photo-1536766820879-059fec98ec0a?q=80&w=1974&auto=format&fit=crop',
+      countdownDate: new Date(Date.now() + 172800000).toISOString()
   };
 
   useEffect(() => {
-    // Find the next product with a release date in the future
-    const now = new Date();
-    const upcoming = products
-        .filter(p => p.releaseDate && new Date(p.releaseDate) > now)
-        .sort((a, b) => new Date(a.releaseDate!).getTime() - new Date(b.releaseDate!).getTime());
+    // Find the next product with a release date in the future if no CMS date is used
+    if (!cmsContent) {
+        const now = new Date();
+        const upcoming = products
+            .filter(p => p.releaseDate && new Date(p.releaseDate) > now)
+            .sort((a, b) => new Date(a.releaseDate!).getTime() - new Date(b.releaseDate!).getTime());
 
-    if (upcoming.length > 0) {
-        setTargetProduct(upcoming[0]);
-    } else {
-        setTargetProduct(MOCK_DROP);
+        if (upcoming.length > 0) {
+            setTargetProduct(upcoming[0]);
+        }
     }
-  }, [products]);
+  }, [products, cmsContent]);
 
   useEffect(() => {
-    if (!targetProduct?.releaseDate) return;
+    const targetDate = cmsContent ? new Date(cmsContent.countdownDate) : (targetProduct?.releaseDate ? new Date(targetProduct.releaseDate) : null);
+    if (!targetDate) return;
 
     const timer = setInterval(() => {
-        const dropDate = new Date(targetProduct.releaseDate!);
         const now = new Date();
-        const difference = dropDate.getTime() - now.getTime();
+        const difference = targetDate.getTime() - now.getTime();
 
         if (difference > 0) {
             setTimeLeft({
@@ -63,12 +58,11 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate }
             });
         } else {
             clearInterval(timer);
-            // Optional: Refresh or change state when drop happens live
         }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [targetProduct]);
+  }, [cmsContent, targetProduct]);
 
   const handleJoinWaitlist = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -85,7 +79,7 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate }
       setHasJoined(true);
   };
 
-  if (!targetProduct) return null;
+  if (!cmsContent && !targetProduct) return null;
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden flex flex-col md:flex-row animate-fade-in">
@@ -97,8 +91,8 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate }
         {/* Left Side: Product Imagery */}
         <div className="relative w-full md:w-1/2 h-[50vh] md:h-screen z-10 overflow-hidden group">
             <img 
-                src={targetProduct.image} 
-                alt={targetProduct.name} 
+                src={dropData.backgroundImage} 
+                alt={dropData.title} 
                 className="w-full h-full object-cover transition-transform duration-[3s] group-hover:scale-105 opacity-80 group-hover:opacity-100"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-black" />
@@ -106,7 +100,7 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate }
             {/* Mobile Title Overlay */}
             <div className="absolute bottom-8 left-6 md:hidden">
                 <span className="text-luxury-gold text-xs font-bold uppercase tracking-[0.3em] mb-2 block animate-pulse">Incoming Drop</span>
-                <h1 className="text-3xl font-serif italic text-white leading-none">{targetProduct.name}</h1>
+                <h1 className="text-3xl font-serif italic text-white leading-none">{dropData.title}</h1>
             </div>
         </div>
 
@@ -118,8 +112,8 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate }
                     <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
                     <span className="text-luxury-gold text-xs font-bold uppercase tracking-[0.3em]">Live Countdown</span>
                 </div>
-                <h1 className="text-5xl lg:text-7xl font-serif italic text-white leading-tight mb-4">{targetProduct.name}</h1>
-                <p className="text-gray-400 text-lg uppercase tracking-widest">{targetProduct.designer}</p>
+                <h1 className="text-5xl lg:text-7xl font-serif italic text-white leading-tight mb-4">{dropData.title}</h1>
+                <p className="text-gray-400 text-lg uppercase tracking-widest">{dropData.subtitle}</p>
             </div>
 
             {/* Countdown Timer */}
@@ -138,8 +132,7 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate }
             </div>
 
             <p className="text-gray-400 font-light leading-relaxed mb-12 max-w-md">
-                {targetProduct.description} Limited to {targetProduct.stock} pieces worldwide. 
-                Secure your access before the public release.
+                {dropData.description}
             </p>
 
             {/* Waitlist Action */}

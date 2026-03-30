@@ -5,7 +5,7 @@ import { LandingView } from './LandingView.tsx';
 import { Loader } from 'lucide-react';
 import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission, AppNotification, Follower } from '../types.ts';
 import { 
-  seedDatabase, migrateData, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
+  seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, deleteUserFromDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
   fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct, fetchUserVotes,
@@ -130,7 +130,6 @@ const App: React.FC = () => {
     const initData = async () => {
       try {
         await seedDatabase();
-        await migrateData(); // Added migration
         await refreshData(true);
       } catch (error) {
         console.error("Database initialization failed.", error);
@@ -815,7 +814,7 @@ const App: React.FC = () => {
       case 'THE_DROP':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <TheDropView products={products} onNavigate={handleNavigate} />
+            <TheDropView products={products} onNavigate={handleNavigate} cmsContent={cmsContent?.drop} />
           </Suspense>
         );
       case 'VENDOR_PROFILE':

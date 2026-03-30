@@ -249,6 +249,14 @@ export interface ThemeSettings {
   borderRadius: 'none' | 'sm' | 'md' | 'lg' | 'full';
 }
 
+export interface DropPageContent {
+  title: string;
+  subtitle: string;
+  description: string;
+  backgroundImage: string;
+  countdownDate: string;
+}
+
 export interface LandingPageContent {
   theme?: ThemeSettings;
   hero: {
@@ -279,6 +287,7 @@ export interface LandingPageContent {
   spotlight: {
     title: string;
   };
+  drop?: DropPageContent;
   about: AboutPageContent;
   auth?: AuthPageContent;
   pricing?: PricingPageContent;

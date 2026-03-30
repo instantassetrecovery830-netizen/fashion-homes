@@ -1955,6 +1955,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                           {/* Right Column */}
                           <div className="space-y-6">
+                              {/* The Drop */}
+                              <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
+                                  <button 
+                                    onClick={() => setExpandedSection(expandedSection === 'drop' ? null : 'drop')}
+                                    className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
+                                  >
+                                    <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><Sparkles size={14} /> The Drop</span>
+                                    <ChevronDown size={16} className={`transition-transform ${expandedSection === 'drop' ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  
+                                  {expandedSection === 'drop' && cmsForm.drop && (
+                                    <div className="p-6 space-y-4 border-t border-gray-100">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Title</label>
+                                            <input 
+                                                value={cmsForm.drop.title}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, title: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Subtitle</label>
+                                            <input 
+                                                value={cmsForm.drop.subtitle}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, subtitle: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Description</label>
+                                            <textarea 
+                                                value={cmsForm.drop.description}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, description: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white h-24"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Background Image URL</label>
+                                            <input 
+                                                value={cmsForm.drop.backgroundImage}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, backgroundImage: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Countdown Date (ISO)</label>
+                                            <input 
+                                                type="datetime-local"
+                                                value={cmsForm.drop.countdownDate.slice(0, 16)}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, countdownDate: new Date(e.target.value).toISOString()}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                  )}
+                              </div>
+
                               {/* Campaign */}
                               <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
                                   <button 

@@ -1,49 +1,225 @@
 
-import { db } from './firebase.ts';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  documentId,
-  Timestamp,
-  addDoc,
-  onSnapshot
-} from 'firebase/firestore';
 import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus, Follower, AppNotification, WaitlistEntry, CartItem, ChatMessage } from '../types.ts';
 import { sql } from './db.ts';
 
-// --- TEST FUNCTION ---
-export const checkFirestoreData = async () => {
+export const initSchema = async () => {
     try {
-        const vendors = await getDocs(collection(db, 'vendors'));
-        console.log('Vendors found in Firestore:', vendors.size);
-        return vendors.size > 0;
+        await sql`
+            CREATE TABLE IF NOT EXISTS vendors (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                email TEXT,
+                description TEXT,
+                visualTheme TEXT,
+                bio TEXT,
+                avatar TEXT,
+                verificationStatus TEXT,
+                subscriptionStatus TEXT,
+                location TEXT,
+                coverImage TEXT,
+                subscriptionPlan TEXT,
+                website TEXT,
+                instagram TEXT,
+                twitter TEXT,
+                facebook TEXT,
+                tiktok TEXT,
+                paymentMethods JSONB,
+                kycDocuments JSONB,
+                gallery JSONB
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS products (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                price NUMERIC,
+                vendorId TEXT,
+                designer TEXT,
+                description TEXT,
+                createdAt TIMESTAMP,
+                category TEXT,
+                image TEXT,
+                rating NUMERIC,
+                isNewSeason BOOLEAN,
+                stock INTEGER,
+                sizes JSONB,
+                isPreOrder BOOLEAN
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                uid TEXT,
+                name TEXT,
+                email TEXT,
+                role TEXT,
+                avatar TEXT,
+                joined TEXT,
+                status TEXT,
+                verificationStatus TEXT,
+                spend TEXT,
+                location TEXT,
+                profileData JSONB
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS orders (
+                id TEXT PRIMARY KEY,
+                customerName TEXT,
+                date TEXT,
+                total NUMERIC,
+                status TEXT,
+                items JSONB
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS cms (
+                id TEXT PRIMARY KEY,
+                content JSONB
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS contacts (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                email TEXT,
+                subject TEXT,
+                message TEXT,
+                date TEXT,
+                status TEXT
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS followers (
+                id TEXT PRIMARY KEY,
+                followerId TEXT,
+                vendorId TEXT,
+                joined TEXT,
+                name TEXT,
+                avatar TEXT,
+                location TEXT,
+                purchases INTEGER,
+                style TEXT
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS notifications (
+                id TEXT PRIMARY KEY,
+                userId TEXT,
+                title TEXT,
+                message TEXT,
+                read BOOLEAN,
+                date TEXT,
+                type TEXT,
+                link TEXT
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS auth_accounts (
+                email TEXT PRIMARY KEY,
+                password TEXT,
+                uid TEXT,
+                email_verified BOOLEAN DEFAULT FALSE
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS waitlist (
+                id TEXT PRIMARY KEY,
+                email TEXT,
+                joinedAt TEXT
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS cart_items (
+                id TEXT PRIMARY KEY,
+                userId TEXT,
+                productId TEXT,
+                quantity INTEGER,
+                size TEXT,
+                measurements JSONB,
+                addedAt TEXT
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS saved_items (
+                id TEXT PRIMARY KEY,
+                userId TEXT,
+                productId TEXT,
+                savedAt TEXT
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS product_votes (
+                id TEXT PRIMARY KEY,
+                userId TEXT,
+                productId TEXT,
+                votedAt TEXT
+            )
+        `;
+
+        await sql`
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                userId TEXT,
+                sender TEXT,
+                text TEXT,
+                timestamp TEXT,
+                read BOOLEAN
+            )
+        `;
+
+        console.log("Database schema initialized.");
     } catch (e) {
-        console.error('Error checking Firestore data:', e);
-        return false;
+        console.error("Error initializing schema:", e);
+        throw e;
     }
 };
+
 export const seedDatabase = async () => {
     try {
+        await initSchema();
+        
         // Seed vendors
-        await sql`INSERT INTO vendors (id, name, email, description, visualTheme) VALUES 
-            ('v1', 'Atelier Lagos', 'atelier@lagos.com', 'Heritage reimagined', 'MINIMALIST'),
-            ('v2', 'Accra Avant-Garde', 'accra@avant.com', 'Modern African aesthetics', 'DARK')
+        await sql`INSERT INTO vendors (id, name, email, description, visualTheme, bio, avatar, location, website) VALUES 
+            ('v1', 'Atelier Lagos', 'atelier@lagos.com', 'Heritage reimagined', 'MINIMALIST', 'Merging digital craftsmanship with sustainable organic fibers.', 'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=600', 'Lagos, Nigeria', 'www.atelier-lagos.com'),
+            ('v2', 'Accra Avant-Garde', 'accra@avant.com', 'Modern African aesthetics', 'DARK', 'Monochromatic minimalism for the modern avant-garde.', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600', 'Accra, Ghana', 'www.accra-avant.com')
             ON CONFLICT (id) DO NOTHING`;
         
         // Seed products
-        await sql`INSERT INTO products (id, name, price, vendorId, description, createdAt) VALUES 
-            ('p1', 'Lagos Silk Dress', 250, 'v1', 'Hand-woven silk', NOW()),
-            ('p2', 'Accra Leather Bag', 150, 'v2', 'Genuine leather', NOW())
+        await sql`INSERT INTO products (id, name, price, vendorId, designer, description, createdAt, category, image, rating, isNewSeason, stock, sizes, isPreOrder) VALUES 
+            ('p1', 'Lagos Silk Dress', 250, 'v1', 'Atelier Lagos', 'Hand-woven silk dress with asymmetrical cut.', NOW(), 'Dresses', 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?q=80&w=800', 4.8, true, 5, '["S", "M", "L"]', false),
+            ('p2', 'Accra Leather Bag', 150, 'v2', 'Accra Avant-Garde', 'Genuine leather bag with metallic hardware.', NOW(), 'Accessories', 'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?q=80&w=800', 5.0, true, 12, '["One Size"]', false),
+            ('p3', 'Obsidian Wide Trousers', 450, 'v2', 'Accra Avant-Garde', 'High-waisted wide leg trousers in Japanese denim.', NOW(), 'Bottoms', 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?q=80&w=800', 4.5, false, 8, '["28", "30", "32", "34"]', false)
             ON CONFLICT (id) DO NOTHING`;
+            
+        // Seed followers
+        await sql`INSERT INTO followers (id, followerId, vendorId, joined, name, avatar, location, purchases, style) VALUES 
+            ('f1', 'u1', 'v1', '2023-10-01', 'Sofia R.', 'https://i.pravatar.cc/150?u=1', 'Milan', 12, 'Avant-Garde'),
+            ('f2', 'u2', 'v1', '2023-12-15', 'James K.', 'https://i.pravatar.cc/150?u=2', 'London', 3, 'Minimalist'),
+            ('f3', 'u3', 'v2', '2024-01-20', 'Arjun P.', 'https://i.pravatar.cc/150?u=3', 'New York', 8, 'Streetwear')
+            ON CONFLICT (id) DO NOTHING`;
+            
+        // Seed notifications
+        await sql`INSERT INTO notifications (id, userId, title, message, read, date, type, link) VALUES 
+            ('notif_init', 'all', 'Welcome to MyFitStore', 'Explore our curated collection of digital fashion.', false, NOW(), 'SYSTEM', 'MARKETPLACE')
+            ON CONFLICT (id) DO NOTHING`;
+            
+        // Seed CMS
+        await sql`INSERT INTO cms (id, content) VALUES 
+            ('main', ${JSON.stringify(DEFAULT_CMS_CONTENT)})
+            ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content`;
             
         console.log("Database seeded with mock data.");
     } catch (e) {
@@ -173,43 +349,6 @@ const DEFAULT_CMS_CONTENT: LandingPageContent = {
 
 // --- INITIALIZATION ---
 
-export const initSchema = async () => {
-    try {
-        await sql`CREATE TABLE IF NOT EXISTS vendors (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            email TEXT,
-            description TEXT,
-            visualTheme TEXT
-        )`;
-        await sql`CREATE TABLE IF NOT EXISTS products (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            price NUMERIC,
-            vendorId TEXT,
-            description TEXT,
-            createdAt TEXT
-        )`;
-        // ... add other tables ...
-        console.log("Neon schema initialized");
-    } catch (e) {
-        console.error("Error initializing Neon schema:", e);
-    }
-};
-
-export const migrateData = async () => {
-    console.log("Starting migration from Firestore to Neon...");
-    // 1. Fetch from Firestore
-    const vendors = await fetchVendors();
-    // 2. Insert into Neon
-    for (const vendor of vendors) {
-        await sql`INSERT INTO vendors (id, name, email, description, visualTheme) 
-                  VALUES (${vendor.id}, ${vendor.name}, ${vendor.email}, ${vendor.bio}, ${vendor.visualTheme || 'MINIMALIST'})
-                  ON CONFLICT (id) DO NOTHING`;
-    }
-    console.log("Migration complete.");
-};
-
 // --- READ OPERATIONS ---
 
 export const fetchVendors = async (): Promise<Vendor[]> => {
@@ -276,13 +415,14 @@ export const fetchUsers = async (): Promise<User[]> => {
         const result = (await sql`SELECT * FROM users`) as any[];
         return result.map(row => ({
             id: row.id,
+            uid: row.uid,
             name: row.name,
             email: row.email,
-            role: row.role,
+            role: row.role as any,
             avatar: row.avatar,
             joined: row.joined,
-            status: row.status,
-            verificationStatus: row.verificationstatus
+            status: row.status as any,
+            verificationStatus: row.verificationstatus as any
         })) as User[];
     } catch (e) {
         console.error("Fetch Users Error:", e);
@@ -297,13 +437,14 @@ export const getUserByEmail = async (email: string): Promise<User | null> => {
             const row = result[0];
             return {
                 id: row.id,
+                uid: row.uid,
                 name: row.name,
                 email: row.email,
-                role: row.role,
+                role: row.role as any,
                 avatar: row.avatar,
                 joined: row.joined,
-                status: row.status,
-                verificationStatus: row.verificationstatus
+                status: row.status as any,
+                verificationStatus: row.verificationstatus as any
             } as User;
         }
         return null;
@@ -338,9 +479,8 @@ export const getVendorByEmail = async (email: string): Promise<Vendor | null> =>
 
 export const fetchVendorFollowerCount = async (vendorId: string): Promise<number> => {
     try {
-        const q = query(collection(db, 'followers'), where('vendorId', '==', vendorId));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.size;
+        const result = (await sql`SELECT COUNT(*) FROM followers WHERE vendorId = ${vendorId}`) as any[];
+        return Number(result[0].count);
     } catch (e) {
         console.error("Error fetching follower count:", e);
         return 0;
@@ -349,11 +489,12 @@ export const fetchVendorFollowerCount = async (vendorId: string): Promise<number
 
 export const fetchVendorFollowers = async (vendorId: string): Promise<Follower[]> => {
     try {
-        const q = query(collection(db, 'followers'), where('vendorId', '==', vendorId), orderBy('joined', 'desc'));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+        const result = (await sql`SELECT * FROM followers WHERE vendorId = ${vendorId} ORDER BY joined DESC`) as any[];
+        return result.map(row => ({
+            id: row.id,
+            followerId: row.followerid,
+            vendorId: row.vendorid,
+            joined: row.joined
         })) as Follower[];
     } catch (e) {
         console.error("Fetch Vendor Followers Error:", e);
@@ -363,10 +504,12 @@ export const fetchVendorFollowers = async (vendorId: string): Promise<Follower[]
 
 export const fetchAllFollowers = async (): Promise<Follower[]> => {
     try {
-        const querySnapshot = await getDocs(collection(db, 'followers'));
-        return querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+        const result = (await sql`SELECT * FROM followers`) as any[];
+        return result.map(row => ({
+            id: row.id,
+            followerId: row.followerid,
+            vendorId: row.vendorid,
+            joined: row.joined
         })) as Follower[];
     } catch (e) {
         console.error("Fetch All Followers Error:", e);
@@ -376,22 +519,21 @@ export const fetchAllFollowers = async (): Promise<Follower[]> => {
 
 export const fetchUserFollowedVendors = async (userId: string): Promise<Vendor[]> => {
     try {
-        const q = query(collection(db, 'followers'), where('followerId', '==', userId));
-        const querySnapshot = await getDocs(q);
-        const vendorIds = querySnapshot.docs.map(doc => doc.data().vendorId);
-        
-        if (vendorIds.length === 0) return [];
-        
-        // Use 'in' operator to fetch all vendors in one query (limit 30)
-        const vendorsQuery = query(
-            collection(db, 'vendors'), 
-            where(documentId(), 'in', vendorIds.slice(0, 30))
-        );
-        const vendorsSnapshot = await getDocs(vendorsQuery);
-        
-        return vendorsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+        const result = (await sql`
+            SELECT v.* FROM vendors v
+            JOIN followers f ON v.id = f.vendorId
+            WHERE f.followerId = ${userId}
+            LIMIT 30
+        `) as any[];
+        return result.map(row => ({
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            bio: row.description || '',
+            visualTheme: row.visualtheme,
+            avatar: '',
+            verificationStatus: 'VERIFIED',
+            subscriptionStatus: 'ACTIVE'
         })) as Vendor[];
     } catch (e) {
         console.error("Error fetching followed vendors:", e);
@@ -401,14 +543,17 @@ export const fetchUserFollowedVendors = async (userId: string): Promise<Vendor[]
 
 export const fetchNotifications = async (userId?: string): Promise<AppNotification[]> => {
     try {
-        const docRef = doc(db, 'notifications', 'notif_init');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            return [{ id: docSnap.id, ...docSnap.data() } as AppNotification];
-        } else {
-            console.log("No such document!");
-            return [];
-        }
+        const result = (await sql`SELECT * FROM notifications WHERE userId = ${userId || 'all'} OR userId = 'all' ORDER BY date DESC`) as any[];
+        return result.map(row => ({
+            id: row.id,
+            userId: row.userid,
+            title: row.title,
+            message: row.message,
+            read: row.read,
+            date: row.date,
+            type: row.type,
+            link: row.link
+        })) as AppNotification[];
     } catch (e) {
         console.error("Error fetching notifications", e);
         return [];
@@ -417,9 +562,9 @@ export const fetchNotifications = async (userId?: string): Promise<AppNotificati
 
 export const fetchLandingContent = async (): Promise<LandingPageContent> => {
     try {
-        const docSnap = await getDoc(doc(db, 'cms', 'main'));
-        if (docSnap.exists()) {
-            const content = docSnap.data() as LandingPageContent;
+        const result = (await sql`SELECT content FROM cms WHERE id = 'main' LIMIT 1`) as any[];
+        if (result.length > 0) {
+            const content = JSON.parse(result[0].content) as LandingPageContent;
             return {
                 ...DEFAULT_CMS_CONTENT,
                 ...content,
@@ -435,11 +580,15 @@ export const fetchLandingContent = async (): Promise<LandingPageContent> => {
 
 export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> => {
     try {
-        const q = query(collection(db, 'contacts'), orderBy('date', 'desc'));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+        const result = (await sql`SELECT * FROM contacts ORDER BY date DESC`) as any[];
+        return result.map(row => ({
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            subject: row.subject,
+            message: row.message,
+            date: row.date,
+            status: row.status
         })) as ContactSubmission[];
     } catch (e) {
         console.error("Fetch Contact Submissions Error:", e);
@@ -451,10 +600,8 @@ export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> =>
 
 export const addProductToDb = async (product: Product) => {
     try {
-        await setDoc(doc(db, 'products', product.id), {
-            ...product,
-            createdAt: product.createdAt || new Date().toISOString()
-        });
+        await sql`INSERT INTO products (id, name, price, designer, description, createdAt) 
+                  VALUES (${product.id}, ${product.name}, ${product.price}, ${product.designer}, ${product.description}, ${product.createdAt || new Date().toISOString()})`;
     } catch (e) {
         console.error("Add Product Failed", e);
     }
@@ -462,7 +609,7 @@ export const addProductToDb = async (product: Product) => {
 
 export const updateProductInDb = async (product: Product) => {
     try {
-        await updateDoc(doc(db, 'products', product.id), { ...product });
+        await sql`UPDATE products SET name=${product.name}, price=${product.price}, designer=${product.designer}, description=${product.description} WHERE id=${product.id}`;
     } catch (e) {
         console.error("Update Product Failed", e);
     }
@@ -470,7 +617,7 @@ export const updateProductInDb = async (product: Product) => {
 
 export const deleteProductFromDb = async (productId: string) => {
     try {
-        await deleteDoc(doc(db, 'products', productId));
+        await sql`DELETE FROM products WHERE id=${productId}`;
     } catch (e) {
         console.error("Delete Product Failed", e);
     }
@@ -480,7 +627,7 @@ export const deleteProductFromDb = async (productId: string) => {
 
 export const updateVendorInDb = async (vendor: Vendor) => {
     try {
-        await updateDoc(doc(db, 'vendors', vendor.id), { ...vendor });
+        await sql`UPDATE vendors SET name=${vendor.name}, email=${vendor.email}, description=${vendor.bio}, visualTheme=${vendor.visualTheme} WHERE id=${vendor.id}`;
     } catch (e) {
         console.error("Update Vendor Failed", e);
     }
@@ -488,14 +635,9 @@ export const updateVendorInDb = async (vendor: Vendor) => {
 
 export const createVendorInDb = async (vendor: Vendor) => {
     try {
-        const vendorDoc = doc(db, 'vendors', vendor.id);
-        const docSnap = await getDoc(vendorDoc);
-        if (!docSnap.exists()) {
-            await setDoc(vendorDoc, {
-                ...vendor,
-                visualTheme: vendor.visualTheme || 'MINIMALIST'
-            });
-        }
+        await sql`INSERT INTO vendors (id, name, email, description, visualTheme) 
+                  VALUES (${vendor.id}, ${vendor.name}, ${vendor.email}, ${vendor.bio}, ${vendor.visualTheme || 'MINIMALIST'})
+                  ON CONFLICT (id) DO NOTHING`;
     } catch (e) {
         console.error("Create Vendor Failed", e);
     }
@@ -503,7 +645,9 @@ export const createVendorInDb = async (vendor: Vendor) => {
 
 export const addFollowerToDb = async (follower: Follower & { followerId: string }) => {
     try {
-        await setDoc(doc(db, 'followers', follower.id), { ...follower });
+        await sql`INSERT INTO followers (id, followerId, vendorId, joined) 
+                  VALUES (${follower.id}, ${follower.followerId}, ${follower.vendorId}, ${follower.joined})
+                  ON CONFLICT (id) DO NOTHING`;
     } catch (e) {
         console.error("Add Follower Failed", e);
     }
@@ -511,11 +655,7 @@ export const addFollowerToDb = async (follower: Follower & { followerId: string 
 
 export const removeFollowerFromDb = async (followerId: string, vendorId: string) => {
     try {
-        const q = query(collection(db, 'followers'), where('followerId', '==', followerId), where('vendorId', '==', vendorId));
-        const querySnapshot = await getDocs(q);
-        for (const docSnap of querySnapshot.docs) {
-            await deleteDoc(doc(db, 'followers', docSnap.id));
-        }
+        await sql`DELETE FROM followers WHERE followerId=${followerId} AND vendorId=${vendorId}`;
     } catch (e) {
         console.error("Remove Follower Failed", e);
     }
@@ -525,10 +665,8 @@ export const removeFollowerFromDb = async (followerId: string, vendorId: string)
 
 export const createNotificationInDb = async (notif: AppNotification) => {
     try {
-        await setDoc(doc(db, 'notifications', notif.id), {
-            ...notif,
-            userId: notif.userId || 'all'
-        });
+        await sql`INSERT INTO notifications (id, userId, title, message, read, date, type, link) 
+                  VALUES (${notif.id}, ${notif.userId || 'all'}, ${notif.title}, ${notif.message}, ${notif.read}, ${notif.date}, ${notif.type}, ${notif.link})`;
     } catch (e) {
         console.error("Create Notification Failed", e);
     }
@@ -536,7 +674,7 @@ export const createNotificationInDb = async (notif: AppNotification) => {
 
 export const markNotificationRead = async (id: string) => {
     try {
-        await updateDoc(doc(db, 'notifications', id), { read: true });
+        await sql`UPDATE notifications SET read=true WHERE id=${id}`;
     } catch (e) {
         console.error("Mark Read Failed", e);
     }
@@ -546,15 +684,9 @@ export const markNotificationRead = async (id: string) => {
 
 export const createUserInDb = async (user: { id: string, name: string, email: string, role: string, avatar: string, status: string, verificationStatus?: VerificationStatus }) => {
     try {
-        const userDoc = doc(db, 'users', user.id);
-        const docSnap = await getDoc(userDoc);
-        if (!docSnap.exists()) {
-            await setDoc(userDoc, {
-                ...user,
-                joined: new Date().toISOString(),
-                verificationStatus: user.verificationStatus || 'PENDING'
-            });
-        }
+        await sql`INSERT INTO users (id, uid, name, email, role, avatar, joined, status, verificationStatus) 
+                  VALUES (${user.id}, ${user.id}, ${user.name}, ${user.email}, ${user.role}, ${user.avatar}, ${new Date().toISOString()}, ${user.status}, ${user.verificationStatus || 'PENDING'})
+                  ON CONFLICT (id) DO NOTHING`;
     } catch (e) {
         console.error("Create User Failed", e);
     }
@@ -562,8 +694,14 @@ export const createUserInDb = async (user: { id: string, name: string, email: st
 
 export const updateUserInDb = async (user: User) => {
     try {
-        const userDoc = doc(db, 'users', user.id);
-        await updateDoc(userDoc, { ...user });
+        await sql`UPDATE users SET 
+                  name = ${user.name}, 
+                  email = ${user.email}, 
+                  role = ${user.role}, 
+                  avatar = ${user.avatar}, 
+                  status = ${user.status}, 
+                  verificationStatus = ${user.verificationStatus}
+                  WHERE id = ${user.id}`;
     } catch (e) {
         console.error("Update User Failed", e);
     }
@@ -571,7 +709,7 @@ export const updateUserInDb = async (user: User) => {
 
 export const deleteUserFromDb = async (userId: string) => {
     try {
-        await deleteDoc(doc(db, 'users', userId));
+        await sql`DELETE FROM users WHERE id = ${userId}`;
     } catch (e) {
         console.error("Delete User Failed", e);
     }
@@ -582,22 +720,11 @@ export const deleteUserFromDb = async (userId: string) => {
 export const voteForProduct = async (productId: string, userId: string) => {
     try {
         const voteId = `${userId}_${productId}`;
-        const voteDoc = doc(db, 'product_votes', voteId);
-        const docSnap = await getDoc(voteDoc);
-        if (docSnap.exists()) return;
-
-        await setDoc(voteDoc, {
-            userId,
-            productId,
-            votedAt: new Date().toISOString()
-        });
-
-        const productDoc = doc(db, 'products', productId);
-        const productSnap = await getDoc(productDoc);
-        if (productSnap.exists()) {
-            const currentVotes = productSnap.data().votes || 0;
-            await updateDoc(productDoc, { votes: currentVotes + 1 });
-        }
+        await sql`INSERT INTO product_votes (id, userId, productId, votedAt) 
+                  VALUES (${voteId}, ${userId}, ${productId}, ${new Date().toISOString()})
+                  ON CONFLICT (id) DO NOTHING`;
+        
+        await sql`UPDATE products SET votes = COALESCE(votes, 0) + 1 WHERE id = ${productId}`;
     } catch (e) {
         console.error("Error voting for product:", e);
     }
@@ -605,9 +732,8 @@ export const voteForProduct = async (productId: string, userId: string) => {
 
 export const fetchUserVotes = async (userId: string): Promise<string[]> => {
     try {
-        const q = query(collection(db, 'product_votes'), where('userId', '==', userId));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => doc.data().productId);
+        const result = (await sql`SELECT productId FROM product_votes WHERE userId = ${userId}`) as any[];
+        return result.map(row => row.productid);
     } catch (e) {
         console.error("Error fetching user votes:", e);
         return [];
@@ -616,7 +742,8 @@ export const fetchUserVotes = async (userId: string): Promise<string[]> => {
 
 export const updateLandingContentInDb = async (content: LandingPageContent) => {
     try {
-        await setDoc(doc(db, 'cms', 'main'), content);
+        await sql`INSERT INTO cms (id, content) VALUES ('main', ${JSON.stringify(content)})
+                  ON CONFLICT (id) DO UPDATE SET content = ${JSON.stringify(content)}`;
     } catch (e) {
         console.error("Update CMS Failed", e);
     }
@@ -626,7 +753,8 @@ export const updateLandingContentInDb = async (content: LandingPageContent) => {
 
 export const createOrderInDb = async (order: Order) => {
     try {
-        await setDoc(doc(db, 'orders', order.id), order);
+        await sql`INSERT INTO orders (id, customerName, date, total, status, items) 
+                  VALUES (${order.id}, ${order.customerName}, ${order.date}, ${order.total}, ${order.status}, ${JSON.stringify(order.items)})`;
     } catch (e) {
         console.error("Create Order Failed", e);
     }
@@ -634,7 +762,7 @@ export const createOrderInDb = async (order: Order) => {
 
 export const updateOrderStatusInDb = async (orderId: string, status: string) => {
     try {
-        await updateDoc(doc(db, 'orders', orderId), { status });
+        await sql`UPDATE orders SET status=${status} WHERE id=${orderId}`;
     } catch (e) {
         console.error("Update Order Status Failed", e);
     }
@@ -644,7 +772,8 @@ export const updateOrderStatusInDb = async (orderId: string, status: string) => 
 
 export const submitContactFormInDb = async (submission: ContactSubmission) => {
     try {
-        await setDoc(doc(db, 'contacts', submission.id), submission);
+        await sql`INSERT INTO contacts (id, name, email, subject, message, date, status) 
+                  VALUES (${submission.id}, ${submission.name}, ${submission.email}, ${submission.subject}, ${submission.message}, ${submission.date}, ${submission.status})`;
     } catch (e) {
         console.error("Submit Contact Failed", e);
     }
@@ -652,7 +781,7 @@ export const submitContactFormInDb = async (submission: ContactSubmission) => {
 
 export const updateContactStatusInDb = async (id: string, status: 'NEW' | 'READ' | 'ARCHIVED') => {
     try {
-        await updateDoc(doc(db, 'contacts', id), { status });
+        await sql`UPDATE contacts SET status=${status} WHERE id=${id}`;
     } catch (e) {
         console.error("Update Contact Status Failed", e);
     }
@@ -662,7 +791,9 @@ export const updateContactStatusInDb = async (id: string, status: 'NEW' | 'READ'
 
 export const joinWaitlistInDb = async (entry: WaitlistEntry) => {
     try {
-        await setDoc(doc(db, 'waitlist', entry.id), entry);
+        await sql`INSERT INTO waitlist (id, email, joinedAt) 
+                  VALUES (${entry.id}, ${entry.email}, ${entry.date})
+                  ON CONFLICT (id) DO NOTHING`;
     } catch (e) {
         console.error("Join Waitlist Failed", e);
     }
@@ -670,25 +801,23 @@ export const joinWaitlistInDb = async (entry: WaitlistEntry) => {
 
 export const fetchCartItems = async (userId: string): Promise<CartItem[]> => {
     try {
-        const q = query(collection(db, 'cart_items'), where('userId', '==', userId), orderBy('addedAt', 'desc'));
-        const querySnapshot = await getDocs(q);
+        const result = (await sql`
+            SELECT c.id as cartitemid, c.quantity, c.size, c.measurements, c.addedAt, p.* 
+            FROM cart_items c 
+            JOIN products p ON c.productId = p.id 
+            WHERE c.userId = ${userId} 
+            ORDER BY c.addedAt DESC
+        `) as any[];
         
-        const cartItems: CartItem[] = [];
-        for (const docSnap of querySnapshot.docs) {
-            const data = docSnap.data();
-            const productDoc = await getDoc(doc(db, 'products', data.productId));
-            if (productDoc.exists()) {
-                cartItems.push({
-                    ...productDoc.data(),
-                    id: data.productId,
-                    cartItemId: docSnap.id,
-                    quantity: data.quantity,
-                    size: data.size,
-                    measurements: data.measurements
-                } as CartItem);
-            }
-        }
-        return cartItems;
+        return result.map(row => ({
+            ...row,
+            id: row.id, // product id
+            cartItemId: row.cartitemid,
+            quantity: row.quantity,
+            size: row.size,
+            measurements: row.measurements ? JSON.parse(row.measurements) : null,
+            price: Number(row.price)
+        })) as CartItem[];
     } catch (e) {
         console.error("Error fetching cart items:", e);
         return [];
@@ -698,14 +827,8 @@ export const fetchCartItems = async (userId: string): Promise<CartItem[]> => {
 export const addCartItemToDb = async (userId: string, item: CartItem) => {
     try {
         const cartItemId = `cart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        await setDoc(doc(db, 'cart_items', cartItemId), {
-            userId,
-            productId: item.id,
-            quantity: item.quantity,
-            size: item.size,
-            measurements: item.measurements || null,
-            addedAt: new Date().toISOString()
-        });
+        await sql`INSERT INTO cart_items (id, userId, productId, quantity, size, measurements, addedAt) 
+                  VALUES (${cartItemId}, ${userId}, ${item.id}, ${item.quantity}, ${item.size}, ${item.measurements ? JSON.stringify(item.measurements) : null}, ${new Date().toISOString()})`;
         return cartItemId;
     } catch (e) {
         console.error("Add Cart Item Failed", e);
@@ -715,7 +838,7 @@ export const addCartItemToDb = async (userId: string, item: CartItem) => {
 
 export const updateCartItemInDb = async (cartItemId: string, quantity: number, size: string) => {
     try {
-        await updateDoc(doc(db, 'cart_items', cartItemId), { quantity, size });
+        await sql`UPDATE cart_items SET quantity=${quantity}, size=${size} WHERE id=${cartItemId}`;
     } catch (e) {
         console.error("Update Cart Item Failed", e);
     }
@@ -723,7 +846,7 @@ export const updateCartItemInDb = async (cartItemId: string, quantity: number, s
 
 export const removeCartItemFromDb = async (cartItemId: string) => {
     try {
-        await deleteDoc(doc(db, 'cart_items', cartItemId));
+        await sql`DELETE FROM cart_items WHERE id=${cartItemId}`;
     } catch (e) {
         console.error("Remove Cart Item Failed", e);
     }
@@ -731,11 +854,7 @@ export const removeCartItemFromDb = async (cartItemId: string) => {
 
 export const clearCartInDb = async (userId: string) => {
     try {
-        const q = query(collection(db, 'cart_items'), where('userId', '==', userId));
-        const querySnapshot = await getDocs(q);
-        for (const docSnap of querySnapshot.docs) {
-            await deleteDoc(doc(db, 'cart_items', docSnap.id));
-        }
+        await sql`DELETE FROM cart_items WHERE userId=${userId}`;
     } catch (e) {
         console.error("Clear Cart Failed", e);
     }
@@ -743,21 +862,19 @@ export const clearCartInDb = async (userId: string) => {
 
 export const fetchSavedItems = async (userId: string): Promise<Product[]> => {
     try {
-        const q = query(collection(db, 'saved_items'), where('userId', '==', userId), orderBy('savedAt', 'desc'));
-        const querySnapshot = await getDocs(q);
+        const result = (await sql`
+            SELECT s.savedAt, p.* 
+            FROM saved_items s 
+            JOIN products p ON s.productId = p.id 
+            WHERE s.userId = ${userId} 
+            ORDER BY s.savedAt DESC
+        `) as any[];
         
-        const savedItems: Product[] = [];
-        for (const docSnap of querySnapshot.docs) {
-            const data = docSnap.data();
-            const productDoc = await getDoc(doc(db, 'products', data.productId));
-            if (productDoc.exists()) {
-                savedItems.push({
-                    id: data.productId,
-                    ...productDoc.data()
-                } as Product);
-            }
-        }
-        return savedItems;
+        return result.map(row => ({
+            ...row,
+            id: row.id,
+            price: Number(row.price)
+        })) as Product[];
     } catch (e) {
         console.error("Error fetching saved items:", e);
         return [];
@@ -767,11 +884,9 @@ export const fetchSavedItems = async (userId: string): Promise<Product[]> => {
 export const addSavedItemToDb = async (userId: string, productId: string) => {
     try {
         const savedItemId = `${userId}_${productId}`;
-        await setDoc(doc(db, 'saved_items', savedItemId), {
-            userId,
-            productId,
-            savedAt: new Date().toISOString()
-        });
+        await sql`INSERT INTO saved_items (id, userId, productId, savedAt) 
+                  VALUES (${savedItemId}, ${userId}, ${productId}, ${new Date().toISOString()})
+                  ON CONFLICT (id) DO NOTHING`;
     } catch (e) {
         console.error("Add Saved Item Failed", e);
     }
@@ -780,7 +895,7 @@ export const addSavedItemToDb = async (userId: string, productId: string) => {
 export const removeSavedItemFromDb = async (userId: string, productId: string) => {
     try {
         const savedItemId = `${userId}_${productId}`;
-        await deleteDoc(doc(db, 'saved_items', savedItemId));
+        await sql`DELETE FROM saved_items WHERE id=${savedItemId}`;
     } catch (e) {
         console.error("Remove Saved Item Failed", e);
     }
@@ -788,17 +903,13 @@ export const removeSavedItemFromDb = async (userId: string, productId: string) =
 
 export const fetchChatMessages = async (userId: string): Promise<ChatMessage[]> => {
     try {
-        const q = query(collection(db, 'chat_messages'), where('userId', '==', userId), orderBy('timestamp', 'asc'));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(docSnap => {
-            const data = docSnap.data();
-            return {
-                id: docSnap.id,
-                sender: data.sender,
-                text: data.text,
-                timestamp: new Date(data.timestamp)
-            } as ChatMessage;
-        });
+        const result = (await sql`SELECT * FROM chat_messages WHERE userId = ${userId} ORDER BY timestamp ASC`) as any[];
+        return result.map(row => ({
+            id: row.id,
+            sender: row.sender,
+            text: row.text,
+            timestamp: new Date(row.timestamp)
+        })) as ChatMessage[];
     } catch (e) {
         console.error("Error fetching chat messages:", e);
         return [];
@@ -807,12 +918,8 @@ export const fetchChatMessages = async (userId: string): Promise<ChatMessage[]> 
 
 export const addChatMessageToDb = async (userId: string, message: ChatMessage) => {
     try {
-        await setDoc(doc(db, 'chat_messages', message.id), {
-            userId,
-            sender: message.sender,
-            text: message.text,
-            timestamp: message.timestamp.toISOString()
-        });
+        await sql`INSERT INTO chat_messages (id, userId, sender, text, timestamp, read) 
+                  VALUES (${message.id}, ${userId}, ${message.sender}, ${message.text}, ${message.timestamp.toISOString()}, false)`;
     } catch (e) {
         console.error("Add Chat Message Failed", e);
     }
