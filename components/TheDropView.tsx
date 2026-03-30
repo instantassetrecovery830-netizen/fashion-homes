@@ -19,12 +19,17 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate, 
   const [hasJoined, setHasJoined] = useState(false);
 
   // Use CMS content if provided, otherwise fallback to product-based logic
-  const dropData = cmsContent || {
+  const defaultDrop = {
       title: 'VANTABLACK ETHER COAT',
       subtitle: 'MAISON OMEGA',
       description: 'A masterpiece of light absorption. The Vantablack Ether Coat redefines the silhouette with a void-like presence. Highly limited run.',
       backgroundImage: 'https://images.unsplash.com/photo-1536766820879-059fec98ec0a?q=80&w=1974&auto=format&fit=crop',
       countdownDate: new Date(Date.now() + 172800000).toISOString()
+  };
+
+  const dropData = {
+      ...defaultDrop,
+      ...(cmsContent || {})
   };
 
   useEffect(() => {
@@ -66,20 +71,18 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate, 
 
   const handleJoinWaitlist = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!email || !targetProduct) return;
+      if (!email) return;
       
       setIsSubmitting(true);
       await joinWaitlistInDb({
           id: `wait_${Date.now()}`,
           email,
-          productId: targetProduct.id,
+          productId: targetProduct?.id || 'general_drop',
           date: new Date().toISOString()
       });
       setIsSubmitting(false);
       setHasJoined(true);
   };
-
-  if (!cmsContent && !targetProduct) return null;
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden flex flex-col md:flex-row animate-fade-in">
@@ -176,3 +179,5 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate, 
     </div>
   );
 };
+
+export default TheDropView;

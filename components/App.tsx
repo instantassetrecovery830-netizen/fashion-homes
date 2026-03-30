@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, Suspense, useMemo, useCallback, useRef } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Layout } from './Layout.tsx';
 import { LandingView } from './LandingView.tsx';
 import { Loader } from 'lucide-react';
@@ -36,6 +37,9 @@ const LoadingFallback = () => (
 );
 
 const App: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // State
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
   const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
@@ -65,6 +69,88 @@ const App: React.FC = () => {
   const [cmsContent, setCmsContent] = useState<LandingPageContent | undefined>(undefined);
   const [allFollowers, setAllFollowers] = useState<Follower[]>([]);
   // Removed blocking isLoadingData state
+
+  // Sync ViewState with URL
+  useEffect(() => {
+    const path = location.pathname;
+    let view: ViewState = 'LANDING';
+
+    if (path === '/') view = 'LANDING';
+    else if (path === '/marketplace') view = 'MARKETPLACE';
+    else if (path === '/new-arrivals') view = 'NEW_ARRIVALS';
+    else if (path === '/new-arrivals/manage') view = 'NEW_ARRIVALS_MANAGE';
+    else if (path === '/designers') view = 'DESIGNERS';
+    else if (path === '/the-drop') view = 'THE_DROP';
+    else if (path.startsWith('/vendor/')) view = 'VENDOR_PROFILE';
+    else if (path.startsWith('/product/')) view = 'PRODUCT_DETAIL';
+    else if (path === '/vendor/dashboard') view = 'VENDOR_DASHBOARD';
+    else if (path === '/admin') view = 'ADMIN_PANEL';
+    else if (path === '/dashboard') view = 'BUYER_DASHBOARD';
+    else if (path === '/auth') view = 'AUTH';
+    else if (path === '/profile') view = 'PROFILE_SETTINGS';
+    else if (path === '/pricing') view = 'PRICING';
+    else if (path === '/about') view = 'ABOUT';
+    else if (path === '/concierge') view = 'AI_CONCIERGE';
+
+    if (view !== currentView) {
+      setCurrentView(view);
+    }
+  }, [location.pathname, currentView]);
+
+  const handleNavigate = useCallback((view: ViewState) => {
+    if (view === 'AUTH') {
+        // Reset defaults if navigating generically
+        setAuthInitialMode('LOGIN');
+        setAuthInitialRole(UserRole.BUYER);
+    }
+    
+    if (view !== 'MARKETPLACE') {
+        setSelectedDesignerFilter(null);
+    }
+    
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    setIsCartOpen(false);
+    setIsSavedOpen(false);
+
+    let path = '/';
+    switch (view) {
+      case 'LANDING': path = '/'; break;
+      case 'MARKETPLACE': path = '/marketplace'; break;
+      case 'NEW_ARRIVALS': path = '/new-arrivals'; break;
+      case 'NEW_ARRIVALS_MANAGE': path = '/new-arrivals/manage'; break;
+      case 'DESIGNERS': path = '/designers'; break;
+      case 'THE_DROP': path = '/the-drop'; break;
+      case 'VENDOR_PROFILE': path = `/vendor/${selectedVendor?.id || 'v1'}`; break;
+      case 'PRODUCT_DETAIL': path = `/product/${selectedProduct?.id || 'p1'}`; break;
+      case 'VENDOR_DASHBOARD': path = '/vendor/dashboard'; break;
+      case 'ADMIN_PANEL': path = '/admin'; break;
+      case 'BUYER_DASHBOARD': path = '/dashboard'; break;
+      case 'AUTH': path = '/auth'; break;
+      case 'PROFILE_SETTINGS': path = '/profile'; break;
+      case 'PRICING': path = '/pricing'; break;
+      case 'ABOUT': path = '/about'; break;
+      case 'AI_CONCIERGE': path = '/concierge'; break;
+    }
+    navigate(path);
+  }, [navigate, selectedVendor, selectedProduct]);
+
+  // Sync selected items from URL
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.startsWith('/product/')) {
+      const productId = path.split('/')[2];
+      const product = products.find(p => p.id === productId);
+      if (product && selectedProduct?.id !== productId) {
+        setSelectedProduct(product);
+      }
+    } else if (path.startsWith('/vendor/')) {
+      const vendorId = path.split('/')[2];
+      const vendor = vendors.find(v => v.id === vendorId);
+      if (vendor && selectedVendor?.id !== vendorId) {
+        setSelectedVendor(vendor);
+      }
+    }
+  }, [location.pathname, products, vendors, selectedProduct, selectedVendor]);
 
   // Visual Search State
   const [visualSearchResults, setVisualSearchResults] = useState<Product[] | null>(null);
@@ -448,21 +534,6 @@ const App: React.FC = () => {
   });
 
   // Handlers
-  const handleNavigate = useCallback((view: ViewState) => {
-    if (view === 'AUTH') {
-        // Reset defaults if navigating generically
-        setAuthInitialMode('LOGIN');
-        setAuthInitialRole(UserRole.BUYER);
-    }
-    
-    if (view !== 'MARKETPLACE') {
-        setSelectedDesignerFilter(null);
-    }
-    setCurrentView(view);
-    window.scrollTo({ top: 0, behavior: 'auto' });
-    setIsCartOpen(false);
-    setIsSavedOpen(false);
-  }, [currentView]);
 
   const handleAuthNavigation = useCallback((mode: 'LOGIN' | 'REGISTER', role: UserRole) => {
     setAuthInitialMode(mode);
@@ -718,35 +789,42 @@ const App: React.FC = () => {
     setFeatureFlags(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // View Routing
-  const renderView = (): React.ReactElement => {
-    if (currentView === 'AUTH') {
-      return (
-        <Suspense fallback={<LoadingFallback />}>
-          <AuthView 
-            onLogin={handleLogin} 
-            onNavigate={handleNavigate} 
-            cmsContent={cmsContent}
-            initialMode={authInitialMode}
-            initialRole={authInitialRole}
-          />
-        </Suspense>
-      );
-    }
+  if (featureFlags.maintenanceMode && userRole !== UserRole.ADMIN) {
+    return (
+      <div className="min-h-screen bg-luxury-cream flex flex-col items-center justify-center animate-fade-in">
+        <h1 className="text-3xl font-serif font-bold tracking-widest mb-6">MyFitStore</h1>
+        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-gray-400">Under Maintenance</p>
+      </div>
+    );
+  }
 
-    if (featureFlags.maintenanceMode && userRole !== UserRole.ADMIN) {
-      return (
-        <div className="h-screen flex items-center justify-center flex-col">
-          <h1 className="text-4xl font-serif">MyFitStore</h1>
-          <p className="mt-4 uppercase tracking-widest text-sm">Under Maintenance</p>
-        </div>
-      );
-    }
+  const associatedVendor = vendors.find(v => v.name === selectedProduct?.designer);
 
-    switch (currentView) {
-      case 'LANDING':
-        return (
-          // Landing View is NOT suspended to ensure instant load
+  return (
+    <Layout 
+      role={userRole} 
+      cart={cart}
+      savedItems={savedItems}
+      isCartOpen={isCartOpen}
+      setIsCartOpen={setIsCartOpen}
+      isSavedOpen={isSavedOpen}
+      setIsSavedOpen={setIsSavedOpen}
+      onUpdateCartItem={handleUpdateCartItem}
+      onRemoveFromCart={handleRemoveFromCart}
+      onToggleSave={handleToggleSave}
+      onNavigate={handleNavigate}
+      onRoleChange={setUserRole}
+      currentView={currentView}
+      isLoggedIn={isLoggedIn}
+      onLogout={handleLogout}
+      onPlaceOrder={handlePlaceOrder}
+      onVisualSearch={handleVisualSearch}
+      onAuthRequest={handleAuthNavigation}
+      notifications={notifications}
+      onRefreshNotifications={refreshData}
+    >
+      <Routes>
+        <Route path="/" element={
           <LandingView 
             onNavigate={handleNavigate} 
             isLoggedIn={isLoggedIn} 
@@ -759,9 +837,8 @@ const App: React.FC = () => {
             onVote={handleVote}
             userVotes={userVotes}
           />
-        );
-      case 'MARKETPLACE':
-        return (
+        } />
+        <Route path="/marketplace" element={
           <Suspense fallback={<LoadingFallback />}>
             <MarketplaceView 
               onNavigate={handleNavigate} 
@@ -775,9 +852,8 @@ const App: React.FC = () => {
               onToggleSave={handleToggleSave}
             />
           </Suspense>
-        );
-      case 'NEW_ARRIVALS':
-        return (
+        } />
+        <Route path="/new-arrivals" element={
           <Suspense fallback={<LoadingFallback />}>
             <NewArrivalsView 
                 onProductSelect={handleProductSelect} 
@@ -791,9 +867,8 @@ const App: React.FC = () => {
                 userVotes={userVotes}
             />
           </Suspense>
-        );
-      case 'NEW_ARRIVALS_MANAGE':
-        return (
+        } />
+        <Route path="/new-arrivals/manage" element={
           <Suspense fallback={<LoadingFallback />}>
             <NewArrivalsManageView 
               products={products}
@@ -804,21 +879,18 @@ const App: React.FC = () => {
               onNavigate={handleNavigate}
             />
           </Suspense>
-        );
-      case 'DESIGNERS':
-        return (
+        } />
+        <Route path="/designers" element={
           <Suspense fallback={<LoadingFallback />}>
             <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />
           </Suspense>
-        );
-      case 'THE_DROP':
-        return (
+        } />
+        <Route path="/the-drop" element={
           <Suspense fallback={<LoadingFallback />}>
             <TheDropView products={products} onNavigate={handleNavigate} cmsContent={cmsContent?.drop} />
           </Suspense>
-        );
-      case 'VENDOR_PROFILE':
-        return (
+        } />
+        <Route path="/vendor/:vendorId" element={
           <Suspense fallback={<LoadingFallback />}>
             {selectedVendor ? (
               <VendorProfileView 
@@ -831,12 +903,10 @@ const App: React.FC = () => {
                 onToggleFollow={handleToggleFollow}
                 isFollowing={followedVendors.some(v => v.id === selectedVendor.id)}
               />
-            ) : <DesignersView onSelectDesigner={handleDesignerSelect} vendors={vendors} />}
+            ) : <Navigate to="/designers" replace />}
           </Suspense>
-        );
-      case 'PRODUCT_DETAIL':
-        const associatedVendor = vendors.find(v => v.name === selectedProduct?.designer);
-        return (
+        } />
+        <Route path="/product/:productId" element={
           <Suspense fallback={<LoadingFallback />}>
             {selectedProduct ? (
               <ProductDetail 
@@ -849,22 +919,10 @@ const App: React.FC = () => {
                 savedItems={savedItems}
                 onToggleSave={handleToggleSave}
               />
-            ) : (
-                <MarketplaceView 
-                    onNavigate={handleNavigate} 
-                    onProductSelect={handleProductSelect} 
-                    products={activeProducts}
-                    vendors={vendors}
-                    savedItems={savedItems}
-                    onToggleSave={handleToggleSave}
-                />
-            )}
+            ) : <Navigate to="/marketplace" replace />}
           </Suspense>
-        );
-      case 'VENDOR_DASHBOARD':
-      case 'ADMIN_PANEL':
-      case 'BUYER_DASHBOARD':
-        return (
+        } />
+        <Route path="/vendor/dashboard" element={
           <Suspense fallback={<LoadingFallback />}>
             <Dashboard 
               role={userRole} 
@@ -894,9 +952,81 @@ const App: React.FC = () => {
               followers={allFollowers}
             />
           </Suspense>
-        );
-      case 'PROFILE_SETTINGS':
-        return (
+        } />
+        <Route path="/admin" element={
+          <Suspense fallback={<LoadingFallback />}>
+            <Dashboard 
+              role={userRole} 
+              featureFlags={featureFlags} 
+              toggleFeatureFlag={toggleFeatureFlag}
+              onNavigate={handleNavigate}
+              vendors={vendors}
+              setVendors={handleSetVendors}
+              onAddVendor={handleAddVendor}
+              orders={orders}
+              onUpdateOrderStatus={handleUpdateOrderStatus}
+              products={products}
+              users={allUsers}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
+              onProductSelect={handleProductSelect}
+              onUpdateUser={handleUpdateUser}
+              onDeleteUser={handleDeleteUser}
+              cmsContent={cmsContent}
+              onUpdateCMSContent={handleUpdateCMSContent}
+              contactSubmissions={contactSubmissions}
+              onUpdateContact={handleUpdateContact}
+              followedVendors={followedVendors}
+              onToggleFollow={handleToggleFollow}
+              onDesignerClick={handleDesignerSelect}
+              followers={allFollowers}
+            />
+          </Suspense>
+        } />
+        <Route path="/dashboard" element={
+          <Suspense fallback={<LoadingFallback />}>
+            <Dashboard 
+              role={userRole} 
+              featureFlags={featureFlags} 
+              toggleFeatureFlag={toggleFeatureFlag}
+              onNavigate={handleNavigate}
+              vendors={vendors}
+              setVendors={handleSetVendors}
+              onAddVendor={handleAddVendor}
+              orders={orders}
+              onUpdateOrderStatus={handleUpdateOrderStatus}
+              products={products}
+              users={allUsers}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
+              onProductSelect={handleProductSelect}
+              onUpdateUser={handleUpdateUser}
+              onDeleteUser={handleDeleteUser}
+              cmsContent={cmsContent}
+              onUpdateCMSContent={handleUpdateCMSContent}
+              contactSubmissions={contactSubmissions}
+              onUpdateContact={handleUpdateContact}
+              followedVendors={followedVendors}
+              onToggleFollow={handleToggleFollow}
+              onDesignerClick={handleDesignerSelect}
+              followers={allFollowers}
+            />
+          </Suspense>
+        } />
+        <Route path="/auth" element={
+          <Suspense fallback={<LoadingFallback />}>
+            <AuthView 
+              onNavigate={handleNavigate} 
+              onLogin={handleLogin} 
+              initialMode={authInitialMode}
+              initialRole={authInitialRole}
+              cmsContent={cmsContent}
+            />
+          </Suspense>
+        } />
+        <Route path="/profile" element={
           <Suspense fallback={<LoadingFallback />}>
             <Dashboard 
               role={userRole} 
@@ -922,68 +1052,24 @@ const App: React.FC = () => {
               onToggleFollow={handleToggleFollow}
             />
           </Suspense>
-        );
-      case 'PRICING':
-        return (
+        } />
+        <Route path="/pricing" element={
           <Suspense fallback={<LoadingFallback />}>
             <PricingView onNavigate={handleNavigate} onRegister={() => handleAuthNavigation('REGISTER', UserRole.VENDOR)} cmsContent={cmsContent} />
           </Suspense>
-        );
-      case 'ABOUT':
-        return (
+        } />
+        <Route path="/about" element={
           <Suspense fallback={<LoadingFallback />}>
             <AboutView onNavigate={handleNavigate} cmsContent={cmsContent} />
           </Suspense>
-        );
-      default:
-        return (
-          <LandingView 
-            onNavigate={handleNavigate} 
-            isLoggedIn={isLoggedIn} 
-            userRole={userRole} 
-            vendors={vendors} 
-            products={activeProducts} 
-            onDesignerClick={handleDesignerSelect} 
-            cmsContent={cmsContent} 
-            onAuthRequest={handleAuthNavigation} 
-          />
-        );
-    }
-  };
-
-  if (featureFlags.maintenanceMode && userRole !== UserRole.ADMIN) {
-    return (
-      <div className="min-h-screen bg-luxury-cream flex flex-col items-center justify-center animate-fade-in">
-        <h1 className="text-3xl font-serif font-bold tracking-widest mb-6">MyFitStore</h1>
-        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-gray-400">Under Maintenance</p>
-      </div>
-    );
-  }
-
-  return (
-    <Layout 
-      role={userRole} 
-      cart={cart}
-      savedItems={savedItems}
-      isCartOpen={isCartOpen}
-      setIsCartOpen={setIsCartOpen}
-      isSavedOpen={isSavedOpen}
-      setIsSavedOpen={setIsSavedOpen}
-      onUpdateCartItem={handleUpdateCartItem}
-      onRemoveFromCart={handleRemoveFromCart}
-      onToggleSave={handleToggleSave}
-      onNavigate={handleNavigate}
-      onRoleChange={setUserRole}
-      currentView={currentView}
-      isLoggedIn={isLoggedIn}
-      onLogout={handleLogout}
-      onPlaceOrder={handlePlaceOrder}
-      onVisualSearch={handleVisualSearch}
-      onAuthRequest={handleAuthNavigation}
-      notifications={notifications}
-      onRefreshNotifications={refreshData}
-    >
-      {renderView()}
+        } />
+        <Route path="/concierge" element={
+          <Suspense fallback={<LoadingFallback />}>
+            <AiConcierge products={activeProducts} />
+          </Suspense>
+        } />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
       
       {/* AI Concierge - Rendered globally but passed active products context. Hidden on AUTH view. Lazy loaded. */}
       {currentView !== 'AUTH' && (

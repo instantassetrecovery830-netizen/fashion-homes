@@ -191,6 +191,15 @@ export const seedDatabase = async () => {
     try {
         await initSchema();
         
+        // Check if already seeded to avoid redundant queries
+        const existingVendors = await sql`SELECT id FROM vendors LIMIT 1` as any[];
+        if (existingVendors.length > 0) {
+            console.log("Database already seeded. Skipping...");
+            return;
+        }
+
+        console.log("Seeding database with initial data...");
+        
         // Seed vendors
         await sql`INSERT INTO vendors (id, name, email, description, visualTheme, bio, avatar, location, website) VALUES 
             ('v1', 'Atelier Lagos', 'atelier@lagos.com', 'Heritage reimagined', 'MINIMALIST', 'Merging digital craftsmanship with sustainable organic fibers.', 'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=600', 'Lagos, Nigeria', 'www.atelier-lagos.com'),
@@ -265,6 +274,13 @@ const DEFAULT_CMS_CONTENT: LandingPageContent = {
   },
   spotlight: {
     title: "Editor's Picks"
+  },
+  drop: {
+    title: 'VANTABLACK ETHER COAT',
+    subtitle: 'MAISON OMEGA',
+    description: 'A masterpiece of light absorption. The Vantablack Ether Coat redefines the silhouette with a void-like presence. Highly limited run.',
+    backgroundImage: 'https://images.unsplash.com/photo-1536766820879-059fec98ec0a?q=80&w=1974&auto=format&fit=crop',
+    countdownDate: new Date(Date.now() + 172800000).toISOString()
   },
   about: {
     hero: {
@@ -358,11 +374,22 @@ export const fetchVendors = async (): Promise<Vendor[]> => {
             id: row.id,
             name: row.name,
             email: row.email,
-            bio: row.description || '',
+            bio: row.bio || row.description || '',
             visualTheme: row.visualtheme,
-            avatar: '',
-            verificationStatus: 'VERIFIED',
-            subscriptionStatus: 'ACTIVE'
+            avatar: row.avatar || '',
+            verificationStatus: row.verificationstatus as any,
+            subscriptionStatus: row.subscriptionstatus as any,
+            location: row.location,
+            coverImage: row.coverimage,
+            subscriptionPlan: row.subscriptionplan as any,
+            website: row.website,
+            instagram: row.instagram,
+            twitter: row.twitter,
+            facebook: row.facebook,
+            tiktok: row.tiktok,
+            paymentMethods: row.paymentmethods || [],
+            kycDocuments: row.kycdocuments || {},
+            gallery: row.gallery || []
         })) as Vendor[];
     } catch (e) {
         console.error("Fetch Vendors Error:", e);
@@ -378,14 +405,16 @@ export const fetchProducts = async (): Promise<Product[]> => {
             name: row.name,
             price: Number(row.price),
             vendorId: row.vendorid,
+            designer: row.designer,
             description: row.description,
             createdAt: row.createdat,
-            designer: '',
-            category: '',
-            image: '',
-            rating: 0,
-            stock: 0,
-            sizes: []
+            category: row.category,
+            image: row.image,
+            rating: Number(row.rating),
+            isNewSeason: row.isnewseason,
+            stock: row.stock,
+            sizes: row.sizes || [],
+            isPreOrder: row.ispreorder
         })) as Product[];
     } catch (e) {
         console.error("Fetch Products Error:", e);
@@ -402,7 +431,7 @@ export const fetchOrders = async (): Promise<Order[]> => {
             date: row.date,
             total: Number(row.total),
             status: row.status,
-            items: JSON.parse(row.items)
+            items: row.items || []
         })) as Order[];
     } catch (e) {
         console.error("Fetch Orders Error:", e);
@@ -422,7 +451,8 @@ export const fetchUsers = async (): Promise<User[]> => {
             avatar: row.avatar,
             joined: row.joined,
             status: row.status as any,
-            verificationStatus: row.verificationstatus as any
+            verificationStatus: row.verificationstatus as any,
+            ...(row.profiledata || {})
         })) as User[];
     } catch (e) {
         console.error("Fetch Users Error:", e);
@@ -444,7 +474,8 @@ export const getUserByEmail = async (email: string): Promise<User | null> => {
                 avatar: row.avatar,
                 joined: row.joined,
                 status: row.status as any,
-                verificationStatus: row.verificationstatus as any
+                verificationStatus: row.verificationstatus as any,
+                ...(row.profiledata || {})
             } as User;
         }
         return null;
@@ -463,11 +494,22 @@ export const getVendorByEmail = async (email: string): Promise<Vendor | null> =>
                 id: row.id,
                 name: row.name,
                 email: row.email,
-                bio: row.description || '',
+                bio: row.bio || row.description || '',
                 visualTheme: row.visualtheme,
-                avatar: '',
-                verificationStatus: 'VERIFIED',
-                subscriptionStatus: 'ACTIVE'
+                avatar: row.avatar || '',
+                verificationStatus: row.verificationstatus as any,
+                subscriptionStatus: row.subscriptionstatus as any,
+                location: row.location,
+                coverImage: row.coverimage,
+                subscriptionPlan: row.subscriptionplan as any,
+                website: row.website,
+                instagram: row.instagram,
+                twitter: row.twitter,
+                facebook: row.facebook,
+                tiktok: row.tiktok,
+                paymentMethods: row.paymentmethods || [],
+                kycDocuments: row.kycdocuments || {},
+                gallery: row.gallery || []
             } as Vendor;
         }
         return null;
@@ -564,7 +606,7 @@ export const fetchLandingContent = async (): Promise<LandingPageContent> => {
     try {
         const result = (await sql`SELECT content FROM cms WHERE id = 'main' LIMIT 1`) as any[];
         if (result.length > 0) {
-            const content = JSON.parse(result[0].content) as LandingPageContent;
+            const content = result[0].content as LandingPageContent;
             return {
                 ...DEFAULT_CMS_CONTENT,
                 ...content,
@@ -627,7 +669,27 @@ export const deleteProductFromDb = async (productId: string) => {
 
 export const updateVendorInDb = async (vendor: Vendor) => {
     try {
-        await sql`UPDATE vendors SET name=${vendor.name}, email=${vendor.email}, description=${vendor.bio}, visualTheme=${vendor.visualTheme} WHERE id=${vendor.id}`;
+        await sql`UPDATE vendors SET 
+                  name=${vendor.name}, 
+                  email=${vendor.email}, 
+                  description=${vendor.bio}, 
+                  visualTheme=${vendor.visualTheme},
+                  bio=${vendor.bio},
+                  avatar=${vendor.avatar},
+                  verificationStatus=${vendor.verificationStatus},
+                  subscriptionStatus=${vendor.subscriptionStatus},
+                  location=${vendor.location},
+                  coverImage=${vendor.coverImage},
+                  subscriptionPlan=${vendor.subscriptionPlan},
+                  website=${vendor.website},
+                  instagram=${vendor.instagram},
+                  twitter=${vendor.twitter},
+                  facebook=${vendor.facebook},
+                  tiktok=${vendor.tiktok},
+                  paymentMethods=${JSON.stringify(vendor.paymentMethods || [])},
+                  kycDocuments=${JSON.stringify(vendor.kycDocuments || {})},
+                  gallery=${JSON.stringify(vendor.gallery || [])}
+                  WHERE id=${vendor.id}`;
     } catch (e) {
         console.error("Update Vendor Failed", e);
     }
@@ -635,8 +697,8 @@ export const updateVendorInDb = async (vendor: Vendor) => {
 
 export const createVendorInDb = async (vendor: Vendor) => {
     try {
-        await sql`INSERT INTO vendors (id, name, email, description, visualTheme) 
-                  VALUES (${vendor.id}, ${vendor.name}, ${vendor.email}, ${vendor.bio}, ${vendor.visualTheme || 'MINIMALIST'})
+        await sql`INSERT INTO vendors (id, name, email, description, visualTheme, bio, avatar, verificationStatus, subscriptionStatus, location, coverImage, subscriptionPlan, website, instagram, twitter, facebook, tiktok, paymentMethods, kycDocuments, gallery) 
+                  VALUES (${vendor.id}, ${vendor.name}, ${vendor.email}, ${vendor.bio}, ${vendor.visualTheme || 'MINIMALIST'}, ${vendor.bio}, ${vendor.avatar}, ${vendor.verificationStatus}, ${vendor.subscriptionStatus}, ${vendor.location}, ${vendor.coverImage}, ${vendor.subscriptionPlan}, ${vendor.website}, ${vendor.instagram}, ${vendor.twitter}, ${vendor.facebook}, ${vendor.tiktok}, ${JSON.stringify(vendor.paymentMethods || [])}, ${JSON.stringify(vendor.kycDocuments || {})}, ${JSON.stringify(vendor.gallery || [])})
                   ON CONFLICT (id) DO NOTHING`;
     } catch (e) {
         console.error("Create Vendor Failed", e);
@@ -694,13 +756,22 @@ export const createUserInDb = async (user: { id: string, name: string, email: st
 
 export const updateUserInDb = async (user: User) => {
     try {
+        const profileData = {
+            phone: user.phone,
+            shippingAddress: user.shippingAddress,
+            measurements: user.measurements,
+            location: user.location,
+            spend: user.spend
+        };
+
         await sql`UPDATE users SET 
                   name = ${user.name}, 
                   email = ${user.email}, 
                   role = ${user.role}, 
                   avatar = ${user.avatar}, 
                   status = ${user.status}, 
-                  verificationStatus = ${user.verificationStatus}
+                  verificationStatus = ${user.verificationStatus},
+                  profileData = ${JSON.stringify(profileData)}
                   WHERE id = ${user.id}`;
     } catch (e) {
         console.error("Update User Failed", e);
@@ -815,7 +886,7 @@ export const fetchCartItems = async (userId: string): Promise<CartItem[]> => {
             cartItemId: row.cartitemid,
             quantity: row.quantity,
             size: row.size,
-            measurements: row.measurements ? JSON.parse(row.measurements) : null,
+            measurements: row.measurements || null,
             price: Number(row.price)
         })) as CartItem[];
     } catch (e) {

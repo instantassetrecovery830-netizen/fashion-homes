@@ -181,7 +181,8 @@ export type ViewState =
   | 'AUTH'
   | 'PROFILE_SETTINGS'
   | 'PRICING'
-  | 'ABOUT';
+  | 'ABOUT'
+  | 'AI_CONCIERGE';
 
 export interface TrendAnalysis {
   title: string;
