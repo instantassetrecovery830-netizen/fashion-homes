@@ -11,7 +11,7 @@ import {
   fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct, fetchUserVotes,
   fetchCartItems, addCartItemToDb, updateCartItemInDb, removeCartItemFromDb, clearCartInDb,
   fetchSavedItems, addSavedItemToDb, removeSavedItemFromDb
-} from '../services/dataService.ts';
+} from '@/services/dataService';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
 
