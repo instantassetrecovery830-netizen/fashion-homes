@@ -9,6 +9,7 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged as firebaseOnAuthStateChanged,
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
+  updatePassword as firebaseUpdatePassword,
   type User
 } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -36,6 +37,8 @@ export const signOut = firebaseSignOut;
 export const sendEmailVerification = firebaseSendEmailVerification;
 
 export const sendPasswordResetEmail = firebaseSendPasswordResetEmail;
+
+export const updateUserPassword = firebaseUpdatePassword;
 
 export const signInWithGoogle = async () => {
     const credential = await firebaseSignInWithPopup(auth, googleProvider);
