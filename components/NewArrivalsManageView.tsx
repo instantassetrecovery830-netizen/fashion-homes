@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Product, UserRole } from '../types';
+import { Product, UserRole, User, Vendor } from '../types';
 import { Trash2, Edit2, Plus, Image as ImageIcon, X, Loader, AlertCircle, ArrowLeft } from 'lucide-react';
 import { auth } from '../services/firebase';
 
@@ -10,6 +10,7 @@ interface NewArrivalsManageViewProps {
   onDeleteProduct: (productId: string) => Promise<void>;
   userRole: UserRole;
   onNavigate: (view: any) => void;
+  currentUser: User | Vendor | null;
 }
 
 export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
@@ -18,15 +19,14 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
   onUpdateProduct,
   onDeleteProduct,
   userRole,
-  onNavigate
+  onNavigate,
+  currentUser
 }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  const currentUser = auth.currentUser;
 
   // Filter products: 
   // 1. Must be "New Arrival" (isNewSeason === true)
@@ -38,7 +38,7 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
         return products.filter(p => p.isNewSeason);
     }
 
-    const userName = currentUser.displayName || currentUser.email?.split('@')[0] || '';
+    const userName = currentUser.name || (currentUser as any).displayName || currentUser.email?.split('@')[0] || '';
     return products.filter(p => p.isNewSeason && p.designer === userName);
   }, [products, userRole, currentUser]);
 
@@ -70,7 +70,7 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
     setSuccessMsg(null);
 
     try {
-      const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Anonymous';
+      const userName = currentUser?.name || (currentUser as any)?.displayName || currentUser?.email?.split('@')[0] || 'Anonymous';
       
       const productToSave: Product = {
         id: formData.id || `prod_${Date.now()}`,

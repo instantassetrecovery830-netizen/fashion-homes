@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tsx server.ts",
     "build": "vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview"
@@ -12,17 +12,25 @@
   "dependencies": {
     "@google/genai": "^1.38.0",
     "@neondatabase/serverless": "^1.0.2",
+    "@types/express": "^5.0.6",
+    "bcryptjs": "^3.0.3",
+    "express": "^5.2.1",
     "firebase": "^12.10.0",
     "lucide-react": "^0.563.0",
     "motion": "^12.38.0",
+    "nodemailer": "^8.0.4",
+    "path-to-regexp": "^8.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-paystack": "^6.0.0",
     "react-router-dom": "^7.13.2",
-    "recharts": "^3.7.0"
+    "recharts": "^3.8.1",
+    "shippo": "^2.18.0",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@types/nodemailer": "^7.0.11",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"

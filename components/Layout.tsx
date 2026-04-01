@@ -29,6 +29,7 @@ interface LayoutProps {
   onAuthRequest?: (mode: 'LOGIN' | 'REGISTER', role: UserRole) => void;
   notifications?: AppNotification[];
   onRefreshNotifications?: () => void;
+  onOpenDirectMessaging?: () => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -52,7 +53,8 @@ export const Layout: React.FC<LayoutProps> = ({
   onVisualSearch,
   onAuthRequest,
   notifications = [],
-  onRefreshNotifications
+  onRefreshNotifications,
+  onOpenDirectMessaging
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
@@ -74,20 +76,33 @@ export const Layout: React.FC<LayoutProps> = ({
   const initializedRef = useRef(false);
   
   // Checkout State
-  const [checkoutStep, setCheckoutStep] = useState<'CART' | 'PAYMENT'>('CART');
+  const [checkoutStep, setCheckoutStep] = useState<'CART' | 'SHIPPING' | 'PAYMENT'>('CART');
+  const [shippingAddress, setShippingAddress] = useState({
+    name: '',
+    street1: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'US'
+  });
+  const [shippingRates, setShippingRates] = useState<any[]>([]);
+  const [selectedRate, setSelectedRate] = useState<any>(null);
+  const [isFetchingRates, setIsFetchingRates] = useState(false);
   const [customerEmail, setCustomerEmail] = useState('');
   
   // --- PAYSTACK CONFIGURATION ---
   const PAYSTACK_PUBLIC_KEY = useMemo(() => import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', []); 
 
   const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + item.price, 0), [cart]);
+  const shippingCost = useMemo(() => selectedRate ? parseFloat(selectedRate.amount) : 0, [selectedRate]);
+  const orderTotal = useMemo(() => cartTotal + shippingCost, [cartTotal, shippingCost]);
 
   const paystackConfig = useMemo(() => ({
     reference: (new Date()).getTime().toString(),
     email: customerEmail,
-    amount: cartTotal * 100, // Paystack expects amount in kobo (or lowest currency unit)
+    amount: Math.round(orderTotal * 100), // Paystack expects amount in kobo (or lowest currency unit)
     publicKey: PAYSTACK_PUBLIC_KEY,
-  }), [customerEmail, cartTotal, PAYSTACK_PUBLIC_KEY]);
+  }), [customerEmail, orderTotal, PAYSTACK_PUBLIC_KEY]);
 
   // Initialize Paystack hook
   // @ts-ignore - Types might not resolve perfectly in all envs without install
@@ -197,7 +212,7 @@ export const Layout: React.FC<LayoutProps> = ({
     }
   }, [onVisualSearch]);
 
-  const handleProceedToPayment = useCallback(() => {
+  const handleProceedToShipping = useCallback(() => {
     // Validate Pre-Orders
     const hasInvalidPreOrder = cart.some(item => 
       item.isPreOrder && (!item.measurements || item.measurements.length < 5)
@@ -215,8 +230,45 @@ export const Layout: React.FC<LayoutProps> = ({
        return;
     }
 
-    setCheckoutStep('PAYMENT');
+    setCheckoutStep('SHIPPING');
   }, [cart, isLoggedIn, onAuthRequest, onNavigate, setIsCartOpen]);
+
+  const handleFetchShippingRates = async () => {
+    if (!shippingAddress.street1 || !shippingAddress.city || !shippingAddress.zip) {
+      alert("Please fill in all required address fields.");
+      return;
+    }
+
+    setIsFetchingRates(true);
+    try {
+      const response = await fetch('/api/shipping/rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          addressTo: shippingAddress,
+          items: cart
+        })
+      });
+      const rates = await response.json();
+      setShippingRates(rates);
+      if (rates.length > 0) {
+        setSelectedRate(rates[0]);
+      }
+    } catch (e) {
+      console.error("Error fetching rates:", e);
+      alert("Could not fetch shipping rates. Please try again.");
+    } finally {
+      setIsFetchingRates(false);
+    }
+  };
+
+  const handleProceedToPayment = useCallback(() => {
+    if (!selectedRate) {
+      alert("Please select a shipping rate.");
+      return;
+    }
+    setCheckoutStep('PAYMENT');
+  }, [selectedRate]);
 
   const handleShareSaved = useCallback(() => {
       if (savedItems.length === 0) return;
@@ -237,7 +289,8 @@ export const Layout: React.FC<LayoutProps> = ({
         id: `ord_${Date.now()}`,
         customerName: customerEmail || 'Guest User', 
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        total: cartTotal,
+        total: orderTotal,
+        shippingCost: shippingCost,
         status: 'Processing',
         items: [...cart]
     };
@@ -258,7 +311,7 @@ export const Layout: React.FC<LayoutProps> = ({
     } finally {
         setIsProcessingCheckout(false);
     }
-  }, [customerEmail, cartTotal, cart, onPlaceOrder, setIsCartOpen, handleDashboardClick]);
+  }, [customerEmail, cart, onPlaceOrder, setIsCartOpen, handleDashboardClick, orderTotal, shippingCost]);
 
   const onPaystackClose = useCallback(() => {
       console.log('Payment closed');
@@ -356,6 +409,17 @@ export const Layout: React.FC<LayoutProps> = ({
 
               <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
               
+              {/* Direct Messaging */}
+              {isLoggedIn && onOpenDirectMessaging && (
+                <button 
+                  onClick={onOpenDirectMessaging}
+                  className="relative hover:text-luxury-gold transition-colors"
+                  title="Messages"
+                >
+                  <Mail size={20} />
+                </button>
+              )}
+
               {/* Notification Bell */}
               <div className="relative" ref={notifDropdownRef}>
                   <button 
@@ -460,8 +524,8 @@ export const Layout: React.FC<LayoutProps> = ({
                   </>
                 ) : (
                   <button 
-                    onClick={() => onAuthRequest ? onAuthRequest('LOGIN', UserRole.BUYER) : onNavigate('AUTH')}
-                    className="bg-black text-white px-5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors whitespace-nowrap"
+                    onClick={() => onAuthRequest ? onAuthRequest('REGISTER', UserRole.BUYER) : onNavigate('AUTH')}
+                    className="bg-black text-white px-5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors whitespace-nowrap hidden md:block"
                   >
                     Get Started
                   </button>
@@ -483,7 +547,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
               {/* Cart Bag */}
               <div 
-                className="relative cursor-pointer hover:text-luxury-gold transition-colors" 
+                className="relative cursor-pointer hover:text-luxury-gold transition-colors hidden md:block" 
                 onClick={() => setIsCartOpen(true)}
               >
                 <ShoppingBag size={20} />
@@ -600,12 +664,19 @@ export const Layout: React.FC<LayoutProps> = ({
           {/* Drawer Header */}
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10 text-black">
              <div className="flex items-center gap-3">
-                 {checkoutStep === 'PAYMENT' && !orderComplete && (
-                     <button onClick={() => setCheckoutStep('CART')} className="hover:text-luxury-gold transition-colors">
+                 {(checkoutStep === 'PAYMENT' || checkoutStep === 'SHIPPING') && !orderComplete && (
+                     <button 
+                        onClick={() => setCheckoutStep(checkoutStep === 'PAYMENT' ? 'SHIPPING' : 'CART')} 
+                        className="hover:text-luxury-gold transition-colors"
+                     >
                          <ArrowLeft size={20} />
                      </button>
                  )}
-                 <h2 className="text-xl font-serif italic">{checkoutStep === 'PAYMENT' ? 'Secure Payment' : 'Your Selection'}</h2>
+                 <h2 className="text-xl font-serif italic">
+                    {checkoutStep === 'PAYMENT' ? 'Secure Payment' : 
+                     checkoutStep === 'SHIPPING' ? 'Shipping Details' : 
+                     'Your Selection'}
+                 </h2>
              </div>
              <button onClick={() => setIsCartOpen(false)} className="hover:rotate-90 transition-transform duration-300">
                <X size={24} />
@@ -678,15 +749,108 @@ export const Layout: React.FC<LayoutProps> = ({
                   )}
                 </div>
               ))
+            ) : checkoutStep === 'SHIPPING' ? (
+                // SHIPPING VIEW
+                <div className="space-y-6 animate-fade-in">
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Full Name</label>
+                                <input 
+                                    type="text"
+                                    value={shippingAddress.name}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, name: e.target.value})}
+                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Street Address</label>
+                                <input 
+                                    type="text"
+                                    value={shippingAddress.street1}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, street1: e.target.value})}
+                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">City</label>
+                                <input 
+                                    type="text"
+                                    value={shippingAddress.city}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">State</label>
+                                <input 
+                                    type="text"
+                                    value={shippingAddress.state}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">ZIP Code</label>
+                                <input 
+                                    type="text"
+                                    value={shippingAddress.zip}
+                                    onChange={(e) => setShippingAddress({...shippingAddress, zip: e.target.value})}
+                                    className="w-full border-b border-gray-200 py-2 text-sm focus:border-black outline-none bg-transparent"
+                                />
+                            </div>
+                        </div>
+                        <button 
+                            onClick={handleFetchShippingRates}
+                            disabled={isFetchingRates}
+                            className="w-full bg-black text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors disabled:opacity-50"
+                        >
+                            {isFetchingRates ? 'Calculating Rates...' : 'Calculate Shipping'}
+                        </button>
+                    </div>
+
+                    {shippingRates.length > 0 && (
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Select Shipping Method</label>
+                            <div className="space-y-2">
+                                {shippingRates.map((rate, idx) => (
+                                    <div 
+                                        key={idx}
+                                        onClick={() => setSelectedRate(rate)}
+                                        className={`p-4 border cursor-pointer transition-all ${selectedRate?.object_id === rate.object_id ? 'border-black bg-gray-50' : 'border-gray-100 hover:border-gray-300'}`}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-xs font-bold uppercase tracking-widest">{rate.provider} - {rate.servicelevel.name}</p>
+                                                <p className="text-[10px] text-gray-400 mt-1">Est. Delivery: {rate.duration_terms || '3-5 business days'}</p>
+                                            </div>
+                                            <span className="font-bold text-sm">${rate.amount}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             ) : (
                 // PAYMENT VIEW (Paystack)
                 <div className="space-y-6 animate-fade-in">
                     <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-bold uppercase text-gray-400">Total Amount</span>
-                            <span className="font-bold text-lg">${cartTotal}</span>
+                            <span className="text-xs font-bold uppercase text-gray-400">Subtotal</span>
+                            <span className="font-bold text-sm">${cartTotal}</span>
                         </div>
-                        <div className="flex gap-2 text-xs text-gray-400">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold uppercase text-gray-400">Shipping</span>
+                            <span className="font-bold text-sm">${shippingCost.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                            <span className="text-xs font-bold uppercase text-gray-400">Total Amount</span>
+                            <span className="font-bold text-lg">${orderTotal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex gap-2 text-xs text-gray-400 mt-2">
                            <Lock size={12} /> <span className="uppercase tracking-wider">Secured by Paystack</span>
                         </div>
                     </div>
@@ -728,10 +892,24 @@ export const Layout: React.FC<LayoutProps> = ({
                     <span className="font-bold text-lg">${cartTotal}</span>
                   </div>
                   <button 
-                    onClick={handleProceedToPayment}
+                    onClick={handleProceedToShipping}
                     className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group"
                   >
-                    Proceed to Checkout <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                    Proceed to Shipping <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </>
+              ) : checkoutStep === 'SHIPPING' ? (
+                <>
+                  <div className="flex justify-between items-center mb-6 text-sm">
+                    <span className="uppercase tracking-widest text-gray-500">Shipping Cost</span>
+                    <span className="font-bold text-lg">${shippingCost.toFixed(2)}</span>
+                  </div>
+                  <button 
+                    onClick={handleProceedToPayment}
+                    disabled={!selectedRate}
+                    className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group disabled:opacity-50"
+                  >
+                    Continue to Payment <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                   </button>
                 </>
               ) : (

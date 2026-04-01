@@ -13,6 +13,7 @@ interface NewArrivalsViewProps {
   isLoggedIn: boolean;
   onVote?: (product: Product) => void;
   userVotes?: string[];
+  onAuthRequest?: (mode: 'LOGIN' | 'REGISTER', role: UserRole) => void;
 }
 
 export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({ 
@@ -24,7 +25,8 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
   userRole,
   isLoggedIn,
   onVote,
-  userVotes = []
+  userVotes = [],
+  onAuthRequest
 }) => {
   const newArrivals = useMemo(() => products.filter(p => p.isNewSeason), [products]);
   const isSaved = (productId: string) => savedItems.some(p => p.id === productId);
@@ -83,7 +85,7 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
           {/* Manage Button - Only for Vendors and Admins */}
           {userRole !== UserRole.BUYER && (
             <button
-              onClick={() => isLoggedIn ? onNavigate('NEW_ARRIVALS_MANAGE') : onNavigate('AUTH')}
+              onClick={() => isLoggedIn ? onNavigate('NEW_ARRIVALS_MANAGE') : (onAuthRequest ? onAuthRequest('LOGIN', UserRole.VENDOR) : onNavigate('AUTH'))}
               className="mt-8 w-full md:w-auto bg-black text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors shadow-lg"
             >
               {isLoggedIn ? 'Add New Piece' : 'Sign in to Add New Piece'}

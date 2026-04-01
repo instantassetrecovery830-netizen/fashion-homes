@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler, Heart, Video } from 'lucide-react';
-import { Product, Vendor } from '../types.ts';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler, Heart, Video, Camera, X, Loader } from 'lucide-react';
+import { Product, Vendor, User as AppUser, Order, Review, ProductVariant } from '../types.ts';
 import { getStyleMatch } from '../services/geminiService.ts';
+import { fetchProductReviews, submitReview, trackProductEvent } from '../services/dataService.ts';
 
 interface ProductDetailProps {
   product: Product;
@@ -13,19 +14,16 @@ interface ProductDetailProps {
   featureFlags: { enableAiStyleMatch: boolean; enableReviews: boolean; };
   savedItems?: Product[];
   onToggleSave?: (product: Product) => void;
+  onMessageClick?: (vendorId: string) => void;
+  currentUser?: AppUser | null;
+  orders?: Order[];
 }
 
-interface Review {
-  id: string;
-  author: string;
-  rating: number;
-  text: string;
-  date: string;
-}
-
-export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, onAddToCart, onBack, onViewDesigner, featureFlags, savedItems = [], onToggleSave }) => {
+export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, onAddToCart, onBack, onViewDesigner, featureFlags, savedItems = [], onToggleSave, onMessageClick, currentUser, orders = [] }) => {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState(false);
+  const [colorError, setColorError] = useState(false);
   const [measurements, setMeasurements] = useState('');
   const [styleTip, setStyleTip] = useState<string | null>(null);
   const [loadingStyle, setLoadingStyle] = useState(false);
@@ -35,6 +33,9 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   const [reviews, setReviews] = useState<Review[]>([]);
   const [newReview, setNewReview] = useState('');
   const [newRating, setNewRating] = useState(5);
+  const [reviewPhotos, setReviewPhotos] = useState<string[]>([]);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isSaved = useMemo(() => savedItems.some(p => p.id === product.id), [savedItems, product.id]);
 
@@ -44,7 +45,29 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
     setMeasurements('');
     setSizeError(false);
     setStyleTip(null);
-  }, [product]);
+    
+    // Fetch reviews
+    if (featureFlags.enableReviews) {
+      fetchProductReviews(product.id).then(setReviews).catch(console.error);
+    }
+
+    // Track view event
+    trackProductEvent(product.id, product.vendorId, 'VIEW').catch(console.error);
+  }, [product, featureFlags.enableReviews]);
+
+  // Eligibility check for reviews
+  const canReview = useMemo(() => {
+    if (!currentUser) return false;
+    // Check if user has a delivered order containing this product
+    return orders.some(order => 
+      order.status === 'Delivered' && 
+      order.items.some(item => item.id === product.id)
+    );
+  }, [currentUser, orders, product.id]);
+
+  const hasReviewed = useMemo(() => {
+    return reviews.some(r => r.userId === currentUser?.id);
+  }, [reviews, currentUser?.id]);
 
   // Use product images if available, otherwise fallback to main image
   const galleryImages = useMemo(() => {
@@ -66,27 +89,77 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   }, [product.name]);
 
   const handleAddToCartClick = useCallback(() => {
-    if (!selectedSize) {
+    const hasVariants = product.variants && product.variants.length > 0;
+    
+    if (hasVariants) {
+      if (!selectedSize) {
+        setSizeError(true);
+        return;
+      }
+      if (!selectedColor) {
+        setColorError(true);
+        return;
+      }
+    } else if (product.sizes && product.sizes.length > 0 && !selectedSize) {
       setSizeError(true);
       return;
     }
-    setSizeError(false);
-    onAddToCart(product, selectedSize, measurements);
-  }, [selectedSize, product, measurements, onAddToCart]);
 
-  const handleReviewSubmit = useCallback((e: React.FormEvent) => {
+    setSizeError(false);
+    setColorError(false);
+    
+    // Track cart event
+    trackProductEvent(product.id, product.vendorId, 'CART_ADD').catch(console.error);
+    
+    onAddToCart(product, selectedSize || 'One Size', measurements);
+  }, [selectedSize, selectedColor, product, measurements, onAddToCart]);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReviewPhotos(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file as unknown as Blob);
+    });
+  };
+
+  const removePhoto = (index: number) => {
+    setReviewPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleReviewSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newReview.trim()) return;
-    const review: Review = {
-      id: `new-${Date.now()}`,
-      author: 'You', // In a real app, from auth context
-      rating: newRating,
-      text: newReview,
-      date: 'Just now'
-    };
-    setReviews(prev => [review, ...prev]);
-    setNewReview('');
-  }, [newReview, newRating]);
+    if (!newReview.trim() || !currentUser) return;
+    
+    setIsSubmittingReview(true);
+    try {
+      const review: Review = {
+        id: `rev_${Date.now()}`,
+        productId: product.id,
+        userId: currentUser.id,
+        userName: currentUser.name || currentUser.email.split('@')[0],
+        rating: newRating,
+        text: newReview,
+        photos: reviewPhotos.length > 0 ? reviewPhotos : undefined,
+        createdAt: new Date().toISOString()
+      };
+      
+      await submitReview(review);
+      setReviews(prev => [review, ...prev]);
+      setNewReview('');
+      setNewRating(5);
+      setReviewPhotos([]);
+    } catch (error) {
+      console.error("Failed to submit review:", error);
+      alert("Failed to submit review. Please try again.");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  }, [newReview, newRating, currentUser, product.id, reviewPhotos]);
 
   return (
     <div className="min-h-screen bg-white animate-fade-in pb-20 md:pb-0">
@@ -181,12 +254,22 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
                         <span className="font-serif italic text-lg">{vendor.name}</span>
                     </div>
                     <p className="text-xs text-gray-500 leading-relaxed mb-3 line-clamp-3">{vendor.bio}</p>
-                    <button 
-                        onClick={onViewDesigner}
-                        className="text-xs font-bold uppercase tracking-widest border-b border-black pb-0.5 hover:text-luxury-gold hover:border-luxury-gold transition-colors"
-                    >
-                        View Profile
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <button 
+                          onClick={onViewDesigner}
+                          className="text-xs font-bold uppercase tracking-widest border-b border-black pb-0.5 hover:text-luxury-gold hover:border-luxury-gold transition-colors"
+                      >
+                          View Profile
+                      </button>
+                      {onMessageClick && (
+                        <button 
+                            onClick={() => onMessageClick(vendor.id)}
+                            className="text-xs font-bold uppercase tracking-widest border-b border-black pb-0.5 hover:text-luxury-gold hover:border-luxury-gold transition-colors"
+                        >
+                            Message Designer
+                        </button>
+                      )}
+                    </div>
                 </div>
             )}
 
@@ -211,30 +294,82 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
               </div>
             )}
 
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <p className={`text-xs font-bold uppercase ${sizeError ? 'text-red-500' : ''}`}>Select Size</p>
-                {sizeError && <span className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12}/> Required</span>}
+            <div className="space-y-6">
+              {/* Size Selection */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className={`text-xs font-bold uppercase ${sizeError ? 'text-red-500' : ''}`}>Select Size</p>
+                  {sizeError && <span className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12}/> Required</span>}
+                </div>
+                
+                <div className="flex flex-wrap gap-3">
+                  {product.variants && product.variants.length > 0 ? (
+                    Array.from(new Set(product.variants.map(v => v.size))).map(size => (
+                      <button
+                        key={size}
+                        onClick={() => { setSelectedSize(size); setSizeError(false); }}
+                        className={`min-w-[48px] h-12 px-3 flex items-center justify-center border text-sm transition-all ${
+                          selectedSize === size 
+                            ? 'bg-black text-white border-black' 
+                            : 'border-gray-200 hover:border-black'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))
+                  ) : product.sizes && product.sizes.length > 0 ? (
+                    product.sizes.map(size => (
+                      <button
+                        key={size}
+                        onClick={() => { setSelectedSize(size); setSizeError(false); }}
+                        className={`min-w-[48px] h-12 px-3 flex items-center justify-center border text-sm transition-all ${
+                          selectedSize === size 
+                            ? 'bg-black text-white border-black' 
+                            : 'border-gray-200 hover:border-black'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-500 italic">One Size Only</span>
+                  )}
+                </div>
               </div>
-              
-              <div className="flex flex-wrap gap-3">
-                {product.sizes && product.sizes.length > 0 ? (
-                  product.sizes.map(size => (
-                  <button
-                    key={size}
-                    onClick={() => { setSelectedSize(size); setSizeError(false); }}
-                    className={`min-w-[48px] h-12 px-3 flex items-center justify-center border text-sm transition-all ${
-                      selectedSize === size 
-                        ? 'bg-black text-white border-black' 
-                        : 'border-gray-200 hover:border-black'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))) : (
-                  <span className="text-sm text-gray-500 italic">One Size Only</span>
-                )}
-              </div>
+
+              {/* Color Selection (if variants exist) */}
+              {product.variants && product.variants.length > 0 && selectedSize && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="flex justify-between items-center">
+                    <p className={`text-xs font-bold uppercase ${colorError ? 'text-red-500' : ''}`}>Select Color</p>
+                    {colorError && <span className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12}/> Required</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {product.variants
+                      .filter(v => v.size === selectedSize)
+                      .map(variant => (
+                        <button
+                          key={variant.id}
+                          disabled={variant.stock <= 0}
+                          onClick={() => { setSelectedColor(variant.color); setColorError(false); }}
+                          className={`px-4 h-12 flex items-center justify-center border text-sm transition-all relative ${
+                            selectedColor === variant.color 
+                              ? 'bg-black text-white border-black' 
+                              : 'border-gray-200 hover:border-black'
+                          } ${variant.stock <= 0 ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        >
+                          {variant.color}
+                          {variant.stock <= 0 && (
+                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[8px] px-1 rounded-full">Out</span>
+                          )}
+                          {variant.stock > 0 && variant.stock <= 5 && (
+                            <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-[8px] px-1 rounded-full">{variant.stock} left</span>
+                          )}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               {/* Custom Measurements Section for Pre-Order */}
               {product.isPreOrder && (
@@ -291,52 +426,120 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
               {/* Write Review */}
               <div className="bg-gray-50 p-8 h-fit">
                 <h4 className="text-xs font-bold uppercase tracking-widest mb-6">Write a Review</h4>
-                <form onSubmit={handleReviewSubmit} className="space-y-4">
-                  <div className="flex gap-2 mb-4">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setNewRating(star)}
-                        className={`transition-colors ${star <= newRating ? 'text-luxury-gold' : 'text-gray-300'}`}
-                      >
-                        <Star size={20} fill={star <= newRating ? 'currentColor' : 'none'} />
-                      </button>
-                    ))}
-                  </div>
-                  <textarea 
-                    value={newReview}
-                    onChange={(e) => setNewReview(e.target.value)}
-                    placeholder="Share your thoughts on the fit, fabric, and style..."
-                    className="w-full p-4 border border-gray-200 bg-white text-sm focus:border-black outline-none min-h-[120px]"
-                  />
-                  <button type="submit" className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest bg-black text-white px-6 py-3 hover:bg-luxury-gold transition-colors">
-                    <Send size={14} /> Submit Review
-                  </button>
-                </form>
+                {!currentUser ? (
+                  <p className="text-sm text-gray-500 italic">Please log in to leave a review.</p>
+                ) : !canReview ? (
+                  <p className="text-sm text-gray-500 italic">You can only review items from orders that have been delivered.</p>
+                ) : hasReviewed ? (
+                  <p className="text-sm text-gray-500 italic">You have already reviewed this product. Thank you!</p>
+                ) : (
+                  <form onSubmit={handleReviewSubmit} className="space-y-4">
+                    <div className="flex gap-2 mb-4">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setNewRating(star)}
+                          className={`transition-colors ${star <= newRating ? 'text-luxury-gold' : 'text-gray-300'}`}
+                        >
+                          <Star size={20} fill={star <= newRating ? 'currentColor' : 'none'} />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea 
+                      value={newReview}
+                      onChange={(e) => setNewReview(e.target.value)}
+                      placeholder="Share your thoughts on the fit, fabric, and style..."
+                      className="w-full p-4 border border-gray-200 bg-white text-sm focus:border-black outline-none min-h-[120px]"
+                      disabled={isSubmittingReview}
+                    />
+                    
+                    {/* Photo Upload */}
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {reviewPhotos.map((photo, idx) => (
+                          <div key={idx} className="relative w-16 h-16 border border-gray-200 rounded-sm overflow-hidden">
+                            <img src={photo} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(idx)}
+                              className="absolute top-0 right-0 bg-white/80 p-0.5 text-red-500 hover:text-red-700"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                        {reviewPhotos.length < 3 && (
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-16 h-16 border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:text-luxury-gold hover:border-luxury-gold transition-colors"
+                          >
+                            <Camera size={16} />
+                            <span className="text-[8px] uppercase mt-1">Add</span>
+                          </button>
+                        )}
+                      </div>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handlePhotoUpload} 
+                        accept="image/*" 
+                        multiple
+                        className="hidden" 
+                      />
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      disabled={isSubmittingReview || !newReview.trim()}
+                      className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest bg-black text-white px-6 py-3 hover:bg-luxury-gold transition-colors disabled:opacity-50"
+                    >
+                      {isSubmittingReview ? <Loader size={14} className="animate-spin" /> : <Send size={14} />} 
+                      Submit Review
+                    </button>
+                  </form>
+                )}
               </div>
 
               {/* Review List */}
               <div className="space-y-8">
-                {reviews.map((review) => (
-                  <div key={review.id} className="border-b border-gray-100 pb-8 last:border-0 animate-fade-in">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-luxury-black text-white rounded-full flex items-center justify-center text-xs font-bold">
-                          {review.author.charAt(0)}
+                {reviews.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">No reviews yet. Be the first to share your thoughts!</p>
+                ) : (
+                  reviews.map((review) => (
+                    <div key={review.id} className="border-b border-gray-100 pb-8 last:border-0 animate-fade-in">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-luxury-black text-white rounded-full flex items-center justify-center text-xs font-bold uppercase">
+                            {review.userName.charAt(0)}
+                          </div>
+                          <span className="text-sm font-bold">{review.userName}</span>
                         </div>
-                        <span className="text-sm font-bold">{review.author}</span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(review.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
-                      <span className="text-xs text-gray-400">{review.date}</span>
+                      <div className="flex gap-1 mb-3 text-luxury-gold">
+                         {[...Array(5)].map((_, i) => (
+                           <Star key={i} size={12} fill={i < review.rating ? 'currentColor' : 'none'} className={i < review.rating ? '' : 'text-gray-200'} />
+                         ))}
+                      </div>
+                      <p className="text-gray-600 text-sm leading-relaxed font-serif italic mb-3">"{review.text}"</p>
+                      
+                      {/* Display Review Photos */}
+                      {review.photos && review.photos.length > 0 && (
+                        <div className="flex gap-2 mt-2">
+                          {review.photos.map((photo, idx) => (
+                            <div key={idx} className="w-16 h-16 border border-gray-100 rounded-sm overflow-hidden cursor-zoom-in" onClick={() => setActiveImage(photo)}>
+                              <img src={photo} alt={`Review photo ${idx}`} className="w-full h-full object-cover" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-1 mb-3 text-luxury-gold">
-                       {[...Array(5)].map((_, i) => (
-                         <Star key={i} size={12} fill={i < review.rating ? 'currentColor' : 'none'} className={i < review.rating ? '' : 'text-gray-200'} />
-                       ))}
-                    </div>
-                    <p className="text-gray-600 text-sm leading-relaxed font-serif italic">"{review.text}"</p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>

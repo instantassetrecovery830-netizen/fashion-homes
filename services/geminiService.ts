@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Chat } from "@google/genai";
+import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { TrendAnalysis, Product } from "../types";
 
 // Initialize Gemini Client
@@ -29,12 +29,27 @@ export const generateSeasonalTrend = async (): Promise<TrendAnalysis> => {
   try {
     const response = await client.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: "Generate a high-fashion, editorial trend forecast for the upcoming season. Return a JSON object with 'title' (short, punchy), 'description' (2 sentences), and 'colorPalette' (array of 4 hex codes). Do not use markdown code blocks.",
+      contents: "Generate a high-fashion, editorial trend forecast for the upcoming season.",
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING, description: "Short, punchy trend title" },
+            description: { type: Type.STRING, description: "2 sentences explaining the trend" },
+            colorPalette: { 
+              type: Type.ARRAY, 
+              items: { type: Type.STRING },
+              description: "Array of 4 hex codes"
+            }
+          },
+          required: ["title", "description", "colorPalette"]
+        }
+      }
     });
 
     const text = response.text || "{}";
-    const jsonStr = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(jsonStr) as TrendAnalysis;
+    return JSON.parse(text) as TrendAnalysis;
   } catch (error: any) {
     console.warn("Gemini API Error (Trends):", error.message || error);
     return fallbackTrend;
@@ -93,7 +108,18 @@ export const searchProductsByImage = async (base64Image: string, products: Produ
         { inlineData: { mimeType: 'image/jpeg', data: cleanBase64 } }
       ],
       config: {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            matchIds: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "IDs of the top matching products"
+            }
+          },
+          required: ["matchIds"]
+        }
       }
     });
 

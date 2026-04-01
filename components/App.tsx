@@ -6,12 +6,12 @@ import { LandingView } from './LandingView.tsx';
 import { Loader } from 'lucide-react';
 import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, User, LandingPageContent, ContactSubmission, AppNotification, Follower } from '../types.ts';
 import { 
-  seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
+  initSchema, seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
   updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, deleteUserFromDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
   fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct, fetchUserVotes,
   fetchCartItems, addCartItemToDb, updateCartItemInDb, removeCartItemFromDb, clearCartInDb,
-  fetchSavedItems, addSavedItemToDb, removeSavedItemFromDb
+  fetchSavedItems, addSavedItemToDb, removeSavedItemFromDb, trackProductEvent
 } from '@/services/dataService';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
@@ -29,6 +29,7 @@ const PricingView = React.lazy(() => import('./PricingView.tsx').then(m => ({ de
 const AboutView = React.lazy(() => import('./AboutView.tsx').then(m => ({ default: m.AboutView })));
 const AiConcierge = React.lazy(() => import('./AiConcierge.tsx').then(m => ({ default: m.AiConcierge })));
 const TheDropView = React.lazy(() => import('./TheDropView.tsx').then(m => ({ default: m.TheDropView })));
+const DirectMessaging = React.lazy(() => import('./DirectMessaging.tsx').then(m => ({ default: m.DirectMessaging })));
 
 const LoadingFallback = () => (
   <div className="h-[50vh] flex items-center justify-center">
@@ -44,6 +45,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
   const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | Vendor | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [savedItems, setSavedItems] = useState<Product[]>([]);
@@ -51,6 +53,8 @@ const App: React.FC = () => {
   const [userVotes, setUserVotes] = useState<string[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSavedOpen, setIsSavedOpen] = useState(false);
+  const [isDirectMessagingOpen, setIsDirectMessagingOpen] = useState(false);
+  const [dmInitialRecipientId, setDmInitialRecipientId] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string | null>(null);
@@ -58,6 +62,7 @@ const App: React.FC = () => {
   // Auth Navigation State
   const [authInitialMode, setAuthInitialMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [authInitialRole, setAuthInitialRole] = useState<UserRole>(UserRole.BUYER);
+  const [authInitialPlan, setAuthInitialPlan] = useState<'Atelier' | 'Maison' | 'Couture' | undefined>(undefined);
 
   // Data State
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -111,6 +116,7 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'auto' });
     setIsCartOpen(false);
     setIsSavedOpen(false);
+    setIsDirectMessagingOpen(false);
 
     let path = '/';
     switch (view) {
@@ -133,6 +139,15 @@ const App: React.FC = () => {
     }
     navigate(path);
   }, [navigate, selectedVendor, selectedProduct]);
+
+  const openDirectMessaging = (recipientId?: string) => {
+    if (!isLoggedIn) {
+      handleAuthNavigation('LOGIN', UserRole.BUYER);
+      return;
+    }
+    setDmInitialRecipientId(recipientId || null);
+    setIsDirectMessagingOpen(true);
+  };
 
   // Sync selected items from URL
   useEffect(() => {
@@ -182,7 +197,7 @@ const App: React.FC = () => {
       const isAdmin = userRole === UserRole.ADMIN;
       
       const [dbOrders, dbUsers, dbContacts, dbNotifications, dbFollowers] = await Promise.all([
-        isAdmin ? fetchOrders() : Promise.resolve([]),
+        fetchOrders(),
         isAdmin ? fetchUsers() : Promise.resolve([]),
         isAdmin ? fetchContactSubmissions() : Promise.resolve([]),
         fetchNotifications(currentUserId),
@@ -209,12 +224,13 @@ const App: React.FC = () => {
     } finally {
       isRefreshingRef.current = false;
     }
-  }, []);
+  }, [userRole]);
 
   useEffect(() => {
     // Initial Load
     const initData = async () => {
       try {
+        await initSchema();
         await seedDatabase();
         await refreshData(true);
       } catch (error) {
@@ -223,12 +239,12 @@ const App: React.FC = () => {
     };
     initData();
 
-    // Real-time: Poll for general data updates every 15 seconds (reduced frequency for better performance)
+    // Real-time: Poll for general data updates every 3 seconds
     const pollInterval = setInterval(() => {
         if (document.visibilityState === 'visible') {
             refreshData();
         }
-    }, 15000);
+    }, 3000);
 
     return () => clearInterval(pollInterval);
   }, [refreshData]);
@@ -416,8 +432,6 @@ const App: React.FC = () => {
       if (user) {
         if (user.emailVerified) {
           setIsLoggedIn(true);
-          // Refresh data immediately on login to get user notifications
-          refreshData(); 
           
           // Determine Role
           const adminEmails = ['instantassetrecovery830@gmail.com', 'juliemtrice7@proton.me', 'mikelarry00764@proton.me'];
@@ -472,12 +486,15 @@ const App: React.FC = () => {
                   }
               }
           }
+          setIsAuthReady(true);
+          refreshData();
         } else {
           // User exists but is not verified
           setIsLoggedIn(false);
           setUserRole(UserRole.BUYER);
           setCurrentUser(null);
-          setCurrentView('AUTH');
+          navigate('/auth');
+          setIsAuthReady(true);
         }
       } else {
         setIsLoggedIn(false);
@@ -485,6 +502,7 @@ const App: React.FC = () => {
         setCurrentUser(null);
         setNotifications([]); // Clear notifications on logout
         setFollowedVendors([]);
+        setIsAuthReady(true);
       }
     });
 
@@ -535,14 +553,16 @@ const App: React.FC = () => {
 
   // Handlers
 
-  const handleAuthNavigation = useCallback((mode: 'LOGIN' | 'REGISTER', role: UserRole) => {
+  const handleAuthNavigation = useCallback((mode: 'LOGIN' | 'REGISTER', role: UserRole, plan?: 'Atelier' | 'Maison' | 'Couture') => {
+    console.log('handleAuthNavigation called:', { mode, role, plan });
     setAuthInitialMode(mode);
     setAuthInitialRole(role);
-    setCurrentView('AUTH');
+    setAuthInitialPlan(plan);
+    navigate('/auth');
     window.scrollTo({ top: 0, behavior: 'auto' });
     setIsCartOpen(false);
     setIsSavedOpen(false);
-  }, []);
+  }, [navigate]);
 
   const handleDesignerSelect = useCallback((designerName: string) => {
     const vendor = vendors.find(v => v.name === designerName);
@@ -593,6 +613,9 @@ const App: React.FC = () => {
     // Optimistic UI update
     setCart(prev => [...prev, newItem]);
     setIsCartOpen(true);
+
+    // Track cart event
+    trackProductEvent(product.id, product.vendorId, 'CART_ADD').catch(console.error);
 
     if (currentUserId) {
       const cartItemId = await addCartItemToDb(currentUserId, newItem);
@@ -773,6 +796,12 @@ const App: React.FC = () => {
   
   const handlePlaceOrder = async (order: Order) => {
      await createOrderInDb(order);
+     
+     // Track sale events for each item
+     for (const item of order.items) {
+       trackProductEvent(item.id, item.vendorId, 'SALE').catch(console.error);
+     }
+
      if (currentUserId) {
        await clearCartInDb(currentUserId);
      }
@@ -800,6 +829,10 @@ const App: React.FC = () => {
 
   const associatedVendor = vendors.find(v => v.name === selectedProduct?.designer);
 
+  if (!isAuthReady) {
+    return <LoadingFallback />;
+  }
+
   return (
     <Layout 
       role={userRole} 
@@ -822,6 +855,7 @@ const App: React.FC = () => {
       onAuthRequest={handleAuthNavigation}
       notifications={notifications}
       onRefreshNotifications={refreshData}
+      onOpenDirectMessaging={openDirectMessaging}
     >
       <Routes>
         <Route path="/" element={
@@ -865,6 +899,7 @@ const App: React.FC = () => {
                 isLoggedIn={isLoggedIn}
                 onVote={handleVote}
                 userVotes={userVotes}
+                onAuthRequest={handleAuthNavigation}
             />
           </Suspense>
         } />
@@ -877,6 +912,7 @@ const App: React.FC = () => {
               onDeleteProduct={handleDeleteProduct}
               userRole={userRole}
               onNavigate={handleNavigate}
+              currentUser={currentUser}
             />
           </Suspense>
         } />
@@ -902,6 +938,7 @@ const App: React.FC = () => {
                 onToggleSave={handleToggleSave}
                 onToggleFollow={handleToggleFollow}
                 isFollowing={followedVendors.some(v => v.id === selectedVendor.id)}
+                onMessageClick={openDirectMessaging}
               />
             ) : <Navigate to="/designers" replace />}
           </Suspense>
@@ -918,6 +955,9 @@ const App: React.FC = () => {
                 featureFlags={featureFlags}
                 savedItems={savedItems}
                 onToggleSave={handleToggleSave}
+                onMessageClick={openDirectMessaging}
+                currentUser={currentUser}
+                orders={orders}
               />
             ) : <Navigate to="/marketplace" replace />}
           </Suspense>
@@ -950,6 +990,7 @@ const App: React.FC = () => {
               onToggleFollow={handleToggleFollow}
               onDesignerClick={handleDesignerSelect}
               followers={allFollowers}
+              onOpenDirectMessaging={openDirectMessaging}
             />
           </Suspense>
         } />
@@ -981,6 +1022,7 @@ const App: React.FC = () => {
               onToggleFollow={handleToggleFollow}
               onDesignerClick={handleDesignerSelect}
               followers={allFollowers}
+              onOpenDirectMessaging={openDirectMessaging}
             />
           </Suspense>
         } />
@@ -1012,6 +1054,7 @@ const App: React.FC = () => {
               onToggleFollow={handleToggleFollow}
               onDesignerClick={handleDesignerSelect}
               followers={allFollowers}
+              onOpenDirectMessaging={openDirectMessaging}
             />
           </Suspense>
         } />
@@ -1022,6 +1065,7 @@ const App: React.FC = () => {
               onLogin={handleLogin} 
               initialMode={authInitialMode}
               initialRole={authInitialRole}
+              initialPlan={authInitialPlan}
               cmsContent={cmsContent}
             />
           </Suspense>
@@ -1055,7 +1099,7 @@ const App: React.FC = () => {
         } />
         <Route path="/pricing" element={
           <Suspense fallback={<LoadingFallback />}>
-            <PricingView onNavigate={handleNavigate} onRegister={() => handleAuthNavigation('REGISTER', UserRole.VENDOR)} cmsContent={cmsContent} />
+            <PricingView onNavigate={handleNavigate} onRegister={(plan) => handleAuthNavigation('REGISTER', UserRole.BUYER, plan)} cmsContent={cmsContent} />
           </Suspense>
         } />
         <Route path="/about" element={
@@ -1075,6 +1119,20 @@ const App: React.FC = () => {
       {currentView !== 'AUTH' && (
         <Suspense fallback={null}>
           <AiConcierge products={activeProducts} />
+        </Suspense>
+      )}
+
+      {/* Direct Messaging - Rendered globally */}
+      {isLoggedIn && currentUser && (
+        <Suspense fallback={null}>
+          <DirectMessaging
+            isOpen={isDirectMessagingOpen}
+            onClose={() => setIsDirectMessagingOpen(false)}
+            currentUser={currentUser}
+            allUsers={allUsers}
+            vendors={vendors}
+            initialRecipientId={dmInitialRecipientId}
+          />
         </Suspense>
       )}
     </Layout>

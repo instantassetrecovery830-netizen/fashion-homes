@@ -44,11 +44,19 @@ export interface AppNotification {
   link?: string;
 }
 
+export interface ProductVariant {
+  id: string;
+  size: string;
+  color?: string;
+  stock: number;
+}
+
 export interface Product {
   id: string;
   name: string;
   designer: string;
   price: number;
+  vendorId?: string;
   category: string;
   image: string;
   images?: string[];
@@ -56,13 +64,16 @@ export interface Product {
   description: string;
   rating: number;
   isNewSeason?: boolean;
-  stock: number;
+  stock: number; // Total stock
   sizes: string[];
+  variants?: ProductVariant[];
   isPreOrder?: boolean;
+  isApproved?: boolean; // For admin approval
   releaseDate?: string; // ISO string for The Drop
   createdAt?: string; // ISO string for upload tracking
   votes?: number;
   dropDate?: string; // ISO string for New Arrivals countdown
+  status?: 'approved' | 'rejected' | 'pending';
 }
 
 export type SubscriptionStatus = 'ACTIVE' | 'INACTIVE';
@@ -90,6 +101,14 @@ export interface KycDocuments {
   submittedAt?: string;
 }
 
+export interface ShippingAddress {
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
 export interface Vendor {
   id: string;
   name: string;
@@ -111,6 +130,8 @@ export interface Vendor {
   visualTheme?: 'MINIMALIST' | 'DARK' | 'GOLD';
   gallery?: string[];
   videoUrl?: string;
+  brandName?: string;
+  shipping_address?: ShippingAddress;
 }
 
 export interface Follower {
@@ -147,6 +168,8 @@ export interface Order {
   total: number;
   status: 'Processing' | 'Shipped' | 'Delivered';
   items: CartItem[];
+  buyerId?: string;
+  shippingCost?: number;
 }
 
 export interface ContactSubmission {
@@ -157,6 +180,19 @@ export interface ContactSubmission {
   message: string;
   date: string;
   status: 'NEW' | 'READ' | 'ARCHIVED';
+}
+
+export interface Shipment {
+  id: string;
+  order_id: string;
+  vendor_id: string;
+  customer_name: string;
+  destination: string;
+  carrier: string;
+  tracking_number: string;
+  status: 'Pending' | 'In Transit' | 'Delivered' | 'Exception';
+  estimated_delivery?: string;
+  created_at: string;
 }
 
 export interface FeatureFlags {
@@ -177,6 +213,8 @@ export type ViewState =
   | 'PRODUCT_DETAIL' 
   | 'VENDOR_DASHBOARD' 
   | 'ADMIN_PANEL'
+  | 'VENDOR_REVIEW'
+  | 'ANALYTICS'
   | 'BUYER_DASHBOARD'
   | 'AUTH'
   | 'PROFILE_SETTINGS'
@@ -195,6 +233,27 @@ export interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   timestamp: Date;
+}
+
+export interface DirectMessage {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  text: string;
+  timestamp: string;
+  read: boolean;
+  productId?: string;
+}
+
+export interface Review {
+  id: string;
+  productId: string;
+  userId: string;
+  userName: string;
+  rating: number;
+  text: string;
+  photos?: string[];
+  createdAt: string;
 }
 
 export interface AboutPageContent {

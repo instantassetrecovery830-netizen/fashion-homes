@@ -13,6 +13,7 @@ interface VendorProfileViewProps {
   onToggleFollow?: (vendor: Vendor) => Promise<void>;
   isFollowing?: boolean;
   followerCount?: number;
+  onMessageClick?: (vendorId: string) => void;
 }
 
 export const VendorProfileView: React.FC<VendorProfileViewProps> = ({ 
@@ -24,7 +25,8 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
   onToggleSave,
   onToggleFollow,
   isFollowing = false,
-  followerCount = 0
+  followerCount = 0,
+  onMessageClick
 }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);

@@ -1,96 +1,154 @@
-import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  signInWithEmailAndPassword as firebaseSignInWithEmailAndPassword, 
-  createUserWithEmailAndPassword as firebaseCreateUserWithEmailAndPassword, 
-  signOut as firebaseSignOut, 
-  onAuthStateChanged as firebaseOnAuthStateChanged, 
-  sendEmailVerification as firebaseSendEmailVerification, 
-  sendPasswordResetEmail as firebaseSendPasswordResetEmail, 
-  updatePassword as firebaseUpdatePassword,
-  GoogleAuthProvider,
-  signInWithPopup,
-  User
-} from "firebase/auth";
-import firebaseConfig from "../firebase-applet-config.json";
+import { apiSignUp, apiSignIn, apiUpdatePassword } from './dataService.ts';
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+export interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  emailVerified: boolean;
+  phoneNumber: string | null;
+  isAnonymous: boolean;
+  tenantId: string | null;
+  providerData: any[];
+  reload: () => Promise<void>;
+}
 
-// --- MOCK AUTH IMPLEMENTATION (For Preview/Dev Environments) ---
-let mockUser: User | null = null;
-const authListeners: ((user: User | null) => void)[] = [];
+class MockAuth {
+  currentUser: User | null = null;
+  private listeners: ((user: User | null) => void)[] = [];
 
-export const setMockUser = (user: any) => {
-  mockUser = {
-    ...user,
-    emailVerified: true, // Auto-verify mock users
-    reload: async () => {},
-    getIdToken: async () => 'mock-token',
-    getIdTokenResult: async () => ({
-      token: 'mock-token',
-      signInProvider: 'custom',
-      claims: {},
-      authTime: Date.now().toString(),
-      issuedAtTime: Date.now().toString(),
-      expirationTime: (Date.now() + 3600000).toString(),
-    }),
-  } as User;
-  
-  // Notify listeners
-  authListeners.forEach(listener => listener(mockUser));
-  return mockUser;
-};
-
-// Wrapper for onAuthStateChanged to support both Firebase and Mock
-export const onAuthStateChanged = (authInstance: any, callback: (user: User | null) => void) => {
-  // 1. Register for Firebase updates
-  const firebaseUnsubscribe = firebaseOnAuthStateChanged(authInstance, (firebaseUser) => {
-    if (firebaseUser) {
-      callback(firebaseUser);
-    } else {
-      // If Firebase says logged out, check if we have a mock user
-      callback(mockUser);
+  constructor() {
+    const savedUser = localStorage.getItem('myfitstore_auth_user');
+    if (savedUser) {
+      try {
+        this.currentUser = JSON.parse(savedUser);
+        // Add reload method back
+        if (this.currentUser) {
+            this.currentUser.reload = async () => {};
+        }
+      } catch (e) {
+        console.error("Failed to parse saved user", e);
+      }
     }
-  });
+  }
 
-  // 2. Register for Mock updates
-  authListeners.push(callback);
+  onAuthStateChanged(callback: (user: User | null) => void) {
+    this.listeners.push(callback);
+    callback(this.currentUser);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== callback);
+    };
+  }
 
-  // 3. Return unsubscribe
-  return () => {
-    firebaseUnsubscribe();
-    const index = authListeners.indexOf(callback);
-    if (index > -1) authListeners.splice(index, 1);
-  };
+  private notifyListeners() {
+    this.listeners.forEach(l => l(this.currentUser));
+    if (this.currentUser) {
+      localStorage.setItem('myfitstore_auth_user', JSON.stringify(this.currentUser));
+    } else {
+      localStorage.removeItem('myfitstore_auth_user');
+    }
+  }
+
+  async signInWithEmailAndPassword(email: string, password: string) {
+    const dbUser = await apiSignIn(email, password);
+    this.currentUser = {
+      uid: dbUser.uid,
+      email: dbUser.email,
+      displayName: dbUser.email.split('@')[0],
+      photoURL: `https://ui-avatars.com/api/?name=${dbUser.email}`,
+      emailVerified: true,
+      phoneNumber: null,
+      isAnonymous: false,
+      tenantId: null,
+      providerData: [],
+      reload: async () => {}
+    };
+    this.notifyListeners();
+    return { user: this.currentUser };
+  }
+
+  async createUserWithEmailAndPassword(email: string, password: string) {
+    const dbUser = await apiSignUp(email, password);
+    this.currentUser = {
+      uid: dbUser.uid,
+      email: dbUser.email,
+      displayName: dbUser.email.split('@')[0],
+      photoURL: `https://ui-avatars.com/api/?name=${dbUser.email}`,
+      emailVerified: true,
+      phoneNumber: null,
+      isAnonymous: false,
+      tenantId: null,
+      providerData: [],
+      reload: async () => {}
+    };
+    this.notifyListeners();
+    return { user: this.currentUser };
+  }
+
+  async signOut() {
+    this.currentUser = null;
+    this.notifyListeners();
+  }
+
+  async updatePassword(newPassword: string) {
+    if (!this.currentUser || !this.currentUser.email) throw new Error("No user logged in");
+    await apiUpdatePassword(this.currentUser.email, newPassword);
+  }
+}
+
+export const auth = new MockAuth();
+
+export const onAuthStateChanged = (authInstance: MockAuth, callback: (user: User | null) => void) => {
+  return authInstance.onAuthStateChanged(callback);
 };
 
-export const signOut = async (authInstance: any) => {
-  try {
-    await firebaseSignOut(authInstance);
-  } catch (e) {
-    console.warn("Firebase signout failed, clearing mock user only", e);
-  }
-  mockUser = null;
-  authListeners.forEach(listener => listener(null));
+export const signInWithEmailAndPassword = (authInstance: MockAuth, email: string, password: string) => {
+  return authInstance.signInWithEmailAndPassword(email, password);
+};
+
+export const createUserWithEmailAndPassword = (authInstance: MockAuth, email: string, password: string) => {
+  return authInstance.createUserWithEmailAndPassword(email, password);
+};
+
+export const signOut = (authInstance: MockAuth) => {
+  return authInstance.signOut();
+};
+
+export const updateUserPassword = (user: User, newPassword: string) => {
+  return auth.updatePassword(newPassword);
+};
+
+export const sendEmailVerification = async (user: User) => {
+  // Mock email verification
+  return Promise.resolve();
+};
+
+export const sendPasswordResetEmail = async (authInstance: MockAuth, email: string) => {
+  // Mock password reset
+  return Promise.resolve();
 };
 
 export const signInWithGoogle = async () => {
-  const provider = new GoogleAuthProvider();
-  return signInWithPopup(auth, provider);
+  // Mock Google Sign-In
+  const email = `google_${Date.now()}@gmail.com`;
+  const dbUser = await apiSignUp(email, 'google-oauth-mock');
+  auth.currentUser = {
+    uid: dbUser.uid,
+    email: dbUser.email,
+    displayName: 'Google User',
+    photoURL: `https://ui-avatars.com/api/?name=Google+User`,
+    emailVerified: true,
+    phoneNumber: null,
+    isAnonymous: false,
+    tenantId: null,
+    providerData: [],
+    reload: async () => {}
+  };
+  (auth as any).notifyListeners();
+  return { user: auth.currentUser };
 };
 
-export const updateUserPassword = async (user: User, newPassword: string) => {
-  if (mockUser && user.uid === mockUser.uid) {
-    return; // No-op for mock user
-  }
-  return firebaseUpdatePassword(user, newPassword);
-};
-
-// Export original functions but aliased if needed, or wrapped
-export const signInWithEmailAndPassword = firebaseSignInWithEmailAndPassword;
-export const createUserWithEmailAndPassword = firebaseCreateUserWithEmailAndPassword;
-export const sendEmailVerification = firebaseSendEmailVerification;
-export const sendPasswordResetEmail = firebaseSendPasswordResetEmail;
+export const GoogleAuthProvider = class {};
+export const signInWithPopup = async () => {};
 
 

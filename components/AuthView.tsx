@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, ArrowLeft, RefreshCw, Briefcase, ShoppingBag } from 'lucide-react';
+import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, CheckCircle, ArrowLeft, RefreshCw, Briefcase, ShoppingBag, Diamond } from 'lucide-react';
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types.ts';
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail, setMockUser } from '../services/firebase.ts';
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail } from '../services/firebase.ts';
 import { createVendorInDb, createUserInDb, getUserByEmail, getVendorByEmail } from '../services/dataService.ts';
 
 interface AuthViewProps {
@@ -21,13 +21,12 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Verification State
-  const [verificationNeeded, setVerificationNeeded] = useState(false);
-  const [verificationEmail, setVerificationEmail] = useState('');
-  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
-
   // Password Reset State
   const [resetEmailSent, setResetEmailSent] = useState(false);
+
+  // Verification State
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
 
   // Form states
   const [name, setName] = useState('');
@@ -42,12 +41,17 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
   const loginImage = cmsContent?.auth?.loginImage || "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2070";
   const registerImage = cmsContent?.auth?.registerImage || "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=2574";
 
+  // Sync props to state if they change
+  useEffect(() => {
+    setIsRegister(initialMode === 'REGISTER');
+    setSelectedRole(initialRole);
+  }, [initialMode, initialRole]);
+
   // Check for existing unverified session on mount
   useEffect(() => {
-    // If user is logged in but stuck in verification flow
+    // If user is logged in
     if (auth.currentUser && !auth.currentUser.emailVerified) {
-        setVerificationEmail(auth.currentUser.email || '');
-        setVerificationNeeded(true);
+        setIsVerifying(true);
     }
   }, []);
 
@@ -76,8 +80,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     setPassword('');
     setConfirmPassword('');
     setAvatar('');
-    setVerificationNeeded(false);
-    setResendStatus('idle');
     setResetEmailSent(false);
     setIsResetingPassword(false);
   };
@@ -88,23 +90,32 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
   };
 
   const handleResendVerification = async () => {
-    const user = auth.currentUser;
-    if (!user) {
-        setError("Session expired. Please sign in again.");
-        return;
+    if (auth.currentUser) {
+      try {
+        await sendEmailVerification(auth.currentUser);
+        setVerificationSent(true);
+        setError(null);
+      } catch (err: any) {
+        setError(err.message || "Failed to send verification email.");
+      }
     }
+  };
 
-    setResendStatus('sending');
-    try {
-        await sendEmailVerification(user);
-        setResendStatus('sent');
-        // Reset to idle after 5 seconds so they can send again if needed
-        setTimeout(() => setResendStatus('idle'), 5000); 
-    } catch (e) {
-        console.error("Resend failed", e);
-        setError("Failed to resend email. Please try again.");
-        setResendStatus('idle');
+  const handleCheckVerification = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        await routeUser(auth.currentUser);
+      } else {
+        setError("Email not yet verified. Please check your inbox.");
+      }
     }
+  };
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    setIsVerifying(false);
+    handleReset();
   };
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
@@ -169,6 +180,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                     email: user.email,
                     role: UserRole.BUYER,
                     avatar: photoURL,
+                    joined: new Date().toISOString(),
                     status: 'ACTIVE'
                 });
             }
@@ -266,37 +278,21 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                     email: user.email || '',
                     role: UserRole.BUYER,
                     avatar: finalAvatar,
+                    joined: new Date().toISOString(),
                     status: 'ACTIVE'
                 });
             }
 
-            // If user is auto-verified (as per simplified req), skip verification screen
-            if (user.emailVerified) {
-                await routeUser(user);
-            } else {
-                // Send Verification Email
-                await sendEmailVerification(user);
-                
-                // Enforce "Do not sign them in automatically" - Sign out immediately
-                await signOut(auth);
-
-                // Show Verification Screen immediately
-                setVerificationEmail(user.email || email);
-                setVerificationNeeded(true);
-            }
+            await sendEmailVerification(user);
+            setIsVerifying(true);
 
         } else {
             // Login Flow
             const { user } = await signInWithEmailAndPassword(auth, email, password);
-
-            // Check verification status
+            
             if (!user.emailVerified) {
-                // Enforce "Do not sign them in automatically" if not verified
-                await signOut(auth);
-                
-                setVerificationEmail(user.email || email);
-                setVerificationNeeded(true);
-                return; 
+                setIsVerifying(true);
+                return;
             }
             
             await routeUser(user);
@@ -322,147 +318,63 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
     }
   };
 
-  const handleCheckVerification = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-        if (auth.currentUser) {
-            await auth.currentUser.reload();
-            if (auth.currentUser.emailVerified) {
-                await routeUser(auth.currentUser);
-                setVerificationNeeded(false);
-            } else {
-                setError("Email not verified yet. Please check your inbox or wait a moment.");
-            }
-        }
-    } catch(e) {
-         console.error(e);
-         setError("Failed to check verification status.");
-    } finally {
-        setIsLoading(false);
-    }
-  };
+  // Removed handleResendVerification and handleCheckVerification
 
-  const handleDevLogin = async () => {
-    setIsLoading(true);
-    try {
-        // Create a mock user based on selected role
-        const mockUser = {
-            uid: `dev_${selectedRole.toLowerCase()}_${Date.now()}`,
-            email: `dev_${selectedRole.toLowerCase()}@example.com`,
-            displayName: `Dev ${selectedRole}`,
-            emailVerified: true,
-            photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200'
-        };
+  // Verification view
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white p-6 animate-fade-in">
+          <div className="w-full max-w-md text-center">
+              <div className="mb-8 flex justify-center">
+                  <div className="w-20 h-20 bg-luxury-gold/10 rounded-full flex items-center justify-center">
+                      <Mail className="text-luxury-gold" size={32} />
+                  </div>
+              </div>
+              <h1 className="text-3xl font-serif italic mb-4">Verify Your Email</h1>
+              <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+                  We've sent a verification link to <span className="font-bold text-black">{auth.currentUser?.email || email}</span>. 
+                  Please check your inbox and click the link to activate your account.
+              </p>
 
-        // Set in Firebase wrapper
-        setMockUser(mockUser);
-        
-        // Ensure DB entry exists for this mock user so dashboard works
-        if (selectedRole === UserRole.VENDOR) {
-             await createVendorInDb({
-                id: mockUser.uid,
-                name: "Dev Atelier",
-                bio: 'Developer Test Account',
-                avatar: mockUser.photoURL,
-                verificationStatus: 'VERIFIED',
-                subscriptionStatus: 'ACTIVE',
-                location: 'Dev Environment',
-                coverImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=200',
-                email: mockUser.email,
-                subscriptionPlan: 'Couture',
-                website: '',
-                instagram: '',
-                twitter: ''
-            });
-        } else {
-             await createUserInDb({
-                id: mockUser.uid,
-                name: mockUser.displayName,
-                email: mockUser.email,
-                role: selectedRole,
-                avatar: mockUser.photoURL,
-                status: 'ACTIVE'
-            });
-        }
+              {error && (
+                  <div className="flex items-center justify-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-sm mb-6">
+                      <AlertCircle size={14} />
+                      <span>{error}</span>
+                  </div>
+              )}
 
-        // Route user (will trigger onLogin via onAuthStateChanged in App.tsx)
-        // But we can also call onLogin directly to be safe
-        onLogin(selectedRole);
+              {verificationSent && (
+                  <div className="flex items-center justify-center gap-2 text-green-600 text-xs bg-green-50 p-3 rounded-sm mb-6 animate-fade-in">
+                      <CheckCircle size={14} />
+                      <span>Verification email resent successfully.</span>
+                  </div>
+              )}
 
-    } catch (e) {
-        console.error("Dev login failed", e);
-        setError("Dev login failed");
-    } finally {
-        setIsLoading(false);
-    }
-  };
+              <div className="space-y-4">
+                  <button 
+                      onClick={handleCheckVerification}
+                      className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex justify-center items-center gap-2"
+                  >
+                      I've Verified My Email <ArrowRight size={16} />
+                  </button>
+                  
+                  <button 
+                      onClick={handleResendVerification}
+                      className="w-full bg-white border border-gray-200 text-black py-4 text-xs font-bold uppercase tracking-[0.2em] hover:border-black transition-colors flex justify-center items-center gap-2"
+                  >
+                      <RefreshCw size={14} /> Resend Email
+                  </button>
 
-  if (verificationNeeded) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-white p-6 animate-fade-in">
-            <div className="w-full max-w-md text-center">
-                <div className="mx-auto w-16 h-16 bg-luxury-gold/10 text-luxury-gold rounded-full flex items-center justify-center mb-6">
-                    <Mail size={32} />
-                </div>
-                <h2 className="text-2xl font-serif italic mb-4">Verify Your Email</h2>
-                <p className="text-gray-500 text-sm leading-relaxed mb-8">
-                    We have sent you a verification email to <span className="font-bold text-black">{verificationEmail}</span>. 
-                    Verify it and log in.
-                </p>
-
-                {error && (
-                    <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-sm mb-6 text-left">
-                        <AlertCircle size={14} className="shrink-0" />
-                        <span>{error}</span>
-                    </div>
-                )}
-                
-                <button 
-                    onClick={handleCheckVerification}
-                    disabled={isLoading}
-                    className="w-full bg-white border border-gray-200 text-black py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-gray-50 transition-colors mb-3 flex justify-center items-center gap-2 disabled:opacity-70"
-                >
-                    {isLoading ? <Loader className="animate-spin" size={16} /> : "I've Verified My Email"}
-                </button>
-
-                <button 
-                    onClick={async () => {
-                        await signOut(auth);
-                        setVerificationNeeded(false);
-                        setIsRegister(false);
-                        setVerificationEmail('');
-                        setError(null);
-                    }}
-                    className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors mb-6 flex justify-center items-center gap-2"
-                >
-                    Log In
-                </button>
-                
-                <div className="bg-gray-50 p-4 rounded-sm">
-                    <p className="text-xs text-gray-500 mb-3">Didn't receive the email?</p>
-                    
-                    {resendStatus === 'sent' ? (
-                        <div className="text-green-600 text-xs font-bold animate-fade-in flex items-center justify-center gap-2">
-                            <CheckCircle size={14} /> Link Sent!
-                        </div>
-                    ) : (
-                        <button
-                            onClick={handleResendVerification}
-                            disabled={resendStatus === 'sending'}
-                            className="text-xs text-black font-bold uppercase tracking-widest hover:text-luxury-gold underline transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mx-auto"
-                        >
-                            {resendStatus === 'sending' ? (
-                                <><Loader size={12} className="animate-spin" /> Sending...</>
-                            ) : (
-                                <><RefreshCw size={12} /> Resend Link</>
-                            )}
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div>
-      );
+                  <button 
+                      onClick={handleSignOut}
+                      className="text-xs text-gray-400 hover:text-black transition-colors underline mt-4"
+                  >
+                      Sign in with a different account
+                  </button>
+              </div>
+          </div>
+      </div>
+    );
   }
 
   // Reset Password Flow View
@@ -568,6 +480,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
+                     {isRegister && initialPlan && (
+                        <div className="bg-luxury-gold/10 border border-luxury-gold/20 p-4 rounded-sm mb-6 flex items-center justify-between animate-fade-in">
+                            <div>
+                                <p className="text-[10px] text-luxury-gold font-bold uppercase tracking-widest mb-1">Selected Membership</p>
+                                <p className="text-sm font-serif italic">{initialPlan} Tier</p>
+                            </div>
+                            <Diamond size={24} className="text-luxury-gold opacity-50" />
+                        </div>
+                     )}
                      {/* Role Selection Tabs */}
                      <div className="flex p-1 rounded-full border border-gray-100 mb-8 relative bg-gray-50/50">
                          {/* Sliding Background */}
@@ -759,13 +680,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 <div className="mt-12 text-center">
                      <button onClick={() => onNavigate('LANDING')} className="text-[10px] text-gray-300 uppercase tracking-widest hover:text-black transition-colors block mx-auto mb-4">
                          Back to Store
-                     </button>
-                     
-                     <button 
-                        onClick={handleDevLogin}
-                        className="text-[9px] text-gray-200 uppercase tracking-widest hover:text-red-500 transition-colors"
-                     >
-                        Developer Access (Preview Mode)
                      </button>
                 </div>
             </div>

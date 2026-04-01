@@ -129,7 +129,14 @@ export const LandingView: React.FC<LandingViewProps> = ({
             
             {!isLoggedIn && (
               <button 
-                onClick={() => onAuthRequest ? onAuthRequest('REGISTER', UserRole.BUYER) : onNavigate('AUTH')}
+                onClick={() => {
+                  console.log('Get Started button clicked in LandingView');
+                  if (onAuthRequest) {
+                    onAuthRequest('REGISTER', UserRole.BUYER);
+                  } else {
+                    onNavigate('AUTH');
+                  }
+                }}
                 className="group relative inline-flex items-center justify-center gap-2 px-8 py-3 md:py-4 bg-luxury-gold text-white text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase hover:bg-white hover:text-black transition-all duration-300 w-full sm:w-auto sm:min-w-[200px] shadow-xl hover:shadow-2xl hover:-translate-y-1"
               >
                 <UserPlus size={14} /> Get Started
@@ -459,7 +466,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                   </div>
 
                   <button 
-                    onClick={() => onAuthRequest ? onAuthRequest('REGISTER', UserRole.VENDOR) : onNavigate('AUTH')}
+                    onClick={() => onAuthRequest ? onAuthRequest('REGISTER', UserRole.BUYER) : onNavigate('AUTH')}
                     className={`w-full py-4 text-xs font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-colors ${
                       plan.highlight 
                         ? 'bg-white text-black hover:bg-luxury-gold hover:text-white' 
