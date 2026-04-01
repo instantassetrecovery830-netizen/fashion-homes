@@ -284,6 +284,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             }
 
             await sendEmailVerification(user);
+            await signOut(auth);
             setIsVerifying(true);
 
         } else {
@@ -291,6 +292,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             const { user } = await signInWithEmailAndPassword(auth, email, password);
             
             if (!user.emailVerified) {
+                await sendEmailVerification(user);
+                await signOut(auth);
                 setIsVerifying(true);
                 return;
             }
@@ -307,7 +310,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
         // Specific Error Handling as requested
         if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
             setError("Password or Email Incorrect");
-        } else if (err.code === 'auth/email-already-in-use') {
+        } else if (err.code === 'auth/email-already-in-use' || err.message === 'Email already in use') {
             setError("User already exists. Sign in?");
         } else {
             setError(err.message || "Authentication failed.");
@@ -332,8 +335,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
               </div>
               <h1 className="text-3xl font-serif italic mb-4">Verify Your Email</h1>
               <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-                  We've sent a verification link to <span className="font-bold text-black">{auth.currentUser?.email || email}</span>. 
-                  Please check your inbox and click the link to activate your account.
+                  We have sent you a verification email to <span className="font-bold text-black">{auth.currentUser?.email || email}</span>. Verify it and log in.
               </p>
 
               {error && (
@@ -355,7 +357,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                       onClick={handleCheckVerification}
                       className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex justify-center items-center gap-2"
                   >
-                      I've Verified My Email <ArrowRight size={16} />
+                      Login <ArrowRight size={16} />
                   </button>
                   
                   <button 

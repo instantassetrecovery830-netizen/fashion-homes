@@ -37,6 +37,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOp
         if (order) {
           const { createShipmentInDb } = await import('../../services/dataService');
           await createShipmentInDb({
+            id: Math.random().toString(36).substring(2, 15),
             order_id: orderId,
             vendor_id: (order as any).vendor_id || '', 
             customer_name: order.customerName,
@@ -44,7 +45,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOp
             carrier: trackingInfo.carrier,
             tracking_number: trackingInfo.trackingNumber,
             status: 'In Transit',
-            estimated_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            estimated_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            created_at: new Date().toISOString()
           });
         }
       }
