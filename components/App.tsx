@@ -991,6 +991,7 @@ const App: React.FC = () => {
               onDesignerClick={handleDesignerSelect}
               followers={allFollowers}
               onOpenDirectMessaging={openDirectMessaging}
+              currentUser={currentUser}
             />
           </Suspense>
         } />

@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { Menu, Palette, ChevronDown, Video, Type, Sparkles, Image as ImageIcon, FileText, DollarSign } from 'lucide-react';
+import { Product } from '../../types.ts';
 
 interface StoreDesignViewProps {
     cmsForm: any;
     setCmsForm: (form: any) => void;
     handleCMSUpdate: () => Promise<void>;
     setIsSidebarOpen: (open: boolean) => void;
+    products: Product[];
 }
 
 export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
     cmsForm,
     setCmsForm,
     handleCMSUpdate,
-    setIsSidebarOpen
+    setIsSidebarOpen,
+    products
 }) => {
     const [expandedSection, setExpandedSection] = useState<string | null>('theme');
 
@@ -271,12 +274,34 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Background Image URL</label>
-                                        <input 
-                                            value={cmsForm.drop.backgroundImage}
-                                            onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, backgroundImage: e.target.value}})}
-                                            className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white"
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Background Image URLs (comma separated)</label>
+                                        <textarea 
+                                            value={cmsForm.drop.backgroundImages.join(', ')}
+                                            onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, backgroundImages: e.target.value.split(',').map(s => s.trim()).filter(s => s)}})}
+                                            className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white h-24"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Products</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {products.map(product => (
+                                                <div key={product.id} className="flex items-center gap-2">
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={cmsForm.drop.productIds?.includes(product.id) || false}
+                                                        onChange={e => {
+                                                            const currentProductIds = cmsForm.drop.productIds || [];
+                                                            const newProductIds = e.target.checked 
+                                                                ? [...currentProductIds, product.id]
+                                                                : currentProductIds.filter((id: string) => id !== product.id);
+                                                            setCmsForm({...cmsForm, drop: {...cmsForm.drop!, productIds: newProductIds}});
+                                                        }}
+                                                        className="accent-black"
+                                                    />
+                                                    <span className="text-xs text-gray-600">{product.name}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Countdown Date (ISO)</label>

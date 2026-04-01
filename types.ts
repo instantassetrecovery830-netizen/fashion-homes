@@ -313,8 +313,9 @@ export interface DropPageContent {
   title: string;
   subtitle: string;
   description: string;
-  backgroundImage: string;
+  backgroundImages: string[];
   countdownDate: string;
+  productIds: string[];
 }
 
 export interface LandingPageContent {

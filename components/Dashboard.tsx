@@ -70,6 +70,7 @@ interface DashboardProps {
   onDesignerClick?: (designerName: string) => void;
   followers?: Follower[];
   onOpenDirectMessaging?: () => void;
+  currentUser?: AppUser | null;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -99,7 +100,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onToggleFollow,
   onDesignerClick,
   followers = [],
-  onOpenDirectMessaging
+  onOpenDirectMessaging,
+  currentUser
 }) => {
   const [activeTab, setActiveTab] = useState(initialTab || 'OVERVIEW');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -162,10 +164,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Init Storefront Form
   useEffect(() => {
     if (role === UserRole.VENDOR && vendors.length > 0 && !storefrontForm) {
-        const v = vendors.find(v => v.email === auth.currentUser?.email);
+        const v = vendors.find(v => v.email === currentUser?.email);
         if (v) setStorefrontForm(v);
     }
-  }, [vendors, role, storefrontForm]);
+  }, [vendors, role, storefrontForm, currentUser]);
 
   // Force sidebar open on desktop mount
   useEffect(() => {
@@ -180,8 +182,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       window.addEventListener('resize', handleResize);
       return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  const currentUser = auth.currentUser;
   
   // Filter Data based on Role
   const myOrders = useMemo(() => {
@@ -671,6 +671,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               setCmsForm={setCmsForm}
               handleCMSUpdate={handleCMSUpdate}
               setIsSidebarOpen={setIsSidebarOpen}
+              products={products}
             />
           );
       

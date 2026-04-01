@@ -23,7 +23,7 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate, 
       title: 'VANTABLACK ETHER COAT',
       subtitle: 'MAISON OMEGA',
       description: 'A masterpiece of light absorption. The Vantablack Ether Coat redefines the silhouette with a void-like presence. Highly limited run.',
-      backgroundImage: 'https://images.unsplash.com/photo-1536766820879-059fec98ec0a?q=80&w=1974&auto=format&fit=crop',
+      backgroundImages: ['https://images.unsplash.com/photo-1536766820879-059fec98ec0a?q=80&w=1974&auto=format&fit=crop'],
       countdownDate: new Date(Date.now() + 172800000).toISOString()
   };
 
@@ -94,7 +94,7 @@ export const TheDropView: React.FC<TheDropViewProps> = ({ products, onNavigate, 
         {/* Left Side: Product Imagery */}
         <div className="relative w-full md:w-1/2 h-[50vh] md:h-screen z-10 overflow-hidden group">
             <img 
-                src={dropData.backgroundImage} 
+                src={dropData.backgroundImages?.[0] || ''} 
                 alt={dropData.title} 
                 className="w-full h-full object-cover transition-transform duration-[3s] group-hover:scale-105 opacity-80 group-hover:opacity-100"
             />

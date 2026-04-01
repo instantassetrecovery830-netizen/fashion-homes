@@ -491,8 +491,9 @@ const DEFAULT_CMS_CONTENT: LandingPageContent = {
     title: 'VANTABLACK ETHER COAT',
     subtitle: 'MAISON OMEGA',
     description: 'A masterpiece of light absorption. The Vantablack Ether Coat redefines the silhouette with a void-like presence. Highly limited run.',
-    backgroundImage: 'https://images.unsplash.com/photo-1536766820879-059fec98ec0a?q=80&w=1974&auto=format&fit=crop',
-    countdownDate: new Date(Date.now() + 172800000).toISOString()
+    backgroundImages: ['https://images.unsplash.com/photo-1536766820879-059fec98ec0a?q=80&w=1974&auto=format&fit=crop'],
+    countdownDate: new Date(Date.now() + 172800000).toISOString(),
+    productIds: []
   },
   about: {
     hero: {
