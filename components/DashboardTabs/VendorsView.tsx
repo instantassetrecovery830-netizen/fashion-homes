@@ -57,6 +57,7 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                             <tr>
                                 <th className="p-6">Vendor / Brand</th>
                                 <th className="p-6">Location</th>
+                                <th className="p-6">Subscription</th>
                                 <th className="p-6">Status</th>
                                 <th className="p-6">Joined</th>
                                 <th className="p-6 text-right">Actions</th>
@@ -80,6 +81,14 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                                         <div className="flex items-center gap-1">
                                             <MapPin size={12} />
                                             {vendor.location || 'Remote'}
+                                        </div>
+                                    </td>
+                                    <td className="p-6">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-bold">{vendor.subscriptionPlan || 'N/A'}</span>
+                                            <span className={`text-[10px] uppercase ${vendor.subscriptionStatus === 'ACTIVE' ? 'text-green-600' : 'text-gray-400'}`}>
+                                                {vendor.subscriptionStatus}
+                                            </span>
                                         </div>
                                     </td>
                                     <td className="p-6">
@@ -124,7 +133,7 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                             ))}
                             {vendors.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="p-20 text-center">
+                                    <td colSpan={6} className="p-20 text-center">
                                         <div className="flex flex-col items-center text-gray-400">
                                             <Store size={48} className="mb-4 opacity-20" />
                                             <p className="text-sm font-serif italic">No vendors found.</p>
