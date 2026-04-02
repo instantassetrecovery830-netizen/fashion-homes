@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Palette, ChevronDown, Video, Type, Sparkles, Image as ImageIcon, FileText, DollarSign } from 'lucide-react';
+import { Menu, Palette, ChevronDown, Video, Type, Sparkles, Image as ImageIcon, FileText, DollarSign, Plus } from 'lucide-react';
 import { Product } from '../../types.ts';
 
 interface StoreDesignViewProps {
@@ -247,72 +247,93 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                 <ChevronDown size={16} className={`transition-transform ${expandedSection === 'drop' ? 'rotate-180' : ''}`} />
                             </button>
                             
-                            {expandedSection === 'drop' && cmsForm.drop && (
-                                <div className="p-6 space-y-4 border-t border-gray-100">
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Title</label>
-                                        <input 
-                                            value={cmsForm.drop.title}
-                                            onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, title: e.target.value}})}
-                                            className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Subtitle</label>
-                                        <input 
-                                            value={cmsForm.drop.subtitle}
-                                            onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, subtitle: e.target.value}})}
-                                            className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Description</label>
-                                        <textarea 
-                                            value={cmsForm.drop.description}
-                                            onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, description: e.target.value}})}
-                                            className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white h-24"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Background Image URLs (comma separated)</label>
-                                        <textarea 
-                                            value={cmsForm.drop.backgroundImages.join(', ')}
-                                            onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, backgroundImages: e.target.value.split(',').map(s => s.trim()).filter(s => s)}})}
-                                            className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white h-24"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Products</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {products.map(product => (
-                                                <div key={product.id} className="flex items-center gap-2">
-                                                    <input 
-                                                        type="checkbox"
-                                                        checked={cmsForm.drop.productIds?.includes(product.id) || false}
-                                                        onChange={e => {
-                                                            const currentProductIds = cmsForm.drop.productIds || [];
-                                                            const newProductIds = e.target.checked 
-                                                                ? [...currentProductIds, product.id]
-                                                                : currentProductIds.filter((id: string) => id !== product.id);
-                                                            setCmsForm({...cmsForm, drop: {...cmsForm.drop!, productIds: newProductIds}});
-                                                        }}
-                                                        className="accent-black"
-                                                    />
-                                                    <span className="text-xs text-gray-600">{product.name}</span>
-                                                </div>
-                                            ))}
+                            {expandedSection === 'drop' && (
+                                cmsForm.drop ? (
+                                    <div className="p-6 space-y-4 border-t border-gray-100">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Title</label>
+                                            <input 
+                                                value={cmsForm.drop.title || ''}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, title: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Subtitle</label>
+                                            <input 
+                                                value={cmsForm.drop.subtitle || ''}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, subtitle: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Description</label>
+                                            <textarea 
+                                                value={cmsForm.drop.description || ''}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, description: e.target.value}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white h-24"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Background Image URLs (comma separated)</label>
+                                            <textarea 
+                                                value={cmsForm.drop.backgroundImages?.join(', ') || ''}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, backgroundImages: e.target.value.split(',').map(s => s.trim()).filter(s => s)}})}
+                                                className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white h-24"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Products</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {products.map(product => (
+                                                    <div key={product.id} className="flex items-center gap-2">
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={cmsForm.drop.productIds?.includes(product.id) || false}
+                                                            onChange={e => {
+                                                                const currentProductIds = cmsForm.drop.productIds || [];
+                                                                const newProductIds = e.target.checked 
+                                                                    ? [...currentProductIds, product.id]
+                                                                    : currentProductIds.filter((id: string) => id !== product.id);
+                                                                setCmsForm({...cmsForm, drop: {...cmsForm.drop!, productIds: newProductIds}});
+                                                            }}
+                                                            className="accent-black"
+                                                        />
+                                                        <span className="text-xs text-gray-600">{product.name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Countdown Date (ISO)</label>
+                                            <input 
+                                                type="datetime-local"
+                                                value={cmsForm.drop.countdownDate ? cmsForm.drop.countdownDate.slice(0, 16) : ''}
+                                                onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, countdownDate: new Date(e.target.value).toISOString()}})}
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Countdown Date (ISO)</label>
-                                        <input 
-                                            type="datetime-local"
-                                            value={cmsForm.drop.countdownDate.slice(0, 16)}
-                                            onChange={e => setCmsForm({...cmsForm, drop: {...cmsForm.drop!, countdownDate: new Date(e.target.value).toISOString()}})}
-                                            className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
-                                        />
+                                ) : (
+                                    <div className="p-6 border-t border-gray-100">
+                                        <button 
+                                            onClick={() => setCmsForm({
+                                                ...cmsForm, 
+                                                drop: {
+                                                    title: 'New Drop',
+                                                    subtitle: 'New Subtitle',
+                                                    description: 'New Description',
+                                                    backgroundImages: [],
+                                                    countdownDate: new Date().toISOString(),
+                                                    productIds: []
+                                                }
+                                            })}
+                                            className="w-full py-4 border-2 border-dashed border-gray-200 rounded-sm text-gray-400 text-xs font-bold uppercase tracking-widest hover:border-luxury-gold hover:text-luxury-gold transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <Plus size={16} /> Initialize Drop
+                                        </button>
                                     </div>
-                                </div>
+                                )
                             )}
                         </div>
 
