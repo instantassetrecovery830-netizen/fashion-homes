@@ -410,7 +410,7 @@ export const Layout: React.FC<LayoutProps> = ({
               <Search size={20} className="cursor-pointer hover:text-luxury-gold transition-colors hidden sm:block" />
               
               {/* Direct Messaging */}
-              {isLoggedIn && onOpenDirectMessaging && (
+              {isLoggedIn && onOpenDirectMessaging && currentView !== 'LANDING' && (
                 <button 
                   onClick={onOpenDirectMessaging}
                   className="relative hover:text-luxury-gold transition-colors"
