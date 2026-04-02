@@ -94,9 +94,10 @@ export const initSchema = async () => {
         )
     `;
 
-    // Ensure user_id and shipping_cost column exists for existing tables
+    // Ensure user_id, shipping_cost, and customer_name columns exist for existing tables
     await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id)`;
     await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_cost DECIMAL DEFAULT 0`;
+    await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name TEXT`;
 
     await sql`
         CREATE TABLE IF NOT EXISTS followers (
@@ -304,12 +305,6 @@ export const initSchema = async () => {
 };
 
 export const seedDatabase = async () => {
-    const vendors = await sql`SELECT id FROM vendors LIMIT 1`;
-    if (vendors.length > 0) {
-        console.log("Database already seeded. Skipping...");
-        return;
-    }
-
     console.log("Seeding database with initial data...");
     
     // Seed vendors
