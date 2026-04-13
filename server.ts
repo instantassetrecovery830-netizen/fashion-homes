@@ -3,7 +3,10 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import http from "http";
+import cors from "cors";
 import * as dataService from "./services/dataService.server.ts";
+import { initSocket } from "./services/socketService.server.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +19,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
   app.use(express.json());
 
   // API routes
@@ -360,19 +364,34 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*all', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
   // Initialize Schema and Seed on Start
+  console.log("Starting database bootstrap...");
   dataService.initSchema()
-    .then(() => dataService.seedDatabase())
-    .catch(err => console.error("Failed to bootstrap database:", err));
+    .then(() => {
+        console.log("Schema initialized. Starting seed...");
+        return dataService.seedDatabase();
+    })
+    .then(() => console.log("Database bootstrap completed successfully."))
+    .catch(err => {
+        console.error("CRITICAL: Database bootstrap failed!");
+        console.error(err);
+    });
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  const server = http.createServer(app);
+  initSocket(server);
+
+  console.log(`Attempting to start server on port ${PORT}...`);
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`SUCCESS: Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer();
+startServer().catch(err => {
+    console.error("FATAL: Server failed to start!");
+    console.error(err);
+});

@@ -15,6 +15,7 @@ import {
 } from '@/services/dataService';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
+import { getSocket, joinUserRoom } from '../services/socket.ts';
 
 // Lazy Load Heavy Components for Performance
 const MarketplaceView = React.lazy(() => import('./MarketplaceView.tsx').then(m => ({ default: m.MarketplaceView })));
@@ -224,30 +225,85 @@ const App: React.FC = () => {
     } finally {
       isRefreshingRef.current = false;
     }
-  }, [userRole]);
+  }, [userRole, currentUserId]);
 
   useEffect(() => {
     // Initial Load
     const initData = async () => {
       try {
-        await initSchema();
-        await seedDatabase();
-        await refreshData(true);
+        // Wait a small bit for server to bootstrap
+        setTimeout(() => {
+            refreshData(true);
+        }, 1000);
       } catch (error) {
-        console.error("Database initialization failed.", error);
+        console.error("Initial data refresh failed.", error);
       }
     };
     initData();
 
-    // Real-time: Poll for general data updates every 3 seconds
+    // Real-time: Poll for general data updates every 5 seconds (less aggressive)
     const pollInterval = setInterval(() => {
         if (document.visibilityState === 'visible') {
             refreshData();
         }
-    }, 3000);
+    }, 5000);
 
     return () => clearInterval(pollInterval);
   }, [refreshData]);
+
+  // Real-time: Socket.io for Notifications and Messages
+  useEffect(() => {
+    if (isLoggedIn && currentUserId) {
+      const socket = getSocket();
+      joinUserRoom(currentUserId);
+
+      const handleNewNotification = (notif: AppNotification) => {
+        console.log("Real-time notification received:", notif);
+        setNotifications(prev => {
+            // Avoid duplicates
+            if (prev.some(n => n.id === notif.id)) return prev;
+            return [notif, ...prev];
+        });
+        
+        // Optional: Show a toast or browser notification here
+      };
+
+      const handleNewMessage = (message: any) => {
+        console.log("Real-time message received:", message);
+        // If the DM drawer is open, it might handle its own state, 
+        // but we can trigger a refresh or update a global unread count
+        if (isDirectMessagingOpen) {
+            // The DirectMessaging component should ideally listen to its own socket events
+            // but we can trigger a refresh here if needed
+        }
+      };
+
+      const handleOrderCreated = (order: Order) => {
+        console.log("Real-time order created:", order);
+        setOrders(prev => {
+            if (prev.some(o => o.id === order.id)) return prev;
+            return [order, ...prev];
+        });
+      };
+
+      const handleOrderUpdated = (order: Order) => {
+        console.log("Real-time order updated:", order);
+        setOrders(prev => prev.map(o => o.id === order.id ? order : o));
+      };
+
+      socket.on("notification", handleNewNotification);
+      socket.on("message", handleNewMessage);
+      socket.on("order_created", handleOrderCreated);
+      socket.on("order_updated", handleOrderUpdated);
+
+      return () => {
+        socket.off("notification", handleNewNotification);
+        socket.off("message", handleNewMessage);
+        socket.off("order_created", handleOrderCreated);
+        socket.off("order_updated", handleOrderUpdated);
+      };
+    }
+  }, [isLoggedIn, currentUserId, isDirectMessagingOpen]);
 
   // Load user specific data when auth state changes
   useEffect(() => {

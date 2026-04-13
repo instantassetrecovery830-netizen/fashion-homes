@@ -292,7 +292,8 @@ export const Layout: React.FC<LayoutProps> = ({
         total: orderTotal,
         shippingCost: shippingCost,
         status: 'Processing',
-        items: [...cart]
+        items: [...cart],
+        buyerId: auth.currentUser?.uid
     };
 
     try {

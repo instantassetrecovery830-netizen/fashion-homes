@@ -4,6 +4,7 @@ import { ArrowRight, Loader, AlertCircle, Eye, EyeOff, Upload, Camera, Mail, Che
 import { UserRole, ViewState, Vendor, LandingPageContent } from '../types.ts';
 import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, signOut, signInWithGoogle, sendPasswordResetEmail } from '../services/firebase.ts';
 import { createVendorInDb, createUserInDb, getUserByEmail, getVendorByEmail } from '../services/dataService.ts';
+import { logUserAction } from '../services/loggingService.ts';
 
 interface AuthViewProps {
   onLogin: (role: UserRole) => void;
@@ -191,6 +192,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
       }
 
       await routeUser(user);
+      await logUserAction(user.uid, 'GOOGLE_LOGIN', { email: user.email });
     } catch (err: any) {
         console.error("Google Auth Error:", err);
         setError("Google Sign In Failed. Please try again.");
@@ -286,6 +288,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             await sendEmailVerification(user);
             await signOut(auth);
             setIsVerifying(true);
+            await logUserAction(user.uid, 'REGISTER', { email: user.email, role: selectedRole });
 
         } else {
             // Login Flow
@@ -299,6 +302,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             }
             
             await routeUser(user);
+            await logUserAction(user.uid, 'LOGIN', { email: user.email });
         }
     } catch (err: any) {
         // Suppress expected operational errors from console to avoid alarming logs

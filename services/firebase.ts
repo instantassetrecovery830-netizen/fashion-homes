@@ -12,11 +12,13 @@ import {
   updatePassword as firebaseUpdatePassword,
   type User
 } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 import { apiSignUp, apiSignIn } from './dataService.ts';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 
 export type { User };

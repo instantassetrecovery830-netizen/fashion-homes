@@ -2,66 +2,100 @@
 import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, VerificationStatus, Follower, AppNotification, WaitlistEntry, CartItem, ChatMessage, DirectMessage, UserRole, Review } from '../types.ts';
 import { sql } from './db.ts';
 import bcrypt from 'bcryptjs';
+import { emitNotification, emitMessage, emitOrderCreated, emitOrderUpdated } from './socketService.server.ts';
 
 // --- INITIALIZATION & SEEDING ---
 
 export const initSchema = async () => {
-    await sql`
-        CREATE TABLE IF NOT EXISTS vendors (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            bio TEXT,
-            visual_theme TEXT,
-            avatar TEXT,
-            location TEXT,
-            website TEXT,
-            verification_status TEXT,
-            subscription_status TEXT,
-            subscription_plan TEXT,
-            cover_image TEXT,
-            instagram TEXT,
-            twitter TEXT,
-            facebook TEXT,
-            tiktok TEXT,
-            payment_methods JSONB,
-            kyc_documents JSONB,
-            gallery JSONB,
-            video_url TEXT,
-            shipping_address JSONB
-        )
-    `;
+    console.log("Initializing database schema...");
+    try {
+        await sql`
+            CREATE TABLE IF NOT EXISTS vendors (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                bio TEXT,
+                visual_theme TEXT,
+                avatar TEXT,
+                location TEXT,
+                website TEXT,
+                verification_status TEXT,
+                subscription_status TEXT,
+                subscription_plan TEXT,
+                cover_image TEXT,
+                instagram TEXT,
+                twitter TEXT,
+                facebook TEXT,
+                tiktok TEXT,
+                payment_methods JSONB,
+                kyc_documents JSONB,
+                gallery JSONB,
+                video_url TEXT,
+                shipping_address JSONB
+            )
+        `;
+        console.log("Vendors table ready.");
 
-    // Ensure shipping_address column exists for existing tables
-    await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS shipping_address JSONB`;
+        // Ensure shipping_address column exists for existing tables
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS shipping_address JSONB`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS visual_theme TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS verification_status TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS subscription_status TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS subscription_plan TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS cover_image TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS instagram TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS twitter TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS facebook TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS tiktok TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS payment_methods JSONB`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS kyc_documents JSONB`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS gallery JSONB`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS video_url TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS location TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS website TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS avatar TEXT`;
+        await sql`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS bio TEXT`;
 
-    await sql`
-        CREATE TABLE IF NOT EXISTS products (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            designer TEXT NOT NULL,
-            price DECIMAL NOT NULL,
-            vendor_id TEXT REFERENCES vendors(id),
-            category TEXT,
-            image TEXT,
-            images JSONB,
-            video TEXT,
-            description TEXT,
-            rating DECIMAL,
-            is_new_season BOOLEAN,
-            stock INTEGER,
-            sizes JSONB,
-            is_pre_order BOOLEAN,
-            release_date TEXT,
-            created_at TEXT,
-            votes INTEGER DEFAULT 0,
-            drop_date TEXT
-        )
-    `;
+        await sql`
+            CREATE TABLE IF NOT EXISTS products (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                designer TEXT NOT NULL,
+                price DECIMAL NOT NULL,
+                vendor_id TEXT REFERENCES vendors(id),
+                category TEXT,
+                image TEXT,
+                images JSONB,
+                video TEXT,
+                description TEXT,
+                rating DECIMAL,
+                is_new_season BOOLEAN,
+                stock INTEGER,
+                sizes JSONB,
+                is_pre_order BOOLEAN,
+                release_date TEXT,
+                created_at TEXT,
+                votes INTEGER DEFAULT 0,
+                drop_date TEXT
+            )
+        `;
+        console.log("Products table ready.");
 
-    // Ensure created_at and images columns exist for existing tables
+    // Ensure created_at, images, and video columns exist for existing tables
     await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TEXT`;
     await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS video TEXT`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_new_season BOOLEAN`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_pre_order BOOLEAN`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS release_date TEXT`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS votes INTEGER DEFAULT 0`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS drop_date TEXT`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS vendor_id TEXT REFERENCES vendors(id)`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS rating DECIMAL`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes JSONB`;
 
     await sql`
         CREATE TABLE IF NOT EXISTS users (
@@ -80,6 +114,17 @@ export const initSchema = async () => {
             measurements JSONB
         )
     `;
+
+    // Ensure columns exist for existing tables
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS joined TEXT`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS spend TEXT`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_status TEXT`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS shipping_address JSONB`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS measurements JSONB`;
 
     await sql`
         CREATE TABLE IF NOT EXISTS orders (
@@ -112,6 +157,10 @@ export const initSchema = async () => {
             follower_id TEXT REFERENCES users(id)
         )
     `;
+
+    // Ensure columns exist for existing tables
+    await sql`ALTER TABLE followers ADD COLUMN IF NOT EXISTS vendor_id TEXT REFERENCES vendors(id)`;
+    await sql`ALTER TABLE followers ADD COLUMN IF NOT EXISTS follower_id TEXT REFERENCES users(id)`;
 
     // Ensure foreign key columns exist for existing tables
     try {
@@ -198,6 +247,9 @@ export const initSchema = async () => {
         )
     `;
 
+    // Ensure added_at column exists for existing tables
+    await sql`ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS added_at TEXT`;
+
     await sql`
         CREATE TABLE IF NOT EXISTS saved_items (
             id TEXT PRIMARY KEY,
@@ -207,6 +259,9 @@ export const initSchema = async () => {
             UNIQUE(user_id, product_id)
         )
     `;
+
+    // Ensure saved_at column exists for existing tables
+    await sql`ALTER TABLE saved_items ADD COLUMN IF NOT EXISTS saved_at TEXT`;
 
     await sql`
         CREATE TABLE IF NOT EXISTS chat_messages (
@@ -301,7 +356,10 @@ export const initSchema = async () => {
     // Ensure created_at column exists for existing tables
     await sql`ALTER TABLE auth_accounts ADD COLUMN IF NOT EXISTS created_at TEXT`;
 
-    console.log("Schema initialized successfully.");
+    } catch (e) {
+        console.error("Error initializing schema:", e);
+        throw e;
+    }
 };
 
 export const seedDatabase = async () => {
@@ -324,6 +382,7 @@ export const seedDatabase = async () => {
     await sql`
         INSERT INTO vendors (id, name, email, bio, visual_theme, avatar, location, website, verification_status, subscription_status, subscription_plan)
         VALUES (${v1.id}, ${v1.name}, ${v1.email}, ${v1.bio}, ${v1.visualTheme}, ${v1.avatar}, ${v1.location}, ${v1.website}, ${v1.verificationStatus}, ${v1.subscriptionStatus}, ${v1.subscriptionPlan})
+        ON CONFLICT (id) DO NOTHING
     `;
 
     const v2: Vendor = {
@@ -342,6 +401,7 @@ export const seedDatabase = async () => {
     await sql`
         INSERT INTO vendors (id, name, email, bio, visual_theme, avatar, location, website, verification_status, subscription_status, subscription_plan)
         VALUES (${v2.id}, ${v2.name}, ${v2.email}, ${v2.bio}, ${v2.visualTheme}, ${v2.avatar}, ${v2.location}, ${v2.website}, ${v2.verificationStatus}, ${v2.subscriptionStatus}, ${v2.subscriptionPlan})
+        ON CONFLICT (id) DO NOTHING
     `;
     
     // Seed products
@@ -364,6 +424,7 @@ export const seedDatabase = async () => {
     await sql`
         INSERT INTO products (id, name, designer, price, vendor_id, description, created_at, category, image, rating, is_new_season, stock, sizes, is_pre_order)
         VALUES (${p1.id}, ${p1.name}, ${p1.designer}, ${p1.price}, ${p1.vendorId}, ${p1.description}, ${p1.createdAt}, ${p1.category}, ${p1.image}, ${p1.rating}, ${p1.isNewSeason}, ${p1.stock}, ${JSON.stringify(p1.sizes)}, ${p1.isPreOrder})
+        ON CONFLICT (id) DO NOTHING
     `;
 
     const p2: Product = {
@@ -385,12 +446,14 @@ export const seedDatabase = async () => {
     await sql`
         INSERT INTO products (id, name, designer, price, vendor_id, description, created_at, category, image, rating, is_new_season, stock, sizes, is_pre_order)
         VALUES (${p2.id}, ${p2.name}, ${p2.designer}, ${p2.price}, ${p2.vendorId}, ${p2.description}, ${p2.createdAt}, ${p2.category}, ${p2.image}, ${p2.rating}, ${p2.isNewSeason}, ${p2.stock}, ${JSON.stringify(p2.sizes)}, ${p2.isPreOrder})
+        ON CONFLICT (id) DO NOTHING
     `;
         
     // Seed CMS
     await sql`
         INSERT INTO cms (id, content)
         VALUES ('main', ${JSON.stringify(DEFAULT_CMS_CONTENT)})
+        ON CONFLICT (id) DO NOTHING
     `;
 
     // Seed initial notifications
@@ -419,6 +482,7 @@ export const seedDatabase = async () => {
         INSERT INTO notifications (id, user_id, title, message, read, date, type, link)
         VALUES (${n1.id}, ${n1.userId}, ${n1.title}, ${n1.message}, ${n1.read}, ${n1.date}, ${n1.type}, ${n1.link}),
                (${n2.id}, ${n2.userId}, ${n2.title}, ${n2.message}, ${n2.read}, ${n2.date}, ${n2.type}, ${n2.link})
+        ON CONFLICT (id) DO NOTHING
     `;
 
     // Seed Admin Users
@@ -646,7 +710,9 @@ export const fetchOrders = async (): Promise<Order[]> => {
         date: r.date,
         total: Number(r.total),
         status: r.status,
-        items: r.items
+        items: r.items,
+        buyerId: r.user_id,
+        shippingCost: Number(r.shipping_cost)
     } as Order));
 };
 
@@ -1050,6 +1116,7 @@ export const createNotificationInDb = async (notif: AppNotification) => {
             INSERT INTO notifications (id, user_id, title, message, read, date, type, link)
             VALUES (${notif.id}, ${notif.userId}, ${notif.title}, ${notif.message}, ${notif.read}, ${notif.date}, ${notif.type}, ${notif.link})
         `;
+        emitNotification(notif.userId, notif);
     } catch (e) {
         console.error("Error creating notification:", e);
     }
@@ -1152,9 +1219,13 @@ export const updateLandingContentInDb = async (content: LandingPageContent) => {
 export const createOrderInDb = async (order: Order) => {
     try {
         await sql`
-            INSERT INTO orders (id, customer_name, date, total, status, items)
-            VALUES (${order.id}, ${order.customerName}, ${order.date}, ${order.total}, ${order.status}, ${JSON.stringify(order.items)})
+            INSERT INTO orders (id, customer_name, date, total, status, items, user_id, shipping_cost)
+            VALUES (${order.id}, ${order.customerName}, ${order.date}, ${order.total}, ${order.status}, ${JSON.stringify(order.items)}, ${order.buyerId || null}, ${order.shippingCost || 0})
         `;
+        
+        // Extract vendor IDs from items
+        const vendorIds = Array.from(new Set(order.items.map(item => item.vendorId).filter(Boolean)));
+        emitOrderCreated(order, vendorIds as string[]);
     } catch (e) {
         console.error("Error creating order:", e);
     }
@@ -1163,6 +1234,22 @@ export const createOrderInDb = async (order: Order) => {
 export const updateOrderStatusInDb = async (orderId: string, status: string) => {
     try {
         await sql`UPDATE orders SET status = ${status} WHERE id = ${orderId}`;
+        
+        // Fetch the order to get the buyerId and emit update
+        const [r] = await sql`SELECT * FROM orders WHERE id = ${orderId}`;
+        if (r) {
+            const order: Order = {
+                id: r.id,
+                customerName: r.customer_name,
+                date: r.date,
+                total: Number(r.total),
+                status: r.status,
+                items: r.items,
+                buyerId: r.user_id,
+                shippingCost: Number(r.shipping_cost)
+            };
+            emitOrderUpdated(order, order.buyerId);
+        }
     } catch (e) {
         console.error("Error updating order status:", e);
     }
@@ -1448,6 +1535,7 @@ export const sendDirectMessage = async (message: DirectMessage) => {
             INSERT INTO direct_messages (id, sender_id, receiver_id, text, timestamp, read, product_id)
             VALUES (${message.id}, ${message.senderId}, ${message.receiverId}, ${message.text}, ${message.timestamp}, ${message.read}, ${message.productId || null})
         `;
+        emitMessage(message.receiverId, message);
     } catch (e) {
         console.error("Error sending direct message:", e);
     }

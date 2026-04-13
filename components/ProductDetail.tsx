@@ -4,6 +4,7 @@ import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Rul
 import { Product, Vendor, User as AppUser, Order, Review, ProductVariant } from '../types.ts';
 import { getStyleMatch } from '../services/geminiService.ts';
 import { fetchProductReviews, submitReview, trackProductEvent } from '../services/dataService.ts';
+import { logUserAction } from '../services/loggingService.ts';
 
 interface ProductDetailProps {
   product: Product;
@@ -110,6 +111,9 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
     
     // Track cart event
     trackProductEvent(product.id, product.vendorId, 'CART_ADD').catch(console.error);
+    if (currentUser) {
+        logUserAction(currentUser.id, 'ADD_TO_CART', { productId: product.id, productName: product.name });
+    }
     
     onAddToCart(product, selectedSize || 'One Size', measurements);
   }, [selectedSize, selectedColor, product, measurements, onAddToCart]);
@@ -149,6 +153,9 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
       };
       
       await submitReview(review);
+      if (currentUser) {
+          logUserAction(currentUser.id, 'SUBMIT_REVIEW', { productId: product.id, rating: newRating });
+      }
       setReviews(prev => [review, ...prev]);
       setNewReview('');
       setNewRating(5);

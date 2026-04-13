@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, User as UserIcon } from 'lucide-react';
 import { DirectMessage, User, Vendor } from '../types.ts';
 import { fetchDirectMessages, sendDirectMessage, markDirectMessagesRead } from '../services/dataService.ts';
+import { getSocket } from '../services/socket.ts';
 
 interface DirectMessagingProps {
   isOpen: boolean;
@@ -34,8 +35,23 @@ export const DirectMessaging: React.FC<DirectMessagingProps> = ({
   useEffect(() => {
     if (isOpen && currentUser) {
       loadMessages();
-      const interval = setInterval(loadMessages, 3000);
-      return () => clearInterval(interval);
+      
+      const socket = getSocket();
+      const handleNewMessage = (message: DirectMessage) => {
+        console.log("DM received real-time message:", message);
+        // Only add if it's relevant to the current user (either sender or receiver)
+        if (message.receiverId === currentUser.id || message.senderId === currentUser.id) {
+            setMessages(prev => {
+                if (prev.some(m => m.id === message.id)) return prev;
+                return [...prev, message];
+            });
+        }
+      };
+
+      socket.on("message", handleNewMessage);
+      return () => {
+        socket.off("message", handleNewMessage);
+      };
     }
   }, [isOpen, currentUser]);
 
