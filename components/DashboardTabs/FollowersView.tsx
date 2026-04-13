@@ -1,16 +1,7 @@
 import React from 'react';
 import { Users, Search, Mail, ShieldCheck, ShieldAlert, MoreVertical } from 'lucide-react';
 import { motion } from 'motion/react';
-
-interface Follower {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-  joinDate: string;
-  isVerified: boolean;
-  totalSpent: number;
-}
+import { Follower } from '../../types.ts';
 
 interface FollowersViewProps {
   followers: Follower[];

@@ -70,7 +70,7 @@ interface DashboardProps {
   onDesignerClick?: (designerName: string) => void;
   followers?: Follower[];
   onOpenDirectMessaging?: () => void;
-  currentUser?: AppUser | null;
+  currentUser?: AppUser | Vendor | null;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -543,7 +543,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       case 'MARKETING':
         return (
           <MarketingView 
-            promotions={promotions}
             setIsSidebarOpen={setIsSidebarOpen}
           />
         );
@@ -626,8 +625,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return (
           <UsersView 
             users={users}
-            onUpdateUser={onUpdateUser}
-            onDeleteUser={onDeleteUser}
+            handleDeleteUser={onDeleteUser!}
             setIsSidebarOpen={setIsSidebarOpen}
           />
         );

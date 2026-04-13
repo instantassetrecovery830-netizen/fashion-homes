@@ -16,7 +16,7 @@ interface ProductDetailProps {
   savedItems?: Product[];
   onToggleSave?: (product: Product) => void;
   onMessageClick?: (vendorId: string) => void;
-  currentUser?: AppUser | null;
+  currentUser?: AppUser | Vendor | null;
   orders?: Order[];
 }
 

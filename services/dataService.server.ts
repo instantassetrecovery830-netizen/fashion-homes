@@ -1225,6 +1225,37 @@ export const createOrderInDb = async (order: Order) => {
         
         // Extract vendor IDs from items
         const vendorIds = Array.from(new Set(order.items.map(item => item.vendorId).filter(Boolean)));
+        
+        // Create notifications for vendors
+        for (const vendorId of vendorIds) {
+            const notif: AppNotification = {
+                id: `notif_order_${order.id}_${vendorId}`,
+                userId: vendorId as string,
+                title: 'New Order Received',
+                message: `You have a new order #${order.id.slice(0, 8)} for ${order.items.filter(i => i.vendorId === vendorId).length} items.`,
+                read: false,
+                date: new Date().toISOString(),
+                type: 'ORDER',
+                link: 'DASHBOARD'
+            };
+            await createNotificationInDb(notif);
+        }
+
+        // Create notification for buyer
+        if (order.buyerId) {
+            const buyerNotif: AppNotification = {
+                id: `notif_order_confirm_${order.id}`,
+                userId: order.buyerId,
+                title: 'Order Confirmed',
+                message: `Your order #${order.id.slice(0, 8)} has been placed successfully.`,
+                read: false,
+                date: new Date().toISOString(),
+                type: 'ORDER',
+                link: 'ORDERS'
+            };
+            await createNotificationInDb(buyerNotif);
+        }
+
         emitOrderCreated(order, vendorIds as string[]);
     } catch (e) {
         console.error("Error creating order:", e);
@@ -1248,6 +1279,22 @@ export const updateOrderStatusInDb = async (orderId: string, status: string) => 
                 buyerId: r.user_id,
                 shippingCost: Number(r.shipping_cost)
             };
+
+            // Create notification for buyer
+            if (order.buyerId) {
+                const statusNotif: AppNotification = {
+                    id: `notif_order_status_${order.id}_${Date.now()}`,
+                    userId: order.buyerId,
+                    title: 'Order Status Updated',
+                    message: `Your order #${order.id.slice(0, 8)} is now ${status}.`,
+                    read: false,
+                    date: new Date().toISOString(),
+                    type: 'ORDER',
+                    link: 'ORDERS'
+                };
+                await createNotificationInDb(statusNotif);
+            }
+
             emitOrderUpdated(order, order.buyerId);
         }
     } catch (e) {

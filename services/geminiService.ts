@@ -4,12 +4,12 @@ import { TrendAnalysis, Product } from "../types";
 
 // Initialize Gemini Client
 const getClient = () => {
-  if (!process.env.API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     // In production without key, log warning but don't crash
-    console.warn("API_KEY not found. Features may be limited.");
+    console.warn("GEMINI_API_KEY not found. Features may be limited.");
     return null;
   }
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 };
 
 export const generateSeasonalTrend = async (): Promise<TrendAnalysis> => {

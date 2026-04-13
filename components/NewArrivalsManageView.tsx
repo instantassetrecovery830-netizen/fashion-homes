@@ -153,7 +153,7 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
 
           <button
             onClick={() => {
-                setFormData({ designer: currentUser?.displayName || currentUser?.email?.split('@')[0] });
+                setFormData({ designer: currentUser?.name || currentUser?.email?.split('@')[0] });
                 setIsFormOpen(true);
             }}
             disabled={!canUpload}
@@ -189,7 +189,7 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
               <p className="text-xs uppercase tracking-widest mb-6">Share your latest pieces with the community</p>
               <button
                 onClick={() => {
-                    setFormData({ designer: currentUser?.displayName || currentUser?.email?.split('@')[0] });
+                    setFormData({ designer: currentUser?.name || currentUser?.email?.split('@')[0] });
                     setIsFormOpen(true);
                 }}
                 className="text-luxury-gold hover:text-black underline text-sm transition-colors"

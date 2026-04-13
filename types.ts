@@ -31,6 +31,8 @@ export interface User {
     height: string;
     shoeSize: string;
   };
+  profileData?: any;
+  createdAt?: string;
 }
 
 export interface AppNotification {
@@ -119,7 +121,7 @@ export interface Vendor {
   location?: string;
   coverImage?: string;
   email?: string;
-  subscriptionPlan?: 'Atelier' | 'Maison' | 'Couture';
+  subscriptionPlan?: 'Atelier' | 'Maison' | 'Couture' | 'BASIC';
   website?: string;
   instagram?: string;
   twitter?: string;
@@ -132,6 +134,7 @@ export interface Vendor {
   videoUrl?: string;
   brandName?: string;
   shipping_address?: ShippingAddress;
+  createdAt?: string;
 }
 
 export interface Follower {
@@ -144,6 +147,10 @@ export interface Follower {
   style: string;
   vendorId: string;
   followerId?: string;
+  email?: string;
+  joinDate?: string;
+  isVerified?: boolean;
+  totalSpent?: number;
 }
 
 export interface WaitlistEntry {
@@ -170,6 +177,7 @@ export interface Order {
   items: CartItem[];
   buyerId?: string;
   shippingCost?: number;
+  shippingAddress?: ShippingAddress;
 }
 
 export interface ContactSubmission {

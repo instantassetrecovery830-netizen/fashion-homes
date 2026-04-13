@@ -167,7 +167,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     onClick={(e) => { e.stopPropagation(); onToggleSave && onToggleSave(product); }}
                     className={`absolute top-2 right-2 md:top-4 md:right-4 p-1.5 md:p-0 transition-transform hover:scale-110 duration-300 md:opacity-0 md:group-hover:opacity-100 ${isSaved(product.id) ? 'opacity-100 text-luxury-gold' : 'text-white mix-blend-difference'}`}
                 >
-                  <Heart size={18} md:size={20} strokeWidth={1.5} fill={isSaved(product.id) ? "currentColor" : "none"} />
+                  <Heart size={18} strokeWidth={1.5} fill={isSaved(product.id) ? "currentColor" : "none"} />
                 </button>
               </div>
 
