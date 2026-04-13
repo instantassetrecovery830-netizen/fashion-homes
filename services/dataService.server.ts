@@ -505,6 +505,49 @@ export const seedDatabase = async () => {
         }
     }
 
+    // Seed some mock customers and vendors to populate the dashboard
+    const mockUsers = [
+        { id: 'u1', name: 'Sarah Johnson', email: 'sarah@example.com', role: UserRole.BUYER, avatar: 'https://i.pravatar.cc/150?u=u1', joined: new Date().toISOString(), status: 'ACTIVE', spend: '$1,200', location: 'New York, USA' },
+        { id: 'u2', name: 'Michael Chen', email: 'michael@example.com', role: UserRole.BUYER, avatar: 'https://i.pravatar.cc/150?u=u2', joined: new Date().toISOString(), status: 'ACTIVE', spend: '$850', location: 'London, UK' },
+        { id: 'u3', name: 'Elena Rodriguez', email: 'elena@example.com', role: UserRole.BUYER, avatar: 'https://i.pravatar.cc/150?u=u3', joined: new Date().toISOString(), status: 'ACTIVE', spend: '$2,100', location: 'Madrid, Spain' }
+    ];
+
+    for (const user of mockUsers) {
+        await sql`
+            INSERT INTO users (id, name, email, role, avatar, joined, status, spend, location)
+            VALUES (${user.id}, ${user.name}, ${user.email}, ${user.role}, ${user.avatar}, ${user.joined}, ${user.status}, ${user.spend}, ${user.location})
+            ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                role = EXCLUDED.role,
+                avatar = EXCLUDED.avatar,
+                status = EXCLUDED.status,
+                spend = EXCLUDED.spend,
+                location = EXCLUDED.location
+        `;
+    }
+
+    const mockVendors = [
+        { id: 'v3', name: 'Nairobi Knits', email: 'nairobi@knits.com', bio: 'Sustainable knitwear from the heart of Kenya.', visualTheme: 'GOLD', avatar: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=600', location: 'Nairobi, Kenya', website: 'www.nairobi-knits.com', verificationStatus: 'VERIFIED', subscriptionStatus: 'ACTIVE', subscriptionPlan: 'Couture' },
+        { id: 'v4', name: 'Cape Town Couture', email: 'ct@couture.com', bio: 'High-end fashion inspired by the Atlantic coast.', visualTheme: 'MINIMALIST', avatar: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=600', location: 'Cape Town, South Africa', website: 'www.ct-couture.com', verificationStatus: 'PENDING', subscriptionStatus: 'ACTIVE', subscriptionPlan: 'Maison' }
+    ];
+
+    for (const vendor of mockVendors) {
+        await sql`
+            INSERT INTO vendors (id, name, email, bio, visual_theme, avatar, location, website, verification_status, subscription_status, subscription_plan)
+            VALUES (${vendor.id}, ${vendor.name}, ${vendor.email}, ${vendor.bio}, ${vendor.visualTheme}, ${vendor.avatar}, ${vendor.location}, ${vendor.website}, ${vendor.verificationStatus}, ${vendor.subscriptionStatus}, ${vendor.subscriptionPlan})
+            ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                bio = EXCLUDED.bio,
+                visual_theme = EXCLUDED.visual_theme,
+                avatar = EXCLUDED.avatar,
+                location = EXCLUDED.location,
+                website = EXCLUDED.website,
+                verification_status = EXCLUDED.verification_status,
+                subscription_status = EXCLUDED.subscription_status,
+                subscription_plan = EXCLUDED.subscription_plan
+        `;
+    }
+
     console.log("Database seeded with mock data.");
 };
 

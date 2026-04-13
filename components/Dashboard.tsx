@@ -234,6 +234,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
       return Object.entries(data).map(([name, value]) => ({ name, value }));
   }, [myOrders]);
   
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncData = async () => {
+      if (!window.confirm("This will refresh the database schema and seed data. Existing mock data will be updated. Real user data will be preserved. Continue?")) return;
+      
+      setIsSyncing(true);
+      try {
+          const { initSchema, seedDatabase } = await import('../services/dataService');
+          await initSchema();
+          await seedDatabase();
+          alert("Database synchronized successfully. Refreshing page...");
+          window.location.reload();
+      } catch (error) {
+          console.error("Sync failed:", error);
+          alert("Synchronization failed. Check console for details.");
+      } finally {
+          setIsSyncing(false);
+      }
+  };
+
   // Handlers for Profile
   const handlePasswordUpdate = useCallback(async (e: React.FormEvent) => {
       e.preventDefault();
@@ -513,6 +533,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             totalSales={totalSales}
             myProducts={myProducts}
             revenueData={revenueData}
+            onSyncData={handleSyncData}
+            isSyncing={isSyncing}
           />
         );
 

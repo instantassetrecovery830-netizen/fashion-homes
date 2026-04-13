@@ -14,6 +14,8 @@ interface OverviewViewProps {
   totalSales: number;
   myProducts: Product[];
   revenueData: any[];
+  onSyncData?: () => Promise<void>;
+  isSyncing?: boolean;
 }
 
 export const OverviewView: React.FC<OverviewViewProps> = ({
@@ -25,7 +27,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   totalRevenue,
   totalSales,
   myProducts,
-  revenueData
+  revenueData,
+  onSyncData,
+  isSyncing = false
 }) => {
   return (
     <motion.div 
@@ -37,6 +41,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
        <div className="flex items-center justify-between">
            <h2 className="text-3xl font-serif italic">Dashboard Overview</h2>
            <div className="flex gap-4">
+              {role === UserRole.ADMIN && onSyncData && (
+                  <button 
+                      onClick={onSyncData}
+                      disabled={isSyncing}
+                      className="flex items-center gap-2 px-3 py-2 md:px-4 bg-luxury-gold/10 text-luxury-gold border border-luxury-gold/20 rounded-sm text-[10px] md:text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold hover:text-white transition-all disabled:opacity-50"
+                  >
+                      <Activity size={14} className={isSyncing ? 'animate-spin' : ''} /> 
+                      <span>{isSyncing ? 'Syncing...' : 'Sync & Refresh'}</span>
+                  </button>
+              )}
               {role === UserRole.VENDOR && storefrontForm && (
                   <button 
                       onClick={() => onDesignerClick && onDesignerClick(storefrontForm.name)}
