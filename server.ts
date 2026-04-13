@@ -22,6 +22,14 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Request logging
+  app.use((req, res, next) => {
+    if (req.url.startsWith('/api')) {
+      console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    }
+    next();
+  });
+
   // API routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
@@ -348,10 +356,26 @@ async function startServer() {
     res.json(result);
   }));
 
-  // Global Error Handler for API
-  app.use("/api", (err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error("API Error:", err);
-    res.status(500).json({ error: err.message || "Internal Server Error" });
+  // API 404 Handler
+  app.use("/api/*", (req, res) => {
+    console.warn(`API 404: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: `API Route not found: ${req.method} ${req.originalUrl}` });
+  });
+
+  // Global Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(`ERROR at ${req.method} ${req.url}:`, err);
+    
+    // If it's an API request, return JSON
+    if (req.url.startsWith('/api')) {
+      return res.status(err.status || 500).json({ 
+        error: err.message || "Internal Server Error",
+        path: req.url
+      });
+    }
+    
+    // Otherwise, let it fall through or handle as needed
+    next(err);
   });
 
   // Vite middleware for development
@@ -364,7 +388,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
+    app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

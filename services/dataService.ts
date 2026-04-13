@@ -13,17 +13,39 @@ const fetchApi = async (path: string, options?: RequestInit) => {
         
         if (!response.ok) {
             let errorMessage = `API Error: ${response.status} ${response.statusText}`;
-            try {
-                const errorData = await response.json();
-                if (errorData && errorData.error) {
-                    errorMessage = errorData.error;
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                try {
+                    const errorData = await response.json();
+                    if (errorData && errorData.error) {
+                        errorMessage = errorData.error;
+                    }
+                } catch (e) {
+                    // Not valid JSON after all
                 }
-            } catch (e) {
-                // Not a JSON error response
+            } else {
+                // Likely HTML or plain text
+                try {
+                    const text = await response.text();
+                    console.error(`Non-JSON Error Response for [${path}]:`, text.substring(0, 200));
+                    if (text.includes('<!doctype html>') || text.includes('<html>')) {
+                        errorMessage = `Server returned HTML instead of JSON for ${path}. This usually means a 404 or a server error page.`;
+                    }
+                } catch (e) {
+                    // Could not read text
+                }
             }
             throw new Error(errorMessage);
         }
         
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error(`Expected JSON but got [${contentType}] for [${path}]:`, text.substring(0, 200));
+            throw new Error(`Expected JSON response but got ${contentType || 'unknown'}`);
+        }
+
         return response.json();
     } catch (error: any) {
         console.error(`Fetch API Error [${path}]:`, error);
