@@ -357,7 +357,7 @@ async function startServer() {
   }));
 
   // API 404 Handler
-  app.use("/api/*", (req, res) => {
+  app.use("/api", (req, res) => {
     console.warn(`API 404: ${req.method} ${req.originalUrl}`);
     res.status(404).json({ error: `API Route not found: ${req.method} ${req.originalUrl}` });
   });
