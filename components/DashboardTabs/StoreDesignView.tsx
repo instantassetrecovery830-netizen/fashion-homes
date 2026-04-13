@@ -131,24 +131,24 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                     <div>
                                         <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Title Line 1</label>
                                         <input 
-                                            value={cmsForm.hero.titleLine1}
-                                            onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, titleLine1: e.target.value}})}
+                                            value={cmsForm.hero?.titleLine1 || ''}
+                                            onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), titleLine1: e.target.value}})}
                                             className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                         />
                                     </div>
                                     <div>
                                         <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Title Line 2 (Italic)</label>
                                         <input 
-                                            value={cmsForm.hero.titleLine2}
-                                            onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, titleLine2: e.target.value}})}
+                                            value={cmsForm.hero?.titleLine2 || ''}
+                                            onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), titleLine2: e.target.value}})}
                                             className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                         />
                                     </div>
                                     <div>
                                         <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Subtitle</label>
                                         <input 
-                                            value={cmsForm.hero.subtitle}
-                                            onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, subtitle: e.target.value}})}
+                                            value={cmsForm.hero?.subtitle || ''}
+                                            onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), subtitle: e.target.value}})}
                                             className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                         />
                                     </div>
@@ -156,16 +156,16 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                         <div>
                                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Video URL</label>
                                             <input 
-                                                value={cmsForm.hero.videoUrl}
-                                                onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, videoUrl: e.target.value}})}
+                                                value={cmsForm.hero?.videoUrl || ''}
+                                                onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), videoUrl: e.target.value}})}
                                                 className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white"
                                             />
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Poster URL</label>
                                             <input 
-                                                value={cmsForm.hero.posterUrl}
-                                                onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, posterUrl: e.target.value}})}
+                                                value={cmsForm.hero?.posterUrl || ''}
+                                                onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), posterUrl: e.target.value}})}
                                                 className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white"
                                             />
                                         </div>
@@ -174,16 +174,16 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                         <div>
                                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Button Text</label>
                                             <input 
-                                                value={cmsForm.hero.buttonText}
-                                                onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, buttonText: e.target.value}})}
+                                                value={cmsForm.hero?.buttonText || ''}
+                                                onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), buttonText: e.target.value}})}
                                                 className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                             />
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Secondary Button Text</label>
                                             <input 
-                                                value={cmsForm.hero.secondaryButtonText || ''}
-                                                onChange={e => setCmsForm({...cmsForm, hero: {...cmsForm.hero, secondaryButtonText: e.target.value}})}
+                                                value={cmsForm.hero?.secondaryButtonText || ''}
+                                                onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), secondaryButtonText: e.target.value}})}
                                                 className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                             />
                                         </div>
@@ -352,16 +352,16 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                     <div>
                                         <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Campaign Title</label>
                                         <input 
-                                            value={cmsForm.campaign.title}
-                                            onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, title: e.target.value}})}
+                                            value={cmsForm.campaign?.title || ''}
+                                            onChange={e => setCmsForm({...cmsForm, campaign: {...(cmsForm.campaign || {}), title: e.target.value}})}
                                             className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                         />
                                     </div>
                                     <div>
                                         <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Overlay Text</label>
                                         <input 
-                                            value={cmsForm.campaign.overlayText1}
-                                            onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, overlayText1: e.target.value}})}
+                                            value={cmsForm.campaign?.overlayText1 || ''}
+                                            onChange={e => setCmsForm({...cmsForm, campaign: {...(cmsForm.campaign || {}), overlayText1: e.target.value}})}
                                             className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                         />
                                     </div>
@@ -371,9 +371,9 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                 <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Image {num} URL</label>
                                                 <input 
                                                     // @ts-ignore
-                                                    value={cmsForm.campaign[`image${num}`]}
+                                                    value={cmsForm.campaign?.[`image${num}`] || ''}
                                                     // @ts-ignore
-                                                    onChange={e => setCmsForm({...cmsForm, campaign: {...cmsForm.campaign, [`image${num}`]: e.target.value}})}
+                                                    onChange={e => setCmsForm({...cmsForm, campaign: {...(cmsForm.campaign || {}), [`image${num}`]: e.target.value}})}
                                                     className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white"
                                                 />
                                             </div>
@@ -398,8 +398,8 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                     <div>
                                         <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Philosophy Text 1</label>
                                         <textarea 
-                                            value={cmsForm.about.philosophy.description1}
-                                            onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, philosophy: {...cmsForm.about.philosophy, description1: e.target.value}}})}
+                                            value={cmsForm.about?.philosophy?.description1 || ''}
+                                            onChange={e => setCmsForm({...cmsForm, about: {...(cmsForm.about || {}), philosophy: {...(cmsForm.about?.philosophy || {}), description1: e.target.value}}})}
                                             className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none h-32 transition-colors bg-gray-50 focus:bg-white"
                                         />
                                     </div>
@@ -407,16 +407,16 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                         <div>
                                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Email</label>
                                             <input 
-                                                value={cmsForm.about.contact.email}
-                                                onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, email: e.target.value}}})}
+                                                value={cmsForm.about?.contact?.email || ''}
+                                                onChange={e => setCmsForm({...cmsForm, about: {...(cmsForm.about || {}), contact: {...(cmsForm.about?.contact || {}), email: e.target.value}}})}
                                                 className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                             />
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Phone</label>
                                             <input 
-                                                value={cmsForm.about.contact.phone}
-                                                onChange={e => setCmsForm({...cmsForm, about: {...cmsForm.about, contact: {...cmsForm.about.contact, phone: e.target.value}}})}
+                                                value={cmsForm.about?.contact?.phone || ''}
+                                                onChange={e => setCmsForm({...cmsForm, about: {...(cmsForm.about || {}), contact: {...(cmsForm.about?.contact || {}), phone: e.target.value}}})}
                                                 className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                             />
                                         </div>
