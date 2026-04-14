@@ -17,6 +17,8 @@
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
@@ -24,7 +26,6 @@
         "./*"
       ]
     },
-    "allowImportingTsExtensions": true,
     "noEmit": true
   }
 }

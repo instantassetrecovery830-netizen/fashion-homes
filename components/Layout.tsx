@@ -5,7 +5,7 @@ import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
 import { UserRole, ViewState, CartItem, Order, AppNotification, Product } from '../types.ts';
 import { auth } from '../services/firebase.ts';
-import { markNotificationRead } from '../services/dataService.ts';
+import { markNotificationRead, fetchApi } from '../services/dataService.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -241,15 +241,13 @@ export const Layout: React.FC<LayoutProps> = ({
 
     setIsFetchingRates(true);
     try {
-      const response = await fetch('/api/shipping/rates', {
+      const rates = await fetchApi('/shipping/rates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           addressTo: shippingAddress,
           items: cart
         })
       });
-      const rates = await response.json();
       setShippingRates(rates);
       if (rates.length > 0) {
         setSelectedRate(rates[0]);

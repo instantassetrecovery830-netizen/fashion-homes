@@ -79,7 +79,16 @@ export const initSchema = async () => {
                 drop_date TEXT
             )
         `;
-        console.log("Products table ready.");
+        await sql`
+            CREATE TABLE IF NOT EXISTS user_logs (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                details JSONB,
+                timestamp TEXT NOT NULL
+            )
+        `;
+        console.log("User logs table ready.");
 
     // Ensure created_at, images, and video columns exist for existing tables
     await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TEXT`;

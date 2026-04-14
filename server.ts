@@ -12,15 +12,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const asyncHandler = (fn: Function) => (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.log(`Executing ${req.method} ${req.url}`);
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
 async function startServer() {
-  const app = express();
-  const PORT = 3000;
+  try {
+    const app = express();
+    const PORT = 3000;
 
-  app.use(cors());
-  app.use(express.json());
+    app.use(cors());
+    app.use(express.json());
 
   // Request logging
   app.use((req, res, next) => {
@@ -413,6 +415,10 @@ async function startServer() {
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`SUCCESS: Server running on http://0.0.0.0:${PORT}`);
   });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
 }
 
 startServer().catch(err => {

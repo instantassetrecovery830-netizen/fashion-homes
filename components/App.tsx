@@ -198,7 +198,7 @@ const App: React.FC = () => {
       const isAdmin = userRole === UserRole.ADMIN;
       
       const [dbOrders, dbUsers, dbContacts, dbNotifications, dbFollowers] = await Promise.all([
-        fetchOrders(),
+        fetchOrders().catch(e => { console.error("Error fetching orders:", e); throw e; }),
         isAdmin ? fetchUsers() : Promise.resolve([]),
         isAdmin ? fetchContactSubmissions() : Promise.resolve([]),
         fetchNotifications(currentUserId),

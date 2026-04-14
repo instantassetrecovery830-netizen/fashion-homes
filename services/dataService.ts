@@ -1,15 +1,25 @@
 
 import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Follower, AppNotification, CartItem, ChatMessage, DirectMessage, Review } from '../types.ts';
 
-const fetchApi = async (path: string, options?: RequestInit) => {
+export const fetchApi = async (path: string, options?: RequestInit, retries = 3): Promise<any> => {
     try {
+        console.log(`Fetching /api${path}`);
+        
+        const isGet = !options?.method || options.method.toUpperCase() === 'GET';
+        const headers: HeadersInit = {
+            ...(options?.headers || {}),
+        };
+        
+        if (!isGet) {
+            headers['Content-Type'] = 'application/json';
+        }
+
         const response = await fetch(`/api${path}`, {
             ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...(options?.headers || {}),
-            },
+            headers,
         });
+        
+        console.log(`Response status for /api${path}:`, response.status);
         
         if (!response.ok) {
             let errorMessage = `API Error: ${response.status} ${response.statusText}`;
@@ -30,6 +40,11 @@ const fetchApi = async (path: string, options?: RequestInit) => {
                     const text = await response.text();
                     console.error(`Non-JSON Error Response for [${path}]:`, text.substring(0, 200));
                     if (text.includes('<!doctype html>') || text.includes('<html>')) {
+                        if (text.includes('Starting Server...') && retries > 0) {
+                            console.log(`Server is starting. Retrying ${path} in 2 seconds... (${retries} retries left)`);
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            return fetchApi(path, options, retries - 1);
+                        }
                         errorMessage = `Server returned HTML instead of JSON for ${path}. This usually means a 404 or a server error page.`;
                     }
                 } catch (e) {
@@ -42,14 +57,25 @@ const fetchApi = async (path: string, options?: RequestInit) => {
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            console.error(`Expected JSON but got [${contentType}] for [${path}]:`, text.substring(0, 200));
+            if (text.includes('Starting Server...') && retries > 0) {
+                console.log(`Server is starting (200 OK). Retrying ${path} in 2 seconds... (${retries} retries left)`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                return fetchApi(path, options, retries - 1);
+            }
+            console.error(`Expected JSON but got [${contentType}] for [${path}]:\n${text.substring(0, 200)}`);
             throw new Error(`Expected JSON response but got ${contentType || 'unknown'}`);
         }
 
         return response.json();
     } catch (error: any) {
+        const isNetworkError = error instanceof TypeError && error.message === 'Failed to fetch';
+        if (isNetworkError && retries > 0) {
+            console.log(`Network error fetching ${path}. Retrying in 2 seconds... (${retries} retries left)`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return fetchApi(path, options, retries - 1);
+        }
         console.error(`Fetch API Error [${path}]:`, error);
-        throw error;
+        throw new Error(`Fetch API Error [${path}]: ${error instanceof Error ? error.message : String(error)}`);
     }
 };
 
