@@ -58,6 +58,7 @@ interface DashboardProps {
   onUpdateProduct?: (product: Product) => Promise<void>;
   onDeleteProduct?: (productId: string) => Promise<void>;
   onProductSelect?: (product: Product) => void;
+  onAddUser?: (user: AppUser) => Promise<void>;
   onUpdateUser?: (user: AppUser) => Promise<void>;
   onDeleteUser?: (userId: string) => Promise<void>;
   cmsContent?: LandingPageContent;
@@ -89,6 +90,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onUpdateProduct,
   onDeleteProduct,
   onProductSelect,
+  onAddUser,
   onUpdateUser,
   onDeleteUser,
   cmsContent,
@@ -648,6 +650,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <UsersView 
             users={users}
             handleDeleteUser={onDeleteUser!}
+            handleUpdateUser={onUpdateUser!}
+            handleAddUser={onAddUser!}
             setIsSidebarOpen={setIsSidebarOpen}
           />
         );

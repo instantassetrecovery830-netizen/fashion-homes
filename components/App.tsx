@@ -830,6 +830,11 @@ const App: React.FC = () => {
     await refreshData();
   };
   
+  const handleAddUser = async (user: User) => {
+      await createUserInDb(user);
+      await refreshData();
+  };
+
   const handleUpdateUser = async (user: User) => {
       await updateUserInDb(user);
       await refreshData();
