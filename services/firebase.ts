@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 import { 
   getAuth, 
   signInWithEmailAndPassword as firebaseSignInWithEmailAndPassword,
@@ -13,27 +14,29 @@ import {
   type User
 } from 'firebase/auth';
 import { apiSignUp } from './dataService.ts';
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBZkNjNGQT0A7sKnWj2dNCJxyvS8d5OxOA",
-  authDomain: "myfitstore2-97079.firebaseapp.com",
-  projectId: "myfitstore2-97079",
-  storageBucket: "myfitstore2-97079.firebasestorage.app",
-  messagingSenderId: "54647664240",
-  appId: "1:54647664240:web:31c452f1c34e3e800e4eb5"
-};
+import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 
 export type { User };
 
 export const onAuthStateChanged = firebaseOnAuthStateChanged;
 
-export const signInWithEmailAndPassword = firebaseSignInWithEmailAndPassword;
+export const signInWithEmailAndPassword = async (authInstance: any, email: string, password: string) => {
+    const credential = await firebaseSignInWithEmailAndPassword(authInstance, email, password);
+    // Sync with backend - ensure existing Firebase users are added to the app's database
+    try {
+        await apiSignUp(email, 'FIREBASE_AUTH_USER');
+    } catch (e) {
+        // Ignore error if user already exists in backend
+        console.log('User sync to backend completed or user already exists');
+    }
+    return credential;
+};
 
 export const createUserWithEmailAndPassword = async (authInstance: any, email: string, password: string) => {
     const credential = await firebaseCreateUserWithEmailAndPassword(authInstance, email, password);

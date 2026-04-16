@@ -1,298 +1,293 @@
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, addDoc, orderBy } from 'firebase/firestore';
+import { db } from './firebase.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Follower, AppNotification, CartItem, ChatMessage, DirectMessage, Review, UserRole } from '../types.ts';
 
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Follower, AppNotification, CartItem, ChatMessage, DirectMessage, Review } from '../types.ts';
+// Helper to convert Firestore docs to array
+const getArray = async (q: any) => {
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) }));
+};
 
-export const fetchApi = async (path: string, options?: RequestInit, retries = 3): Promise<any> => {
-    try {
-        console.log(`Fetching /api${path}`);
-        
-        const isGet = !options?.method || options.method.toUpperCase() === 'GET';
-        const headers: HeadersInit = {
-            ...(options?.headers || {}),
-        };
-        
-        if (!isGet) {
-            headers['Content-Type'] = 'application/json';
-        }
+export const fetchVendors = async (): Promise<Vendor[]> => getArray(collection(db, 'vendors')) as Promise<Vendor[]>;
+export const fetchProducts = async (): Promise<Product[]> => getArray(collection(db, 'products')) as Promise<Product[]>;
+export const fetchOrders = async (): Promise<Order[]> => getArray(collection(db, 'orders')) as Promise<Order[]>;
+export const fetchUsers = async (): Promise<User[]> => getArray(collection(db, 'users')) as Promise<User[]>;
 
-        const response = await fetch(`/api${path}`, {
-            ...options,
-            headers,
-        });
-        
-        console.log(`Response status for /api${path}:`, response.status);
-        
-        if (!response.ok) {
-            let errorMessage = `API Error: ${response.status} ${response.statusText}`;
-            const contentType = response.headers.get('content-type');
-            
-            if (contentType && contentType.includes('application/json')) {
-                try {
-                    const errorData = await response.json();
-                    if (errorData && errorData.error) {
-                        errorMessage = errorData.error;
-                    }
-                } catch (e) {
-                    // Not valid JSON after all
-                }
-            } else {
-                // Likely HTML or plain text
-                try {
-                    const text = await response.text();
-                    console.error(`Non-JSON Error Response for [${path}]:`, text.substring(0, 200));
-                    if (text.includes('<!doctype html>') || text.includes('<html>')) {
-                        if (text.includes('Starting Server...') && retries > 0) {
-                            console.log(`Server is starting. Retrying ${path} in 2 seconds... (${retries} retries left)`);
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                            return fetchApi(path, options, retries - 1);
-                        }
-                        errorMessage = `Server returned HTML instead of JSON for ${path}. This usually means a 404 or a server error page.`;
-                    }
-                } catch (e) {
-                    // Could not read text
-                }
-            }
-            throw new Error(errorMessage);
-        }
-        
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            if (text.includes('Starting Server...') && retries > 0) {
-                console.log(`Server is starting (200 OK). Retrying ${path} in 2 seconds... (${retries} retries left)`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                return fetchApi(path, options, retries - 1);
-            }
-            console.error(`Expected JSON but got [${contentType}] for [${path}]:\n${text.substring(0, 200)}`);
-            throw new Error(`Expected JSON response but got ${contentType || 'unknown'}`);
-        }
+export const getUserByEmail = async (email: string): Promise<User | null> => {
+    const q = query(collection(db, 'users'), where('email', '==', email));
+    const docs = await getArray(q);
+    return docs.length > 0 ? docs[0] as User : null;
+};
 
-        return response.json();
-    } catch (error: any) {
-        const isNetworkError = error instanceof TypeError && error.message === 'Failed to fetch';
-        if (isNetworkError && retries > 0) {
-            console.log(`Network error fetching ${path}. Retrying in 2 seconds... (${retries} retries left)`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            return fetchApi(path, options, retries - 1);
+export const getVendorByEmail = async (email: string): Promise<Vendor | null> => {
+    const q = query(collection(db, 'vendors'), where('email', '==', email));
+    const docs = await getArray(q);
+    return docs.length > 0 ? docs[0] as Vendor : null;
+};
+
+export const fetchVendorFollowerCount = async (vendorId: string): Promise<number> => {
+    const q = query(collection(db, 'followers'), where('vendorId', '==', vendorId));
+    const docs = await getArray(q);
+    return docs.length;
+};
+
+export const fetchVendorFollowers = async (vendorId: string): Promise<Follower[]> => {
+    const q = query(collection(db, 'followers'), where('vendorId', '==', vendorId));
+    return getArray(q) as Promise<Follower[]>;
+};
+
+export const fetchAllFollowers = async (): Promise<Follower[]> => getArray(collection(db, 'followers')) as Promise<Follower[]>;
+
+export const fetchUserFollowedVendors = async (userId: string): Promise<Vendor[]> => {
+    const q = query(collection(db, 'followers'), where('userId', '==', userId));
+    const follows = await getArray(q);
+    const vendorIds = follows.map((f: any) => f.vendorId);
+    if (vendorIds.length === 0) return [];
+    
+    const vendors: Vendor[] = [];
+    for (const id of vendorIds) {
+        const vDoc = await getDoc(doc(db, 'vendors', id));
+        if (vDoc.exists()) vendors.push({ id: vDoc.id, ...vDoc.data() } as Vendor);
+    }
+    return vendors;
+};
+
+export const fetchNotifications = async (userId?: string): Promise<AppNotification[]> => {
+    let q = collection(db, 'notifications');
+    if (userId && userId !== 'all') {
+        q = query(q, where('userId', '==', userId)) as any;
+    }
+    return getArray(q) as Promise<AppNotification[]>;
+};
+
+export const fetchLandingContent = async (): Promise<LandingPageContent> => {
+    const d = await getDoc(doc(db, 'cms', 'main'));
+    if (d.exists()) return d.data() as LandingPageContent;
+    return { 
+        hero: { videoUrl: '', posterUrl: '', subtitle: '', titleLine1: '', titleLine2: '', buttonText: '' },
+        featuredDesigners: [],
+        categories: [],
+        curatedCollections: [],
+        footer: { aboutText: '', links: [], social: [] }
+    } as any;
+};
+
+export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> => getArray(collection(db, 'contact_submissions')) as Promise<ContactSubmission[]>;
+
+export const addProductToDb = async (product: Product) => setDoc(doc(db, 'products', product.id), cleanData(product));
+export const updateProductInDb = async (product: Product) => updateDoc(doc(db, 'products', product.id), cleanData(product));
+export const deleteProductFromDb = async (productId: string) => deleteDoc(doc(db, 'products', productId));
+
+export const createVendorInDb = async (vendor: Vendor) => setDoc(doc(db, 'vendors', vendor.id), cleanData(vendor));
+export const updateVendorInDb = async (vendor: Vendor) => updateDoc(doc(db, 'vendors', vendor.id), cleanData(vendor));
+export const deleteVendorFromDb = async (vendorId: string) => deleteDoc(doc(db, 'vendors', vendorId));
+
+export const createUserInDb = async (user: User) => setDoc(doc(db, 'users', user.id), cleanData(user));
+export const updateUserInDb = async (user: User) => updateDoc(doc(db, 'users', user.id), cleanData(user));
+export const deleteUserFromDb = async (userId: string) => deleteDoc(doc(db, 'users', userId));
+
+const cleanData = (obj: any) => {
+    // Handle null or non-objects
+    if (obj === null || typeof obj !== 'object') {
+        return obj;
+    }
+    
+    // Handle arrays
+    if (Array.isArray(obj)) {
+        return obj.map(item => cleanData(item)).filter(item => item !== undefined);
+    }
+
+    const cleaned: any = {};
+    Object.keys(obj).forEach(key => {
+        if (obj[key] !== undefined) {
+            cleaned[key] = cleanData(obj[key]);
         }
-        console.error(`Fetch API Error [${path}]:`, error);
-        throw new Error(`Fetch API Error [${path}]: ${error instanceof Error ? error.message : String(error)}`);
+    });
+    return cleaned;
+};
+
+export const createOrderInDb = async (order: Order) => setDoc(doc(db, 'orders', order.id), cleanData(order));
+
+export const markNotificationRead = async (notificationId: string) => updateDoc(doc(db, 'notifications', notificationId), { read: true });
+
+export const submitContactFormInDb = async (submission: ContactSubmission) => setDoc(doc(db, 'contact_submissions', submission.id), cleanData(submission));
+
+export const joinWaitlistInDb = async (entry: any) => setDoc(doc(db, 'waitlist', entry.email), cleanData(entry));
+
+export const fetchCartItems = async (userId: string): Promise<CartItem[]> => {
+    const q = query(collection(db, 'cart_items'), where('userId', '==', userId));
+    return getArray(q) as Promise<CartItem[]>;
+};
+
+export const addCartItemToDb = async (userId: string, item: CartItem) => {
+    const id = `${userId}_${item.id}_${item.size || 'nosize'}`;
+    await setDoc(doc(db, 'cart_items', id), cleanData({ ...item, userId, id }));
+    return id;
+};
+
+export const updateCartItemInDb = async (cartItemId: string, quantity: number, size: string) => {
+    await updateDoc(doc(db, 'cart_items', cartItemId), { quantity, size });
+};
+
+export const removeCartItemFromDb = async (cartItemId: string) => deleteDoc(doc(db, 'cart_items', cartItemId));
+
+export const clearCartInDb = async (userId: string) => {
+    const items = await fetchCartItems(userId);
+    for (const item of items) {
+        await deleteDoc(doc(db, 'cart_items', item.id));
     }
 };
 
-export const initSchema = () => fetchApi('/init-schema', { method: 'POST' });
-export const seedDatabase = () => fetchApi('/seed-database', { method: 'POST' });
+export const fetchSavedItems = async (userId: string): Promise<Product[]> => {
+    const q = query(collection(db, 'saved_items'), where('userId', '==', userId));
+    const saved = await getArray(q);
+    const productIds = saved.map((s: any) => s.productId);
+    if (productIds.length === 0) return [];
+    
+    const products: Product[] = [];
+    for (const id of productIds) {
+        const pDoc = await getDoc(doc(db, 'products', id));
+        if (pDoc.exists()) products.push({ id: pDoc.id, ...pDoc.data() } as Product);
+    }
+    return products;
+};
 
-export const fetchVendors = (): Promise<Vendor[]> => fetchApi('/vendors');
-export const fetchProducts = (): Promise<Product[]> => fetchApi('/products');
-export const fetchOrders = (): Promise<Order[]> => fetchApi('/orders');
-export const fetchUsers = (): Promise<User[]> => fetchApi('/users');
+export const addSavedItemToDb = async (userId: string, productId: string) => {
+    const id = `${userId}_${productId}`;
+    await setDoc(doc(db, 'saved_items', id), cleanData({ userId, productId, id }));
+};
 
-export const getUserByEmail = (email: string): Promise<User | null> => fetchApi(`/user-by-email?email=${encodeURIComponent(email)}`);
-export const getVendorByEmail = (email: string): Promise<Vendor | null> => fetchApi(`/vendor-by-email?email=${encodeURIComponent(email)}`);
+export const removeSavedItemFromDb = async (userId: string, productId: string) => {
+    const id = `${userId}_${productId}`;
+    await deleteDoc(doc(db, 'saved_items', id));
+};
 
-export const fetchVendorFollowerCount = (vendorId: string): Promise<number> => 
-    fetchApi(`/vendor-follower-count/${vendorId}`).then(res => res.count);
+export const fetchChatMessages = async (userId: string): Promise<ChatMessage[]> => {
+    const q = query(collection(db, 'messages'), where('userId', '==', userId));
+    return getArray(q) as Promise<ChatMessage[]>;
+};
 
-export const fetchVendorFollowers = (vendorId: string): Promise<Follower[]> => fetchApi(`/vendor-followers/${vendorId}`);
-export const fetchAllFollowers = (): Promise<Follower[]> => fetchApi('/all-followers');
+export const addChatMessageToDb = async (userId: string, message: ChatMessage) => {
+    await setDoc(doc(db, 'messages', message.id), cleanData({ ...message, userId }));
+};
 
-export const fetchUserFollowedVendors = (userId: string): Promise<Vendor[]> => fetchApi(`/user-followed-vendors/${userId}`);
+export const fetchDirectMessages = async (userId1: string, userId2: string): Promise<DirectMessage[]> => {
+    const q1 = query(collection(db, 'direct_messages'), where('senderId', '==', userId1), where('receiverId', '==', userId2));
+    const q2 = query(collection(db, 'direct_messages'), where('senderId', '==', userId2), where('receiverId', '==', userId1));
+    const [docs1, docs2] = await Promise.all([getArray(q1), getArray(q2)]);
+    return [...docs1, ...docs2].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) as DirectMessage[];
+};
 
-export const fetchNotifications = (userId?: string): Promise<AppNotification[]> => 
-    fetchApi(`/notifications/${userId || 'all'}`);
+export const sendDirectMessageToDb = async (message: DirectMessage) => {
+    await setDoc(doc(db, 'direct_messages', message.id), cleanData(message));
+};
 
-export const fetchLandingContent = (): Promise<LandingPageContent> => fetchApi('/landing-content');
-export const fetchContactSubmissions = (): Promise<ContactSubmission[]> => fetchApi('/contact-submissions');
+export const markDirectMessageReadInDb = async (messageId: string) => {
+    await updateDoc(doc(db, 'direct_messages', messageId), { read: true });
+};
 
-export const addProductToDb = (product: Product) => fetchApi('/products', {
-    method: 'POST',
-    body: JSON.stringify(product)
-});
+export const fetchReviews = async (productId: string): Promise<Review[]> => {
+    const q = query(collection(db, 'reviews'), where('productId', '==', productId));
+    return getArray(q) as Promise<Review[]>;
+};
 
-export const updateProductInDb = (product: Product) => fetchApi(`/products/${product.id}`, {
-    method: 'PUT',
-    body: JSON.stringify(product)
-});
+export const addReviewToDb = async (review: Review) => {
+    await setDoc(doc(db, 'reviews', review.id), cleanData(review));
+};
 
-export const deleteProductFromDb = (productId: string) => fetchApi(`/products/${productId}`, {
-    method: 'DELETE'
-});
+export const fetchUserVotes = async (userId: string): Promise<string[]> => {
+    const q = query(collection(db, 'votes'), where('userId', '==', userId));
+    const docs = await getArray(q);
+    return docs.map((d: any) => d.productId);
+};
 
-export const updateVendorInDb = (vendor: Vendor) => fetchApi(`/vendors/${vendor.id}`, {
-    method: 'PUT',
-    body: JSON.stringify(vendor)
-});
+export const addVoteToDb = async (userId: string, productId: string) => {
+    const id = `${userId}_${productId}`;
+    await setDoc(doc(db, 'votes', id), cleanData({ userId, productId, id }));
+};
 
-export const createVendorInDb = (vendor: Vendor) => fetchApi('/vendors', {
-    method: 'POST',
-    body: JSON.stringify(vendor)
-});
+export const removeVoteFromDb = async (userId: string, productId: string) => {
+    const id = `${userId}_${productId}`;
+    await deleteDoc(doc(db, 'votes', id));
+};
 
-export const deleteVendorFromDb = (vendorId: string) => fetchApi(`/vendors/${vendorId}`, {
-    method: 'DELETE'
-});
+export const updateLandingContentInDb = async (content: LandingPageContent) => {
+    await setDoc(doc(db, 'cms', 'main'), cleanData(content));
+};
 
-export const createUserInDb = (user: User) => fetchApi('/users', {
-    method: 'POST',
-    body: JSON.stringify(user)
-});
+export const updateOrderStatusInDb = async (orderId: string, status: string) => updateDoc(doc(db, 'orders', orderId), { status });
 
-export const updateUserInDb = (user: User) => fetchApi(`/users/${user.id}`, {
-    method: 'PUT',
-    body: JSON.stringify(user)
-});
+export const createNotificationInDb = async (notification: AppNotification) => setDoc(doc(db, 'notifications', notification.id), cleanData(notification));
 
-export const createOrderInDb = (order: Order) => fetchApi('/orders', {
-    method: 'POST',
-    body: JSON.stringify(order)
-});
+export const addFollowerToDb = async (follower: Follower) => setDoc(doc(db, 'followers', follower.id), cleanData(follower));
 
-export const markNotificationRead = (notificationId: string) => fetchApi('/notifications/read', {
-    method: 'POST',
-    body: JSON.stringify({ notificationId })
-});
+export const removeFollowerFromDb = async (followerId: string) => deleteDoc(doc(db, 'followers', followerId));
 
-export const submitContactFormInDb = (submission: ContactSubmission) => fetchApi('/contacts', {
-    method: 'POST',
-    body: JSON.stringify(submission)
-});
+export const updateContactStatusInDb = async (id: string, status: string) => updateDoc(doc(db, 'contact_submissions', id), { status });
 
-export const joinWaitlistInDb = (entry: any) => fetchApi('/waitlist', {
-    method: 'POST',
-    body: JSON.stringify(entry)
-});
+export const voteForProduct = async (userId: string, productId: string) => {
+    const id = `${userId}_${productId}`;
+    await setDoc(doc(db, 'votes', id), cleanData({ userId, productId, id }));
+};
 
-export const fetchCartItems = (userId: string): Promise<CartItem[]> => fetchApi(`/cart/${userId}`);
+export const trackProductEvent = async (productId: string, eventType: string, userId?: string) => {
+    // Optional implementation
+};
 
-export const addCartItemToDb = (userId: string, item: CartItem) => fetchApi('/cart', {
-    method: 'POST',
-    body: JSON.stringify({ userId, item })
-});
+export const fetchVendorAnalytics = async (vendorId: string) => {
+    return [];
+};
 
-export const updateCartItemInDb = (cartItemId: string, quantity: number, size: string) => fetchApi(`/cart/${cartItemId}`, {
-    method: 'PUT',
-    body: JSON.stringify({ quantity, size })
-});
+export const createShipmentInDb = async (shipment: any) => setDoc(doc(db, 'shipments', shipment.id), cleanData(shipment));
 
-export const removeCartItemFromDb = (cartItemId: string) => fetchApi(`/cart-item/${cartItemId}`, {
-    method: 'DELETE'
-});
+export const fetchVendorShipments = async (vendorId: string): Promise<any[]> => {
+    const q = query(collection(db, 'shipments'), where('vendorId', '==', vendorId));
+    return getArray(q);
+};
 
-export const clearCartInDb = (userId: string) => fetchApi(`/cart/${userId}`, {
-    method: 'DELETE'
-});
+export const updateShipmentStatusInDb = async (id: string, status: string) => updateDoc(doc(db, 'shipments', id), { status });
 
-export const fetchSavedItems = (userId: string): Promise<Product[]> => fetchApi(`/saved/${userId}`);
+export const sendDirectMessage = async (message: DirectMessage) => setDoc(doc(db, 'direct_messages', message.id), cleanData(message));
 
-export const addSavedItemToDb = (userId: string, productId: string) => fetchApi('/saved', {
-    method: 'POST',
-    body: JSON.stringify({ userId, productId })
-});
+export const markDirectMessagesRead = async (userId: string, senderId: string) => {
+    const q = query(collection(db, 'direct_messages'), where('receiverId', '==', userId), where('senderId', '==', senderId), where('read', '==', false));
+    const unread = await getArray(q);
+    for (const msg of unread) {
+        await updateDoc(doc(db, 'direct_messages', msg.id), { read: true });
+    }
+};
 
-export const removeSavedItemFromDb = (userId: string, productId: string) => fetchApi(`/saved/${userId}/${productId}`, {
-    method: 'DELETE'
-});
+export const getShippingRates = async (addressTo: any, items: any[]) => {
+    // Mock shipping rates
+    return [
+        { object_id: 'rate_1', provider: 'USPS', servicelevel: { name: 'Priority Mail' }, amount: '8.50', currency: 'USD', estimated_days: 3 },
+        { object_id: 'rate_2', provider: 'FedEx', servicelevel: { name: 'Ground' }, amount: '12.00', currency: 'USD', estimated_days: 5 },
+        { object_id: 'rate_3', provider: 'UPS', servicelevel: { name: 'Next Day Air' }, amount: '35.00', currency: 'USD', estimated_days: 1 }
+    ];
+};
 
-export const fetchChatMessages = (userId: string): Promise<ChatMessage[]> => fetchApi(`/chat/${userId}`);
+export const fetchProductReviews = async (productId: string): Promise<Review[]> => {
+    const q = query(collection(db, 'reviews'), where('productId', '==', productId));
+    return getArray(q) as Promise<Review[]>;
+};
 
-export const addChatMessageToDb = (userId: string, message: ChatMessage) => fetchApi('/chat', {
-    method: 'POST',
-    body: JSON.stringify({ userId, message })
-});
+export const submitReview = async (review: Review) => setDoc(doc(db, 'reviews', review.id), cleanData(review));
 
-export const addFollowerToDb = (follower: Follower & { followerId: string }) => fetchApi('/follow', {
-    method: 'POST',
-    body: JSON.stringify({ follower })
-});
+export const initSchema = async () => {};
+export const seedDatabase = async () => {};
 
-export const removeFollowerFromDb = (followerId: string, vendorId: string) => fetchApi(`/follow/${followerId}/${vendorId}`, {
-    method: 'DELETE'
-});
-
-export const voteForProduct = (productId: string, userId: string) => fetchApi('/vote', {
-    method: 'POST',
-    body: JSON.stringify({ productId, userId })
-});
-
-export const fetchUserVotes = (userId: string): Promise<string[]> => fetchApi(`/votes/${userId}`);
-
-export const updateLandingContentInDb = (content: LandingPageContent) => fetchApi('/landing-content', {
-    method: 'PUT',
-    body: JSON.stringify(content)
-});
-
-export const updateOrderStatusInDb = (orderId: string, status: string) => fetchApi(`/orders/${orderId}/status`, {
-    method: 'PUT',
-    body: JSON.stringify({ status })
-});
-
-export const updateContactStatusInDb = (id: string, status: string) => fetchApi(`/contacts/${id}/status`, {
-    method: 'PUT',
-    body: JSON.stringify({ status })
-});
-
-export const deleteUserFromDb = (userId: string) => fetchApi(`/users/${userId}`, {
-    method: 'DELETE'
-});
-
-export const createNotificationInDb = (notif: AppNotification) => fetchApi('/notifications', {
-    method: 'POST',
-    body: JSON.stringify(notif)
-});
-
-// Direct Messaging API
-export const fetchDirectMessages = (userId: string): Promise<DirectMessage[]> => fetchApi(`/direct-messages/${userId}`);
-
-export const sendDirectMessage = (message: DirectMessage) => fetchApi('/direct-messages', {
-    method: 'POST',
-    body: JSON.stringify(message)
-});
-
-export const markDirectMessagesRead = (receiverId: string, senderId: string) => fetchApi('/direct-messages/read', {
-    method: 'PUT',
-    body: JSON.stringify({ receiverId, senderId })
-});
-
-// Reviews API
-export const fetchProductReviews = (productId: string): Promise<Review[]> => fetchApi(`/reviews/${productId}`);
-
-export const submitReview = (review: Review) => fetchApi('/reviews', {
-    method: 'POST',
-    body: JSON.stringify(review)
-});
-
-// Auth API
-export const apiSignUp = (email: string, password: string) => fetchApi('/auth/signup', {
-    method: 'POST',
-    body: JSON.stringify({ email, password })
-});
-
-export const apiSignIn = (email: string, password: string) => fetchApi('/auth/signin', {
-    method: 'POST',
-    body: JSON.stringify({ email, password })
-});
-
-export const apiUpdatePassword = (email: string, newPassword: string) => fetchApi('/auth/update-password', {
-    method: 'POST',
-    body: JSON.stringify({ email, newPassword })
-});
-
-// Analytics API
-export const trackProductEvent = (productId: string, vendorId: string, type: 'VIEW' | 'SALE' | 'CART_ADD') => fetchApi('/analytics/track', {
-    method: 'POST',
-    body: JSON.stringify({ productId, vendorId, type })
-});
-
-export const fetchVendorAnalytics = (vendorId: string): Promise<any[]> => fetchApi(`/analytics/vendor/${vendorId}`);
-
-export const fetchVendorShipments = (vendorId: string): Promise<any[]> => fetchApi(`/shipments/vendor/${vendorId}`);
-
-export const createShipmentInDb = (shipment: any) => fetchApi('/shipments', {
-    method: 'POST',
-    body: JSON.stringify(shipment)
-});
-
-export const updateShipmentStatusInDb = (id: string, status: string) => fetchApi(`/shipments/${id}/status`, {
-    method: 'PUT',
-    body: JSON.stringify({ status })
-});
+export const apiSignUp = async (email: string, name: string) => {
+    const existing = await getUserByEmail(email);
+    if (!existing) {
+        const newUser: User = {
+            id: email, // Or generate a UUID
+            name: name || email.split('@')[0],
+            email: email,
+            role: UserRole.BUYER,
+            joined: new Date().toISOString(),
+            status: 'ACTIVE',
+            avatar: ''
+        };
+        await createUserInDb(newUser);
+    }
+};

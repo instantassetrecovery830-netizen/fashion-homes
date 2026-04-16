@@ -1,11 +1,16 @@
-import { sql } from './db.ts';
+import { db } from './firebase.ts';
+import { collection, setDoc, doc } from 'firebase/firestore';
 
 export const logUserAction = async (userId: string, action: string, details: any) => {
     try {
-        await sql`
-            INSERT INTO user_logs (id, user_id, action, details, timestamp)
-            VALUES (gen_random_uuid(), ${userId}, ${action}, ${JSON.stringify(details)}, ${new Date().toISOString()})
-        `;
+        const id = `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await setDoc(doc(db, 'user_logs', id), {
+            id,
+            userId,
+            action,
+            details,
+            timestamp: new Date().toISOString()
+        });
     } catch (error) {
         console.error("Error logging user action:", error);
     }

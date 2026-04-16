@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, User as UserIcon } from 'lucide-react';
 import { DirectMessage, User, Vendor } from '../types.ts';
 import { fetchDirectMessages, sendDirectMessage, markDirectMessagesRead } from '../services/dataService.ts';
-import { getSocket } from '../services/socket.ts';
+import { db } from '../services/firebase.ts';
+import { collection, onSnapshot, query, where, or } from 'firebase/firestore';
 
 interface DirectMessagingProps {
   isOpen: boolean;
@@ -36,21 +37,27 @@ export const DirectMessaging: React.FC<DirectMessagingProps> = ({
     if (isOpen && currentUser) {
       loadMessages();
       
-      const socket = getSocket();
-      const handleNewMessage = (message: DirectMessage) => {
-        console.log("DM received real-time message:", message);
-        // Only add if it's relevant to the current user (either sender or receiver)
-        if (message.receiverId === currentUser.id || message.senderId === currentUser.id) {
-            setMessages(prev => {
-                if (prev.some(m => m.id === message.id)) return prev;
-                return [...prev, message];
-            });
-        }
+      const q1 = query(collection(db, 'direct_messages'), where('receiverId', '==', currentUser.id));
+      const q2 = query(collection(db, 'direct_messages'), where('senderId', '==', currentUser.id));
+      
+      const handleSnapshot = (snapshot: any) => {
+        snapshot.docChanges().forEach((change: any) => {
+            if (change.type === 'added') {
+                const message = { id: change.doc.id, ...change.doc.data() } as DirectMessage;
+                setMessages(prev => {
+                    if (prev.some(m => m.id === message.id)) return prev;
+                    return [...prev, message].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                });
+            }
+        });
       };
 
-      socket.on("message", handleNewMessage);
+      const unsub1 = onSnapshot(q1, handleSnapshot);
+      const unsub2 = onSnapshot(q2, handleSnapshot);
+
       return () => {
-        socket.off("message", handleNewMessage);
+        unsub1();
+        unsub2();
       };
     }
   }, [isOpen, currentUser]);
@@ -64,7 +71,8 @@ export const DirectMessaging: React.FC<DirectMessagingProps> = ({
 
   const loadMessages = async () => {
     try {
-      const msgs = await fetchDirectMessages(currentUser.id);
+      if (!selectedContactId) return;
+      const msgs = await fetchDirectMessages(currentUser.id, selectedContactId);
       setMessages(msgs);
     } catch (error) {
       console.error("Failed to load messages", error);

@@ -8,14 +8,14 @@ import { FeatureFlags, Product, UserRole, ViewState, Vendor, CartItem, Order, Us
 import { 
   initSchema, seedDatabase, fetchVendors, fetchProducts, fetchOrders, fetchUsers, fetchLandingContent, fetchContactSubmissions,
   addProductToDb, updateProductInDb, deleteProductFromDb,
-  updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, updateUserInDb, deleteUserFromDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
+  updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, createUserInDb, updateUserInDb, deleteUserFromDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
   fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct, fetchUserVotes,
   fetchCartItems, addCartItemToDb, updateCartItemInDb, removeCartItemFromDb, clearCartInDb,
   fetchSavedItems, addSavedItemToDb, removeSavedItemFromDb, trackProductEvent
 } from '@/services/dataService';
 import { searchProductsByImage } from '../services/geminiService.ts';
-import { auth, onAuthStateChanged, signOut } from '../services/firebase.ts';
-import { getSocket, joinUserRoom } from '../services/socket.ts';
+import { auth, onAuthStateChanged, signOut, db } from '../services/firebase.ts';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 // Lazy Load Heavy Components for Performance
 const MarketplaceView = React.lazy(() => import('./MarketplaceView.tsx').then(m => ({ default: m.MarketplaceView })));
@@ -240,67 +240,49 @@ const App: React.FC = () => {
       }
     };
     initData();
-
-    // Real-time: Poll for general data updates every 5 seconds (less aggressive)
-    const pollInterval = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-            refreshData();
-        }
-    }, 5000);
-
-    return () => clearInterval(pollInterval);
   }, [refreshData]);
 
-  // Real-time: Socket.io for Notifications and Messages
+  // Real-time: Firestore onSnapshot for general data updates
+  useEffect(() => {
+    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+        setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+    });
+    const unsubVendors = onSnapshot(collection(db, 'vendors'), (snapshot) => {
+        setVendors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
+    });
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+        setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+    });
+    const unsubContent = onSnapshot(collection(db, 'landing_content'), (snapshot) => {
+        if (!snapshot.empty) {
+            setCmsContent({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as unknown as LandingPageContent);
+        }
+    });
+
+    return () => {
+        unsubProducts();
+        unsubVendors();
+        unsubUsers();
+        unsubContent();
+    };
+  }, []);
+
+  // Real-time: Firestore onSnapshot for Notifications and Orders
   useEffect(() => {
     if (isLoggedIn && currentUserId) {
-      const socket = getSocket();
-      joinUserRoom(currentUserId);
+      const qNotif = query(collection(db, 'notifications'), where('userId', '==', currentUserId));
+      const unsubNotif = onSnapshot(qNotif, (snapshot) => {
+        setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification)));
+      });
 
-      const handleNewNotification = (notif: AppNotification) => {
-        console.log("Real-time notification received:", notif);
-        setNotifications(prev => {
-            // Avoid duplicates
-            if (prev.some(n => n.id === notif.id)) return prev;
-            return [notif, ...prev];
-        });
-        
-        // Optional: Show a toast or browser notification here
-      };
-
-      const handleNewMessage = (message: any) => {
-        console.log("Real-time message received:", message);
-        // If the DM drawer is open, it might handle its own state, 
-        // but we can trigger a refresh or update a global unread count
-        if (isDirectMessagingOpen) {
-            // The DirectMessaging component should ideally listen to its own socket events
-            // but we can trigger a refresh here if needed
-        }
-      };
-
-      const handleOrderCreated = (order: Order) => {
-        console.log("Real-time order created:", order);
-        setOrders(prev => {
-            if (prev.some(o => o.id === order.id)) return prev;
-            return [order, ...prev];
-        });
-      };
-
-      const handleOrderUpdated = (order: Order) => {
-        console.log("Real-time order updated:", order);
-        setOrders(prev => prev.map(o => o.id === order.id ? order : o));
-      };
-
-      socket.on("notification", handleNewNotification);
-      socket.on("message", handleNewMessage);
-      socket.on("order_created", handleOrderCreated);
-      socket.on("order_updated", handleOrderUpdated);
+      const qOrders = query(collection(db, 'orders'));
+      const unsubOrders = onSnapshot(qOrders, (snapshot) => {
+        setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
+      });
 
       return () => {
-        socket.off("notification", handleNewNotification);
-        socket.off("message", handleNewMessage);
-        socket.off("order_created", handleOrderCreated);
-        socket.off("order_updated", handleOrderUpdated);
+        unsubNotif();
+        unsubOrders();
       };
     }
   }, [isLoggedIn, currentUserId, isDirectMessagingOpen]);
@@ -761,7 +743,7 @@ const App: React.FC = () => {
       if (isFollowing) {
           // Optimistic update
           setFollowedVendors(prev => prev.filter(v => v.id !== vendor.id));
-          await removeFollowerFromDb(followerId, vendor.id);
+          await removeFollowerFromDb(`follow_${followerId}_${vendor.id}`);
       } else {
           // Optimistic update
           setFollowedVendors(prev => [...prev, vendor]);

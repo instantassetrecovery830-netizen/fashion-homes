@@ -14,7 +14,7 @@ interface UsersViewProps {
 export const UsersView: React.FC<UsersViewProps> = ({ users, setIsSidebarOpen, handleDeleteUser, handleUpdateUser, handleAddUser }) => {
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [isAddingUser, setIsAddingUser] = useState(false);
-    const [newUser, setNewUser] = useState<Partial<User>>({ role: 'BUYER', status: 'ACTIVE' });
+    const [newUser, setNewUser] = useState<Partial<User>>({ role: UserRole.BUYER, status: 'ACTIVE' });
     const [isSaving, setIsSaving] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -48,7 +48,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ users, setIsSidebarOpen, h
             } as User;
             await handleAddUser(userToCreate);
             setIsAddingUser(false);
-            setNewUser({ role: 'BUYER', status: 'ACTIVE' });
+            setNewUser({ role: UserRole.BUYER, status: 'ACTIVE' });
         } catch (error) {
             console.error('Failed to create user:', error);
             alert('Failed to create user. Please try again.');
