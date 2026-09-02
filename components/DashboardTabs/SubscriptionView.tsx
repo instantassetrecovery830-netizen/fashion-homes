@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { BadgeCheck, FileText, CreditCard, Menu, Loader, Check, X, ShieldCheck, Sparkles, Lock } from 'lucide-react';
 import { Vendor } from '../../types.ts';
+import { useCurrency } from '../../context/CurrencyContext.tsx';
 // @ts-ignore
 import { usePaystackPayment } from 'react-paystack';
 
@@ -36,6 +37,7 @@ const PLANS = [
 ];
 
 export const SubscriptionView: React.FC<SubscriptionViewProps> = ({ storefrontForm, setIsSidebarOpen, onUpdateVendor }) => {
+    const { formatPrice } = useCurrency();
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState<typeof PLANS[0] | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -204,7 +206,7 @@ export const SubscriptionView: React.FC<SubscriptionViewProps> = ({ storefrontFo
                                     )}
                                     <h3 className="text-lg font-serif italic mb-1">{plan.name}</h3>
                                     <div className="flex items-baseline gap-1 mb-6">
-                                        <span className="text-2xl font-bold">${plan.price}</span>
+                                        <span className="text-2xl font-bold">{formatPrice(plan.price)}</span>
                                         <span className="text-[10px] text-gray-400 uppercase tracking-widest">/ month</span>
                                     </div>
                                     <ul className="space-y-3 mb-8 flex-1">

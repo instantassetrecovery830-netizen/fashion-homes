@@ -2,6 +2,7 @@
 import React from 'react';
 import { Menu, Sparkles } from 'lucide-react';
 import { Product, Vendor } from '../../types.ts';
+import { useCurrency } from '../../context/CurrencyContext.tsx';
 
 interface NewArrivalsFeedProps {
     products: Product[];
@@ -16,6 +17,7 @@ export const NewArrivalsFeed: React.FC<NewArrivalsFeedProps> = ({
     setIsSidebarOpen,
     onProductSelect
 }) => {
+    const { formatPrice } = useCurrency();
     // Filter for active new arrivals (last 7 days) from active vendors/admin
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -63,7 +65,7 @@ export const NewArrivalsFeed: React.FC<NewArrivalsFeedProps> = ({
                                     <h3 className="font-bold text-sm truncate pr-2">{product.name}</h3>
                                     <p className="text-[10px] text-gray-500 uppercase tracking-wide">{product.designer}</p>
                                 </div>
-                                <span className="text-sm font-medium">${product.price}</span>
+                                <span className="text-sm font-medium">{formatPrice(product.price)}</span>
                             </div>
                         </div>
                     </div>

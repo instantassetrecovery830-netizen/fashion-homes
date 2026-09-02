@@ -2,6 +2,7 @@ import React from 'react';
 import { Package, Search, Plus, Filter, MoreVertical, Edit2, Trash2, Eye, Star, Archive, AlertCircle, CheckCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Product, UserRole } from '../../types';
+import { useCurrency } from '../../context/CurrencyContext.tsx';
 
 interface ProductsViewProps {
   products: Product[];
@@ -24,6 +25,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   onUpdateProduct,
   onProductSelect
 }) => {
+  const { formatPrice } = useCurrency();
   return (
     <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
       <div className="flex items-center justify-between">
@@ -80,7 +82,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         </div>
         <div className="bg-white p-6 border border-gray-100 rounded-sm shadow-sm">
           <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-1">Total Value</p>
-          <p className="text-2xl font-serif text-luxury-gold">${products.reduce((acc, p) => acc + (p.price * p.stock), 0).toLocaleString()}</p>
+          <p className="text-2xl font-serif text-luxury-gold">{formatPrice(products.reduce((acc, p) => acc + (p.price * p.stock), 0))}</p>
         </div>
       </div>
 
@@ -131,7 +133,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                   <td className="px-6 py-4">
                     <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-full">{product.category}</span>
                   </td>
-                  <td className="px-6 py-4 font-medium text-sm">${product.price.toLocaleString()}</td>
+                  <td className="px-6 py-4 font-medium text-sm">{formatPrice(product.price)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <span className={`text-sm font-medium ${product.stock < 5 ? 'text-red-500' : 'text-gray-600'}`}>

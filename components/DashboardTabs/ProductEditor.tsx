@@ -201,15 +201,50 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <input 
-                  type="checkbox" 
-                  id="isPreOrder"
-                  checked={productForm.isPreOrder || false}
-                  onChange={e => setProductForm({...productForm, isPreOrder: e.target.checked})}
-                  className="accent-black"
-                />
-                <label htmlFor="isPreOrder" className="text-xs text-gray-600 cursor-pointer select-none">Available for Pre-Order</label>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="isPreOrder"
+                    checked={productForm.isPreOrder || false}
+                    onChange={e => setProductForm({...productForm, isPreOrder: e.target.checked, preOrderDepositPercentage: e.target.checked ? (productForm.preOrderDepositPercentage || 50) : undefined})}
+                    className="accent-black"
+                  />
+                  <label htmlFor="isPreOrder" className="text-xs text-gray-600 cursor-pointer select-none font-medium">Bespoke / Pre-Order Piece (Allow partial deposit)</label>
+                </div>
+
+                {productForm.isPreOrder && (
+                  <div className="pl-6 space-y-2 bg-amber-50/50 p-3 rounded-sm border border-amber-200/60">
+                    <label className="text-[10px] font-bold uppercase text-amber-900 block">Upfront Deposit Percentage (%)</label>
+                    <div className="flex items-center gap-3">
+                      {[25, 50, 75].map(pct => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => setProductForm({...productForm, preOrderDepositPercentage: pct})}
+                          className={`px-3 py-1 rounded text-xs font-bold ${
+                            (productForm.preOrderDepositPercentage || 50) === pct 
+                              ? 'bg-amber-900 text-white' 
+                              : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-100'
+                          }`}
+                        >
+                          {pct}% Upfront
+                        </button>
+                      ))}
+                      <input 
+                        type="number"
+                        min="10"
+                        max="90"
+                        value={productForm.preOrderDepositPercentage || 50}
+                        onChange={e => setProductForm({...productForm, preOrderDepositPercentage: Number(e.target.value)})}
+                        className="w-16 border-b border-amber-300 py-1 text-xs text-center font-bold outline-none bg-transparent"
+                      />
+                    </div>
+                    <p className="text-[10px] text-amber-800">
+                      Buyers will pay {productForm.preOrderDepositPercentage || 50}% upfront to reserve this bespoke piece, with the remaining balance due upon order fulfillment.
+                    </p>
+                  </div>
+                )}
               </div>
               
               <div className="bg-gray-50 p-3 rounded-sm border border-gray-100 mt-2">

@@ -28,6 +28,7 @@ const Dashboard = React.lazy(() => import('./Dashboard.tsx').then(m => ({ defaul
 const AuthView = React.lazy(() => import('./AuthView.tsx').then(m => ({ default: m.AuthView })));
 const PricingView = React.lazy(() => import('./PricingView.tsx').then(m => ({ default: m.PricingView })));
 const AboutView = React.lazy(() => import('./AboutView.tsx').then(m => ({ default: m.AboutView })));
+const TrackOrderView = React.lazy(() => import('./TrackOrderView.tsx').then(m => ({ default: m.TrackOrderView })));
 const AiConcierge = React.lazy(() => import('./AiConcierge.tsx').then(m => ({ default: m.AiConcierge })));
 const TheDropView = React.lazy(() => import('./TheDropView.tsx').then(m => ({ default: m.TheDropView })));
 const DirectMessaging = React.lazy(() => import('./DirectMessaging.tsx').then(m => ({ default: m.DirectMessaging })));
@@ -97,6 +98,7 @@ const App: React.FC = () => {
     else if (path === '/pricing') view = 'PRICING';
     else if (path === '/about') view = 'ABOUT';
     else if (path === '/concierge') view = 'AI_CONCIERGE';
+    else if (path.startsWith('/track-order')) view = 'TRACK_ORDER';
 
     if (view !== currentView) {
       setCurrentView(view);
@@ -137,6 +139,7 @@ const App: React.FC = () => {
       case 'PRICING': path = '/pricing'; break;
       case 'ABOUT': path = '/about'; break;
       case 'AI_CONCIERGE': path = '/concierge'; break;
+      case 'TRACK_ORDER': path = '/track-order'; break;
     }
     navigate(path);
   }, [navigate, selectedVendor, selectedProduct]);
@@ -1154,6 +1157,11 @@ const App: React.FC = () => {
         <Route path="/concierge" element={
           <Suspense fallback={<LoadingFallback />}>
             <AiConcierge products={activeProducts} />
+          </Suspense>
+        } />
+        <Route path="/track-order" element={
+          <Suspense fallback={<LoadingFallback />}>
+            <TrackOrderView orders={orders} onNavigate={handleNavigate} />
           </Suspense>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />

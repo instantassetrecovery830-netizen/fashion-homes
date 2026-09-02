@@ -5,11 +5,12 @@ import { Product, Vendor, User as AppUser, Order, Review, ProductVariant } from 
 import { getStyleMatch } from '../services/geminiService.ts';
 import { fetchProductReviews, submitReview, trackProductEvent } from '../services/dataService.ts';
 import { logUserAction } from '../services/loggingService.ts';
+import { useCurrency } from '../context/CurrencyContext.tsx';
 
 interface ProductDetailProps {
   product: Product;
   vendor?: Vendor;
-  onAddToCart: (product: Product, size: string, measurements?: string) => void;
+  onAddToCart: (product: Product, size: string, measurements?: string, isDepositPayment?: boolean) => void;
   onBack: () => void;
   onViewDesigner?: () => void;
   featureFlags: { enableAiStyleMatch: boolean; enableReviews: boolean; };
@@ -21,11 +22,16 @@ interface ProductDetailProps {
 }
 
 export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, onAddToCart, onBack, onViewDesigner, featureFlags, savedItems = [], onToggleSave, onMessageClick, currentUser, orders = [] }) => {
+  const { formatPrice } = useCurrency();
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState(false);
   const [colorError, setColorError] = useState(false);
   const [measurements, setMeasurements] = useState('');
+  const [isDepositPayment, setIsDepositPayment] = useState(true);
+  const depositPct = product.preOrderDepositPercentage || 50;
+  const depositAmt = (product.price * depositPct) / 100;
+  const remainingAmt = product.price - depositAmt;
   const [styleTip, setStyleTip] = useState<string | null>(null);
   const [loadingStyle, setLoadingStyle] = useState(false);
   const [activeImage, setActiveImage] = useState(product.images?.[0] || product.image);
@@ -115,8 +121,8 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
         logUserAction(currentUser.id, 'ADD_TO_CART', { productId: product.id, productName: product.name });
     }
     
-    onAddToCart(product, selectedSize || 'One Size', measurements);
-  }, [selectedSize, selectedColor, product, measurements, onAddToCart]);
+    onAddToCart(product, selectedSize || 'One Size', measurements, product.isPreOrder ? isDepositPayment : false);
+  }, [selectedSize, selectedColor, product, measurements, isDepositPayment, onAddToCart, currentUser]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -244,7 +250,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
                 </div>
               </div>
               <h1 className="text-4xl font-serif italic mb-4">{product.name}</h1>
-              <p className="text-2xl font-light">${product.price}</p>
+              <p className="text-2xl font-light">{formatPrice(product.price)}</p>
             </div>
 
             <p className="text-gray-600 leading-relaxed font-light">
@@ -380,20 +386,49 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
 
               {/* Custom Measurements Section for Pre-Order */}
               {product.isPreOrder && (
-                <div className="pt-4 animate-fade-in border-t border-gray-50 mt-4">
-                  <div className="flex items-center gap-2 mb-3 text-luxury-gold">
-                    <Ruler size={16} />
-                    <span className="text-xs font-bold uppercase tracking-widest">Custom Measurements</span>
+                <div className="space-y-6 pt-4 animate-fade-in border-t border-gray-50 mt-4">
+                  <div className="bg-amber-50/60 p-4 border border-amber-200 rounded-sm space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold uppercase text-amber-900 tracking-wider">Payment Structure</span>
+                      <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-bold uppercase">{depositPct}% Deposit Option</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsDepositPayment(true)}
+                        className={`p-3 border text-left rounded-sm transition-all ${isDepositPayment ? 'border-amber-900 bg-white shadow-sm' : 'border-amber-200/60 bg-white/50 hover:bg-white'}`}
+                      >
+                        <p className="text-[10px] font-bold uppercase text-amber-900">Pay {depositPct}% Deposit</p>
+                        <p className="text-sm font-bold text-black mt-0.5">{formatPrice(depositAmt)}</p>
+                        <p className="text-[9px] text-gray-500 mt-1">Balance ({formatPrice(remainingAmt)}) due on delivery</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsDepositPayment(false)}
+                        className={`p-3 border text-left rounded-sm transition-all ${!isDepositPayment ? 'border-amber-900 bg-white shadow-sm' : 'border-amber-200/60 bg-white/50 hover:bg-white'}`}
+                      >
+                        <p className="text-[10px] font-bold uppercase text-amber-900">Pay Full Amount</p>
+                        <p className="text-sm font-bold text-black mt-0.5">{formatPrice(product.price)}</p>
+                        <p className="text-[9px] text-gray-500 mt-1">Paid in full upfront</p>
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mb-3 leading-relaxed">
-                     For our made-to-order pieces, we ensure the perfect fit. Please provide your measurements (Bust, Waist, Hips, Height).
-                  </p>
-                  <textarea
-                    value={measurements}
-                    onChange={(e) => setMeasurements(e.target.value)}
-                    placeholder="e.g. Bust: 85cm, Waist: 64cm, Hips: 92cm, Height: 175cm"
-                    className="w-full p-4 border border-gray-200 bg-gray-50 text-sm focus:border-black outline-none min-h-[100px] resize-none font-serif placeholder-gray-400"
-                  />
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-3 text-luxury-gold">
+                      <Ruler size={16} />
+                      <span className="text-xs font-bold uppercase tracking-widest">Custom Measurements</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+                       For our made-to-order pieces, we ensure the perfect fit. Please provide your measurements (Bust, Waist, Hips, Height).
+                    </p>
+                    <textarea
+                      value={measurements}
+                      onChange={(e) => setMeasurements(e.target.value)}
+                      placeholder="e.g. Bust: 85cm, Waist: 64cm, Hips: 92cm, Height: 175cm"
+                      className="w-full p-4 border border-gray-200 bg-gray-50 text-sm focus:border-black outline-none min-h-[100px] resize-none font-serif placeholder-gray-400"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -557,7 +592,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
       <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-100 p-4 md:hidden z-40 flex items-center gap-4 mb-[env(safe-area-inset-bottom)]">
          <div className="flex-1">
             <p className="text-xs font-bold uppercase line-clamp-1">{product.name}</p>
-            <p className="text-sm">${product.price}</p>
+            <p className="text-sm">{formatPrice(product.price)}</p>
          </div>
          <button 
             onClick={handleAddToCartClick}

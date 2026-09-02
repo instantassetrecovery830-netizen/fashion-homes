@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Filter, ChevronDown, Heart, Camera, X } from 'lucide-react';
 import { Product, ViewState, Vendor } from '../types.ts';
+import { useCurrency } from '../context/CurrencyContext.tsx';
 
 interface MarketplaceViewProps {
   onProductSelect: (product: Product) => void;
@@ -27,6 +28,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   savedItems = [],
   onToggleSave
 }) => {
+  const { formatPrice } = useCurrency();
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeDesigner, setActiveDesigner] = useState('All Designers');
 
@@ -176,7 +178,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   <h3 className="text-[9px] md:text-xs font-bold uppercase tracking-widest mb-0.5 md:mb-1 truncate text-gray-500 md:text-black">{product.designer}</h3>
                   <p className="font-serif text-xs md:text-base text-gray-900 md:text-gray-600 italic group-hover:text-black transition-colors duration-200 truncate">{product.name}</p>
                 </div>
-                <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">${product.price}</span>
+                <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">{formatPrice(product.price)}</span>
               </div>
             </div>
           ))}

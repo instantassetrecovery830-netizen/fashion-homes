@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check, ThumbsUp } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService.ts';
 import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types.ts';
+import { useCurrency } from '../context/CurrencyContext.tsx';
 
 interface LandingViewProps {
   onNavigate: (view: ViewState) => void;
@@ -29,6 +30,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   onVote,
   userVotes
 }) => {
+  const { formatPrice } = useCurrency();
   const [trend, setTrend] = useState<TrendAnalysis | null>(null);
   const [loadingTrend, setLoadingTrend] = useState(false);
   const [scrollY, setScrollY] = useState(0);
@@ -211,7 +213,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 </div>
                 <h3 className="font-bold text-xs uppercase tracking-wide mb-1 text-gray-400">{product.designer}</h3>
                 <p className="font-serif text-sm md:text-base italic text-luxury-black mb-1 truncate">{product.name}</p>
-                <p className="text-xs font-medium text-luxury-black">${product.price}</p>
+                <p className="text-xs font-medium text-luxury-black">{formatPrice(product.price)}</p>
               </div>
             ))}
             {products.filter(p => p.isNewSeason).length === 0 && (
@@ -331,10 +333,23 @@ export const LandingView: React.FC<LandingViewProps> = ({
             </div>
 
             <div className="relative hidden md:block">
-               {/* Editorial Grid Mockup */}
+               {/* Editorial Grid */}
                <div className="grid grid-cols-2 gap-4">
-                  <img src="https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800" className="w-full h-64 object-cover grayscale hover:grayscale-0 transition-all duration-700" alt="African Fashion Trend 1" />
-                  <img src="https://images.unsplash.com/photo-1589156280159-27698a70f29e?q=80&w=800" className="w-full h-64 object-cover mt-12 grayscale hover:grayscale-0 transition-all duration-700" alt="African Fashion Trend 2" />
+                  {(cmsContent?.editorialImages && cmsContent.editorialImages.length > 0) ? (
+                    cmsContent.editorialImages.slice(0, 4).map((img, idx) => (
+                      <img 
+                        key={idx} 
+                        src={img} 
+                        className={`w-full h-64 object-cover grayscale hover:grayscale-0 transition-all duration-700 ${idx % 2 === 1 ? 'mt-8' : ''}`} 
+                        alt={`African Fashion Trend ${idx + 1}`} 
+                      />
+                    ))
+                  ) : (
+                    <>
+                      <img src="https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800" className="w-full h-64 object-cover grayscale hover:grayscale-0 transition-all duration-700" alt="African Fashion Trend 1" />
+                      <img src="https://images.unsplash.com/photo-1589156280159-27698a70f29e?q=80&w=800" className="w-full h-64 object-cover mt-12 grayscale hover:grayscale-0 transition-all duration-700" alt="African Fashion Trend 2" />
+                    </>
+                  )}
                </div>
             </div>
           </div>
@@ -353,7 +368,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 onClick={() => onNavigate('MARKETPLACE')}
                 className="col-span-2 md:col-span-2 row-span-2 relative group overflow-hidden h-[300px] md:h-full cursor-pointer"
               >
-                 <img src={campaign.image1} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 1" />
+                 <img src={campaign.image1 || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 1" />
                  <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
                  <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 text-white opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                     <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest">{campaign.overlayText1}</p>
@@ -363,23 +378,88 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 onClick={() => onNavigate('MARKETPLACE')}
                 className="col-span-1 relative group overflow-hidden h-[150px] md:h-full cursor-pointer"
               >
-                 <img src={campaign.image2} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 2" />
+                 <img src={campaign.image2 || "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 2" />
               </div>
               <div 
                 onClick={() => onNavigate('MARKETPLACE')}
                 className="col-span-1 relative group overflow-hidden h-[150px] md:h-full cursor-pointer"
               >
-                 <img src={campaign.image3} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 3" />
+                 <img src={campaign.image3 || "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 3" />
               </div>
                <div 
                  onClick={() => onNavigate('MARKETPLACE')}
                  className="col-span-2 relative group overflow-hidden h-[150px] md:h-full cursor-pointer"
                >
-                 <img src={campaign.image4} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 4" />
+                 <img src={campaign.image4 || "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 4" />
               </div>
            </div>
+
+           {/* Additional Uploaded Campaign Photos */}
+           {campaign.images && campaign.images.length > 0 && (
+             <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+               {campaign.images.map((img, i) => (
+                 <div 
+                   key={i} 
+                   onClick={() => onNavigate('MARKETPLACE')}
+                   className="aspect-square relative group overflow-hidden cursor-pointer bg-gray-100 rounded-sm"
+                 >
+                   <img src={img} alt={`Campaign gallery ${i+1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                 </div>
+               ))}
+             </div>
+           )}
         </div>
       </section>
+
+      {/* Featured Collections Section (If Admin Configured) */}
+      {cmsContent?.featuredCollections && cmsContent.featuredCollections.length > 0 && (
+        <section className="py-16 bg-white border-b border-gray-100">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="mb-10 text-center">
+              <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-luxury-gold mb-2 block">Curated Curation</span>
+              <h2 className="text-3xl font-serif italic text-luxury-black">Featured Collections</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {cmsContent.featuredCollections.map((col, idx) => (
+                <div 
+                  key={idx} 
+                  onClick={() => onNavigate('MARKETPLACE')}
+                  className="group cursor-pointer bg-gray-50 overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300"
+                >
+                  <div className="aspect-[4/3] overflow-hidden bg-gray-200">
+                    <img src={col.image} alt={col.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                  </div>
+                  <div className="p-6">
+                    <h3 className="text-lg font-serif italic text-luxury-black group-hover:text-luxury-gold transition-colors">{col.title}</h3>
+                    {col.description && <p className="text-xs text-gray-500 mt-2">{col.description}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Master Gallery Section (If Admin Uploaded Images) */}
+      {cmsContent?.galleryImages && cmsContent.galleryImages.length > 0 && (
+        <section className="py-16 bg-luxury-black text-white">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="mb-8 flex justify-between items-end">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-luxury-gold block mb-1">Visual Lookbook</span>
+                <h2 className="text-2xl md:text-3xl font-serif italic">Brand Showcase Gallery</h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+              {cmsContent.galleryImages.map((img, i) => (
+                <div key={i} className="aspect-square overflow-hidden bg-gray-800 rounded-sm group">
+                  <img src={img} alt={`Gallery look ${i+1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 grayscale hover:grayscale-0" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Spotlight Products */}
       <section className="py-16 md:py-24 max-w-7xl mx-auto px-6 bg-luxury-cream-dark">
@@ -405,7 +485,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
               <h3 className="font-bold text-xs md:text-sm uppercase tracking-wide mb-1 text-luxury-charcoal">{product.designer}</h3>
               <p className="font-serif text-base md:text-lg italic text-luxury-taupe mb-2">{product.name}</p>
-              <p className="text-xs md:text-sm font-medium text-luxury-black">${product.price}</p>
+              <p className="text-xs md:text-sm font-medium text-luxury-black">{formatPrice(product.price)}</p>
             </div>
           )) : (
             <div className="col-span-3 text-center text-gray-400 py-12">

@@ -6,6 +6,8 @@ import { NAV_LINKS } from '../constants.ts';
 import { UserRole, ViewState, CartItem, Order, AppNotification, Product } from '../types.ts';
 import { auth } from '../services/firebase.ts';
 import { markNotificationRead, getShippingRates } from '../services/dataService.ts';
+import { CurrencySelector } from './CurrencySelector.tsx';
+import { useCurrency } from '../context/CurrencyContext.tsx';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -56,6 +58,7 @@ export const Layout: React.FC<LayoutProps> = ({
   onRefreshNotifications,
   onOpenDirectMessaging
 }) => {
+  const { formatPrice, currency, convertPrice } = useCurrency();
   const [isScrolled, setIsScrolled] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [measurementError, setMeasurementError] = useState(false);
@@ -93,7 +96,12 @@ export const Layout: React.FC<LayoutProps> = ({
   // --- PAYSTACK CONFIGURATION ---
   const PAYSTACK_PUBLIC_KEY = useMemo(() => import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', []); 
 
-  const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + item.price, 0), [cart]);
+  const cartTotal = useMemo(() => cart.reduce((sum, item) => {
+    const itemPrice = (item.isPreOrder && item.isDepositPayment !== false)
+      ? (item.price * (item.preOrderDepositPercentage || 50)) / 100
+      : item.price;
+    return sum + itemPrice;
+  }, 0), [cart]);
   const shippingCost = useMemo(() => selectedRate ? parseFloat(selectedRate.amount) : 0, [selectedRate]);
   const orderTotal = useMemo(() => cartTotal + shippingCost, [cartTotal, shippingCost]);
 
@@ -277,6 +285,16 @@ export const Layout: React.FC<LayoutProps> = ({
   const onPaystackSuccess = useCallback(async (reference: any) => {
     setIsProcessingCheckout(true);
 
+    const hasDeposit = cart.some(item => item.isPreOrder && item.isDepositPayment !== false);
+    const totalFullPrice = cart.reduce((sum, item) => sum + item.price, 0);
+    const totalDepositAmt = cart.reduce((sum, item) => {
+      if (item.isPreOrder && item.isDepositPayment !== false) {
+        return sum + (item.price * (item.preOrderDepositPercentage || 50)) / 100;
+      }
+      return sum + item.price;
+    }, 0);
+    const remainingBalanceAmt = totalFullPrice - totalDepositAmt;
+
     const newOrder: Order = {
         id: `ord_${Date.now()}`,
         customerName: customerEmail || 'Guest User', 
@@ -285,7 +303,11 @@ export const Layout: React.FC<LayoutProps> = ({
         shippingCost: shippingCost,
         status: 'Processing',
         items: [...cart],
-        buyerId: auth.currentUser?.uid
+        buyerId: auth.currentUser?.uid,
+        isDepositOrder: hasDeposit,
+        depositAmount: hasDeposit ? totalDepositAmt : undefined,
+        remainingBalance: hasDeposit ? remainingBalanceAmt : undefined,
+        paymentStatus: hasDeposit ? 'DEPOSIT_PAID' : 'PAID_IN_FULL'
     };
 
     try {
@@ -381,7 +403,10 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
 
             {/* Icons */}
-            <div className={`flex items-center gap-4 md:gap-6 ${navTextColor}`}>
+            <div className={`flex items-center gap-3 md:gap-5 ${navTextColor}`}>
+              {/* Currency Selector */}
+              <CurrencySelector />
+
               {/* Visual Search */}
               <div className="relative group hidden md:block">
                   <button 
@@ -613,7 +638,7 @@ export const Layout: React.FC<LayoutProps> = ({
                       <p className="font-serif italic text-sm text-gray-600 leading-tight">{item.name}</p>
                     </div>
                     <div className="flex justify-between items-end">
-                      <span className="text-sm font-medium">${item.price}</span>
+                      <span className="text-sm font-medium">{formatPrice(item.price)}</span>
                       <button 
                         onClick={() => onToggleSave(item)}
                         className="text-luxury-gold hover:text-black transition-colors"
@@ -709,7 +734,7 @@ export const Layout: React.FC<LayoutProps> = ({
                         <p className="text-xs text-gray-400 mt-2">Size: {item.size}</p>
                       </div>
                       <div className="flex justify-between items-end">
-                        <span className="text-sm font-medium">${item.price}</span>
+                        <span className="text-sm font-medium">{formatPrice(item.price)}</span>
                         <button 
                           onClick={() => onRemoveFromCart(index)}
                           className="text-gray-400 hover:text-red-600 transition-colors"
@@ -722,22 +747,52 @@ export const Layout: React.FC<LayoutProps> = ({
 
                   {/* Pre-Order Custom Fit Section */}
                   {item.isPreOrder && (
-                    <div className={`p-4 bg-gray-50 border ${measurementError && (!item.measurements || item.measurements.length < 5) ? 'border-red-300 bg-red-50' : 'border-gray-100'} rounded-sm`}>
-                      <div className="flex items-center gap-2 mb-2 text-luxury-gold">
-                        <Ruler size={14} />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Pre-Order: Custom Fit</span>
+                    <div className="space-y-3">
+                      <div className={`p-4 bg-gray-50 border ${measurementError && (!item.measurements || item.measurements.length < 5) ? 'border-red-300 bg-red-50' : 'border-gray-100'} rounded-sm`}>
+                        <div className="flex items-center gap-2 mb-2 text-luxury-gold">
+                          <Ruler size={14} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Pre-Order: Custom Fit</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2">This piece is made-to-order. Please provide your measurements (Bust, Waist, Hips, Height).</p>
+                        <textarea
+                          value={item.measurements || ''}
+                          onChange={(e) => onUpdateCartItem(index, { measurements: e.target.value })}
+                          placeholder="e.g. Bust: 85cm, Waist: 64cm, Hips: 92cm, Height: 175cm"
+                          className="w-full text-xs p-3 border border-gray-200 outline-none focus:border-black bg-white resize-none font-sans"
+                          rows={3}
+                        />
+                        {measurementError && (!item.measurements || item.measurements.length < 5) && (
+                          <p className="text-[10px] text-red-500 mt-1">* Measurements required for checkout</p>
+                        )}
                       </div>
-                      <p className="text-xs text-gray-500 mb-2">This piece is made-to-order. Please provide your measurements (Bust, Waist, Hips, Height).</p>
-                      <textarea
-                        value={item.measurements || ''}
-                        onChange={(e) => onUpdateCartItem(index, { measurements: e.target.value })}
-                        placeholder="e.g. Bust: 85cm, Waist: 64cm, Hips: 92cm, Height: 175cm"
-                        className="w-full text-xs p-3 border border-gray-200 outline-none focus:border-black bg-white resize-none font-sans"
-                        rows={3}
-                      />
-                      {measurementError && (!item.measurements || item.measurements.length < 5) && (
-                        <p className="text-[10px] text-red-500 mt-1">* Measurements required for checkout</p>
-                      )}
+
+                      {/* Pre-Order Deposit Option */}
+                      <div className="p-3 bg-amber-50/50 border border-amber-200/60 rounded-sm space-y-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-amber-900 uppercase tracking-wider text-[10px] font-bold">Payment Option</span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onUpdateCartItem(index, { isDepositPayment: true })}
+                              className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase ${item.isDepositPayment !== false ? 'bg-amber-900 text-white' : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-100'}`}
+                            >
+                              Pay {item.preOrderDepositPercentage || 50}% Deposit ({formatPrice((item.price * (item.preOrderDepositPercentage || 50)) / 100)})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateCartItem(index, { isDepositPayment: false })}
+                              className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase ${item.isDepositPayment === false ? 'bg-amber-900 text-white' : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-100'}`}
+                            >
+                              Pay Full ({formatPrice(item.price)})
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-amber-800">
+                          {item.isDepositPayment !== false
+                            ? `Remaining ${100 - (item.preOrderDepositPercentage || 50)}% balance (${formatPrice(item.price - (item.price * (item.preOrderDepositPercentage || 50)) / 100)}) due upon order fulfillment.`
+                            : 'Paid in full upfront.'}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -819,7 +874,7 @@ export const Layout: React.FC<LayoutProps> = ({
                                                 <p className="text-xs font-bold uppercase tracking-widest">{rate.provider} - {rate.servicelevel.name}</p>
                                                 <p className="text-[10px] text-gray-400 mt-1">Est. Delivery: {rate.duration_terms || '3-5 business days'}</p>
                                             </div>
-                                            <span className="font-bold text-sm">${rate.amount}</span>
+                                            <span className="font-bold text-sm">{formatPrice(parseFloat(rate.amount))}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -833,15 +888,15 @@ export const Layout: React.FC<LayoutProps> = ({
                     <div className="bg-gray-50 p-4 rounded-sm border border-gray-100">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-xs font-bold uppercase text-gray-400">Subtotal</span>
-                            <span className="font-bold text-sm">${cartTotal}</span>
+                            <span className="font-bold text-sm">{formatPrice(cartTotal)}</span>
                         </div>
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-xs font-bold uppercase text-gray-400">Shipping</span>
-                            <span className="font-bold text-sm">${shippingCost.toFixed(2)}</span>
+                            <span className="font-bold text-sm">{formatPrice(shippingCost)}</span>
                         </div>
                         <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                             <span className="text-xs font-bold uppercase text-gray-400">Total Amount</span>
-                            <span className="font-bold text-lg">${orderTotal.toFixed(2)}</span>
+                            <span className="font-bold text-lg">{formatPrice(orderTotal)}</span>
                         </div>
                         <div className="flex gap-2 text-xs text-gray-400 mt-2">
                            <Lock size={12} /> <span className="uppercase tracking-wider">Secured by Paystack</span>
@@ -882,7 +937,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 <>
                   <div className="flex justify-between items-center mb-6 text-sm">
                     <span className="uppercase tracking-widest text-gray-500">Subtotal</span>
-                    <span className="font-bold text-lg">${cartTotal}</span>
+                    <span className="font-bold text-lg">{formatPrice(cartTotal)}</span>
                   </div>
                   <button 
                     onClick={handleProceedToShipping}
@@ -895,7 +950,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 <>
                   <div className="flex justify-between items-center mb-6 text-sm">
                     <span className="uppercase tracking-widest text-gray-500">Shipping Cost</span>
-                    <span className="font-bold text-lg">${shippingCost.toFixed(2)}</span>
+                    <span className="font-bold text-lg">{formatPrice(shippingCost)}</span>
                   </div>
                   <button 
                     onClick={handleProceedToPayment}

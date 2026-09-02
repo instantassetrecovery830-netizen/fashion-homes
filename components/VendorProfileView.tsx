@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { BadgeCheck, MapPin, Users, Star, ArrowLeft, Heart, Share2, Instagram, Twitter, Globe, Check, X, Link, Facebook, Mail, Video } from 'lucide-react';
 import { Vendor, Product, ViewState } from '../types';
+import { useCurrency } from '../context/CurrencyContext.tsx';
 
 interface VendorProfileViewProps {
   vendor: Vendor;
@@ -28,6 +29,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
   followerCount = 0,
   onMessageClick
 }) => {
+  const { formatPrice } = useCurrency();
   const [showShareModal, setShowShareModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   
@@ -333,7 +335,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                       <h3 className={`text-xs font-bold uppercase tracking-widest mb-1 ${currentTheme.text}`}>{product.designer}</h3>
                       <p className={`font-serif italic transition-colors ${currentTheme.subText} group-hover:${currentTheme.text}`}>{product.name}</p>
                     </div>
-                    <span className={`text-sm font-medium ${currentTheme.text}`}>${product.price}</span>
+                    <span className={`text-sm font-medium ${currentTheme.text}`}>{formatPrice(product.price)}</span>
                   </div>
                 </div>
               ))}

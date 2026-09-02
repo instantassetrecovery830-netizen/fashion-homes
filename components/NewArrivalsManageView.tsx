@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Product, UserRole, User, Vendor } from '../types';
 import { Trash2, Edit2, Plus, Image as ImageIcon, X, Loader, AlertCircle, ArrowLeft } from 'lucide-react';
 import { auth } from '../services/firebase';
+import { useCurrency } from '../context/CurrencyContext.tsx';
 
 interface NewArrivalsManageViewProps {
   products: Product[];
@@ -22,6 +23,7 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
   onNavigate,
   currentUser
 }) => {
+  const { formatPrice } = useCurrency();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -224,7 +226,7 @@ export const NewArrivalsManageView: React.FC<NewArrivalsManageViewProps> = ({
                       </h3>
                       <p className="font-serif italic text-lg text-black">{product.name}</p>
                     </div>
-                    <span className="text-sm font-medium">${product.price}</span>
+                    <span className="text-sm font-medium">{formatPrice(product.price)}</span>
                   </div>
                   
                   <div className="flex gap-2 mt-6 pt-4 border-t border-gray-50">

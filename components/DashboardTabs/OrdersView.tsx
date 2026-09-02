@@ -1,16 +1,19 @@
 import React from 'react';
 import { ShoppingBag, Search, Filter, MoreVertical, ExternalLink, Package, Truck, CheckCircle, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Order, UserRole } from '../../types';
+import { Order, UserRole, ViewState } from '../../types';
+import { useCurrency } from '../../context/CurrencyContext.tsx';
 
 interface OrdersViewProps {
   myOrders: Order[];
   setIsSidebarOpen: (open: boolean) => void;
   onUpdateStatus?: (orderId: string, status: Order['status']) => Promise<void>;
   role?: UserRole;
+  onNavigate?: (view: ViewState) => void;
 }
 
-export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOpen, onUpdateStatus, role }) => {
+export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOpen, onUpdateStatus, role, onNavigate }) => {
+  const { formatPrice } = useCurrency();
   const [updatingId, setUpdatingId] = React.useState<string | null>(null);
   const [showTrackingInput, setShowTrackingInput] = React.useState<string | null>(null);
   const [trackingInfo, setTrackingInfo] = React.useState({ carrier: 'DHL Express', trackingNumber: '' });
@@ -137,7 +140,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOp
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-medium text-sm">${order.total.toLocaleString()}</td>
+                  <td className="px-6 py-4 font-medium text-sm">{formatPrice(order.total)}</td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-2">
                       <span className={`text-[9px] px-2 py-1 rounded-full font-bold uppercase tracking-widest flex items-center gap-1 w-fit ${
@@ -215,9 +218,15 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOp
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-black transition-colors">
-                        <ExternalLink size={16} />
-                      </button>
+                      {onNavigate && (
+                        <button 
+                          onClick={() => onNavigate('TRACK_ORDER')}
+                          className="px-2.5 py-1 bg-black text-white text-[10px] font-bold uppercase tracking-wider rounded hover:bg-luxury-gold transition-colors flex items-center gap-1"
+                          title="Track Order via Shippo Portal"
+                        >
+                          <Truck size={12} /> Track
+                        </button>
+                      )}
                       <button className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-black transition-colors">
                         <MoreVertical size={16} />
                       </button>

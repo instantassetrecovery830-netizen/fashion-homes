@@ -70,6 +70,7 @@ export interface Product {
   sizes: string[];
   variants?: ProductVariant[];
   isPreOrder?: boolean;
+  preOrderDepositPercentage?: number; // e.g. 50 for 50% deposit
   isApproved?: boolean; // For admin approval
   releaseDate?: string; // ISO string for The Drop
   createdAt?: string; // ISO string for upload tracking
@@ -117,11 +118,18 @@ export interface Vendor {
   bio: string;
   avatar: string;
   verificationStatus: VerificationStatus;
+  approvalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED';
   subscriptionStatus: SubscriptionStatus;
   location?: string;
   coverImage?: string;
   email?: string;
   subscriptionPlan?: 'Atelier' | 'Maison' | 'Couture' | 'BASIC';
+  bankDetails?: {
+    bankName?: string;
+    accountName?: string;
+    accountNumber?: string;
+    routingNumber?: string;
+  };
   website?: string;
   instagram?: string;
   twitter?: string;
@@ -166,6 +174,9 @@ export interface CartItem extends Product {
   size: string;
   stock: number;
   measurements?: string;
+  isDepositPayment?: boolean;
+  depositAmount?: number;
+  remainingBalance?: number;
 }
 
 export interface Order {
@@ -178,6 +189,13 @@ export interface Order {
   buyerId?: string;
   shippingCost?: number;
   shippingAddress?: ShippingAddress;
+  carrier?: string;
+  trackingNumber?: string;
+  estimatedDelivery?: string;
+  isDepositOrder?: boolean;
+  depositAmount?: number;
+  remainingBalance?: number;
+  paymentStatus?: 'DEPOSIT_PAID' | 'PAID_IN_FULL';
 }
 
 export interface ContactSubmission {
@@ -228,7 +246,8 @@ export type ViewState =
   | 'PROFILE_SETTINGS'
   | 'PRICING'
   | 'ABOUT'
-  | 'AI_CONCIERGE';
+  | 'AI_CONCIERGE'
+  | 'TRACK_ORDER';
 
 export interface TrendAnalysis {
   title: string;
@@ -336,6 +355,7 @@ export interface LandingPageContent {
     titleLine2: string;
     buttonText: string;
     secondaryButtonText?: string;
+    heroImages?: string[];
   };
   marquee: {
     text: string;
@@ -351,8 +371,17 @@ export interface LandingPageContent {
     image2: string;
     image3: string;
     image4: string;
+    images?: string[];
     overlayText1: string;
   };
+  editorialImages?: string[];
+  featuredCollections?: Array<{
+    title: string;
+    image: string;
+    description?: string;
+    link?: string;
+  }>;
+  galleryImages?: string[];
   spotlight: {
     title: string;
   };

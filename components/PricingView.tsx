@@ -2,6 +2,7 @@
 import React from 'react';
 import { Check, ArrowRight, Diamond } from 'lucide-react';
 import { ViewState, LandingPageContent } from '../types';
+import { useCurrency } from '../context/CurrencyContext.tsx';
 
 interface PricingViewProps {
   onNavigate: (view: ViewState) => void;
@@ -10,6 +11,7 @@ interface PricingViewProps {
 }
 
 export const PricingView: React.FC<PricingViewProps> = ({ onNavigate, onRegister, cmsContent }) => {
+  const { formatPrice } = useCurrency();
   const content = cmsContent?.pricing || {
     title: "Unlock Privilege",
     subtitle: "MyFitStore Membership",
@@ -97,7 +99,9 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate, onRegister
               <div className="mb-8">
                 <h3 className="text-2xl font-serif italic mb-2">{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-4xl font-bold">{plan.price}</span>
+                  <span className="text-4xl font-bold">
+                    {formatPrice(parseFloat(plan.price.toString().replace(/[^0-9.]/g, '') || '0'))}
+                  </span>
                   <span className={`text-xs uppercase tracking-wide ${plan.highlight ? 'text-gray-400' : 'text-gray-500'}`}>{plan.period}</span>
                 </div>
                 <p className={`text-sm leading-relaxed ${plan.highlight ? 'text-gray-300' : 'text-gray-500'}`}>

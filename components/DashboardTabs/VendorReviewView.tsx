@@ -9,7 +9,7 @@ interface VendorReviewViewProps {
 }
 
 export const VendorReviewView: React.FC<VendorReviewViewProps> = ({ vendors, onVerifyVendor, setIsSidebarOpen }) => {
-    const pendingVendors = vendors.filter(v => v.verificationStatus === 'PENDING');
+    const pendingVendors = vendors.filter(v => v.verificationStatus === 'PENDING' || v.approvalStatus === 'PENDING');
 
     return (
         <div className="space-y-8 animate-fade-in pb-20 md:pb-0">

@@ -292,7 +292,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const handleVerifyVendor = useCallback(async (vendor: Vendor, status: 'VERIFIED' | 'REJECTED') => {
       if (setVendors) {
-          await setVendors([{ ...vendor, verificationStatus: status }]);
+          const updatedVendor: Vendor = { 
+              ...vendor, 
+              verificationStatus: status,
+              approvalStatus: status === 'VERIFIED' ? 'APPROVED' : 'REJECTED',
+              subscriptionStatus: status === 'VERIFIED' ? 'ACTIVE' : vendor.subscriptionStatus
+          };
+          await setVendors([updatedVendor]);
           setSelectedVendorForReview(null);
       }
   }, [setVendors]);
@@ -555,14 +561,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
         );
       }
 
-      case 'FINANCE':
+      case 'FINANCE': {
+        const currentVendor = vendors.find(v => v.email === currentUser?.email) || null;
         return (
           <FinanceView 
             totalRevenue={totalRevenue}
             myOrders={myOrders}
             setIsSidebarOpen={setIsSidebarOpen}
+            currentUser={currentUser}
+            vendor={currentVendor}
           />
         );
+      }
 
       case 'MARKETING':
         return (
@@ -614,6 +624,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             setIsSidebarOpen={setIsSidebarOpen} 
             onUpdateStatus={onUpdateOrderStatus}
             role={role}
+            onNavigate={onNavigate}
           />
         );
 
@@ -740,10 +751,96 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  const loggedInVendor = useMemo(() => {
+    if (role !== UserRole.VENDOR) return null;
+    return vendors.find(v => v.email === currentUser?.email || v.id === currentUser?.email);
+  }, [role, vendors, currentUser]);
+
+  const renderVendorApprovalBanner = () => {
+    if (role !== UserRole.VENDOR || !loggedInVendor) return null;
+    
+    const isPending = loggedInVendor.verificationStatus === 'PENDING' || loggedInVendor.approvalStatus === 'PENDING';
+    const isRejected = loggedInVendor.verificationStatus === 'REJECTED' || loggedInVendor.approvalStatus === 'REJECTED';
+    const isApproved = loggedInVendor.verificationStatus === 'VERIFIED' || loggedInVendor.approvalStatus === 'APPROVED';
+
+    if (isPending) {
+      return (
+        <div className="mb-6 bg-amber-50 border border-amber-200/80 rounded-md p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-amber-900 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-100 rounded-full text-amber-700 shrink-0 mt-0.5 md:mt-0">
+              <Clock size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-sm uppercase tracking-wider text-amber-900">Atelier Onboarding Approval Pending</h4>
+                <span className="px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold bg-amber-200 text-amber-900 rounded-full">In Review</span>
+              </div>
+              <p className="text-xs text-amber-800 mt-1">
+                Your vendor store application has been received and is currently under Admin review. You can customize your store design, upload products, and set up bank details while waiting. Your store will go live on the public marketplace as soon as an Admin approves your application.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setActiveTab('KYC')} 
+            className="shrink-0 bg-amber-900 text-amber-50 hover:bg-amber-950 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors"
+          >
+            Review Documents
+          </button>
+        </div>
+      );
+    }
+
+    if (isRejected) {
+      return (
+        <div className="mb-6 bg-red-50 border border-red-200/80 rounded-md p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-red-900 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-red-100 rounded-full text-red-700 shrink-0 mt-0.5 md:mt-0">
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-sm uppercase tracking-wider text-red-900">Store Application Action Required</h4>
+                <span className="px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold bg-red-200 text-red-900 rounded-full">Declined</span>
+              </div>
+              <p className="text-xs text-red-800 mt-1">
+                Your vendor application was declined by the marketplace administrators. Please review your submitted KYC documents or update your store profile before requesting re-review.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setActiveTab('KYC')} 
+            className="shrink-0 bg-red-900 text-red-50 hover:bg-red-950 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors"
+          >
+            Update Documentation
+          </button>
+        </div>
+      );
+    }
+
+    if (isApproved) {
+      return (
+        <div className="mb-6 bg-emerald-50 border border-emerald-200/80 rounded-md p-3 px-4 flex items-center justify-between text-emerald-900 shadow-sm">
+          <div className="flex items-center gap-3">
+            <ShieldCheck size={18} className="text-emerald-600" />
+            <p className="text-xs font-medium text-emerald-800">
+              <strong className="font-bold">Verified & Approved Atelier:</strong> Your store and products are live on the public MyFitStore marketplace.
+            </p>
+          </div>
+          <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-emerald-100 text-emerald-800 rounded">
+            Live
+          </span>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
        {renderSidebar()}
        <div className={`transition-all duration-300 md:ml-64 p-4 md:p-12`}>
+           {renderVendorApprovalBanner()}
            {renderContent()}
        </div>
 
