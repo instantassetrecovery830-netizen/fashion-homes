@@ -4,8 +4,13 @@ import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Fo
 
 // Helper to convert Firestore docs to array
 const getArray = async (q: any) => {
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) }));
+    try {
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) }));
+    } catch (error) {
+        console.warn("Firestore query notice:", error);
+        return [];
+    }
 };
 
 export const fetchVendors = async (): Promise<Vendor[]> => getArray(collection(db, 'vendors')) as Promise<Vendor[]>;

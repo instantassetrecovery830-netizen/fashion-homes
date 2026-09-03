@@ -296,7 +296,14 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
             // Login Flow
             const { user } = await signInWithEmailAndPassword(auth, email, password);
             
-            if (!user.emailVerified) {
+            const adminEmails = [
+                'instantassetrecovery830@gmail.com', 
+                'juliemtrice7@proton.me', 
+                'mikelarry00764@proton.me'
+            ];
+            const isAdminEmail = adminEmails.includes(user.email?.toLowerCase() || '');
+
+            if (!user.emailVerified && !isAdminEmail) {
                 await sendEmailVerification(user);
                 await signOut(auth);
                 setIsVerifying(true);

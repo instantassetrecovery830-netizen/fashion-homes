@@ -102,6 +102,11 @@
       "title": "Message",
       "description": "Customer support or concierge message",
       "type": "object"
+    },
+    "UserLog": {
+      "title": "UserLog",
+      "description": "User activity audit log",
+      "type": "object"
     }
   },
   "firestore": {
@@ -136,6 +141,10 @@
     "/messages/{messageId}": {
       "schema": { "$ref": "#/entities/Message" },
       "description": "Support chat messages"
+    },
+    "/user_logs/{logId}": {
+      "schema": { "$ref": "#/entities/UserLog" },
+      "description": "User action logs"
     }
   }
 }

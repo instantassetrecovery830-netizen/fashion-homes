@@ -12,6 +12,6 @@ export const logUserAction = async (userId: string, action: string, details: any
             timestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error("Error logging user action:", error);
+        console.warn("Notice logging user action:", error);
     }
 };

@@ -184,14 +184,14 @@ const App: React.FC = () => {
     try {
       // Prioritize content visible on landing
       const [dbContent, dbVendors, dbProducts] = await Promise.all([
-        fetchLandingContent(),
-        fetchVendors(), 
-        fetchProducts(),
+        fetchLandingContent().catch(e => { console.warn("Notice fetching landing content:", e); return null; }),
+        fetchVendors().catch(e => { console.warn("Notice fetching vendors:", e); return []; }), 
+        fetchProducts().catch(e => { console.warn("Notice fetching products:", e); return []; }),
       ]);
       
-      setCmsContent(dbContent);
-      setVendors(dbVendors);
-      setProducts(dbProducts);
+      if (dbContent) setCmsContent(dbContent);
+      if (dbVendors && dbVendors.length > 0) setVendors(dbVendors);
+      if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
 
       // Fetch user-specific data (Notifications, Orders, Follows, Votes)
       const currentUserId = auth.currentUser?.uid;
@@ -225,7 +225,7 @@ const App: React.FC = () => {
       }
 
     } catch (error) {
-      console.error("Failed to refresh data", error);
+      console.warn("Notice refreshing data:", error);
     } finally {
       isRefreshingRef.current = false;
     }
@@ -240,7 +240,7 @@ const App: React.FC = () => {
             refreshData(true);
         }, 1000);
       } catch (error) {
-        console.error("Initial data refresh failed.", error);
+        console.warn("Notice in initial data refresh:", error);
       }
     };
     initData();

@@ -52,8 +52,12 @@ export const DirectMessaging: React.FC<DirectMessagingProps> = ({
         });
       };
 
-      const unsub1 = onSnapshot(q1, handleSnapshot);
-      const unsub2 = onSnapshot(q2, handleSnapshot);
+      const unsub1 = onSnapshot(q1, handleSnapshot, (err) => {
+        console.warn("DirectMessaging receiver listener notice:", err.message);
+      });
+      const unsub2 = onSnapshot(q2, handleSnapshot, (err) => {
+        console.warn("DirectMessaging sender listener notice:", err.message);
+      });
 
       return () => {
         unsub1();
