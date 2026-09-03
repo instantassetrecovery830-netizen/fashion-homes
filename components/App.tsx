@@ -11,7 +11,7 @@ import {
   updateVendorInDb, createVendorInDb, createOrderInDb, updateOrderStatusInDb, createUserInDb, updateUserInDb, deleteUserFromDb, updateLandingContentInDb, createNotificationInDb, fetchNotifications,
   fetchUserFollowedVendors, addFollowerToDb, removeFollowerFromDb, updateContactStatusInDb, fetchAllFollowers, voteForProduct, fetchUserVotes,
   fetchCartItems, addCartItemToDb, updateCartItemInDb, removeCartItemFromDb, clearCartInDb,
-  fetchSavedItems, addSavedItemToDb, removeSavedItemFromDb, trackProductEvent
+  fetchSavedItems, addSavedItemToDb, removeSavedItemFromDb, trackProductEvent, clearAllOrdersInDb
 } from '@/services/dataService';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut, db } from '../services/firebase.ts';
@@ -195,17 +195,18 @@ const App: React.FC = () => {
 
       // Fetch user-specific data (Notifications, Orders, Follows, Votes)
       const currentUserId = auth.currentUser?.uid;
+      const currentEmail = auth.currentUser?.email || currentUser?.email;
       
       // Load heavy data in parallel
       // Only fetch admin-only data if user is admin
       const isAdmin = userRole === UserRole.ADMIN;
       
       const [dbOrders, dbUsers, dbContacts, dbNotifications, dbFollowers] = await Promise.all([
-        fetchOrders().catch(e => { console.error("Error fetching orders:", e); throw e; }),
-        isAdmin ? fetchUsers() : Promise.resolve([]),
-        isAdmin ? fetchContactSubmissions() : Promise.resolve([]),
-        fetchNotifications(currentUserId),
-        isAdmin ? fetchAllFollowers() : Promise.resolve([])
+        fetchOrders().catch(e => { console.warn("Notice fetching orders:", e); return []; }),
+        isAdmin ? fetchUsers().catch(e => { console.warn("Notice fetching users:", e); return []; }) : Promise.resolve([]),
+        isAdmin ? fetchContactSubmissions().catch(e => { console.warn("Notice fetching contacts:", e); return []; }) : Promise.resolve([]),
+        fetchNotifications(currentUserId, currentEmail).catch(e => { console.warn("Notice fetching notifications:", e); return []; }),
+        isAdmin ? fetchAllFollowers().catch(e => { console.warn("Notice fetching followers:", e); return []; }) : Promise.resolve([])
       ]);
 
       setOrders(dbOrders);
@@ -249,17 +250,25 @@ const App: React.FC = () => {
   useEffect(() => {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
         setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+    }, (err) => {
+        console.warn("Products listener notice:", err.message);
     });
     const unsubVendors = onSnapshot(collection(db, 'vendors'), (snapshot) => {
         setVendors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
+    }, (err) => {
+        console.warn("Vendors listener notice:", err.message);
     });
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
         setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+    }, (err) => {
+        console.warn("Users listener notice:", err.message);
     });
     const unsubContent = onSnapshot(collection(db, 'landing_content'), (snapshot) => {
         if (!snapshot.empty) {
             setCmsContent({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as unknown as LandingPageContent);
         }
+    }, (err) => {
+        console.warn("Landing content listener notice:", err.message);
     });
 
     return () => {
@@ -273,14 +282,24 @@ const App: React.FC = () => {
   // Real-time: Firestore onSnapshot for Notifications and Orders
   useEffect(() => {
     if (isLoggedIn && currentUserId) {
-      const qNotif = query(collection(db, 'notifications'), where('userId', '==', currentUserId));
+      const currentEmail = auth.currentUser?.email || currentUser?.email;
+      const targetUserKeys = [currentUserId, 'all'];
+      if (currentEmail) {
+        targetUserKeys.push(currentEmail.toLowerCase());
+      }
+      const qNotif = query(collection(db, 'notifications'), where('userId', 'in', targetUserKeys));
       const unsubNotif = onSnapshot(qNotif, (snapshot) => {
-        setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification)));
+        const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
+        setNotifications(notifs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      }, (err) => {
+        console.warn("Notifications listener notice:", err.message);
       });
 
       const qOrders = query(collection(db, 'orders'));
       const unsubOrders = onSnapshot(qOrders, (snapshot) => {
         setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
+      }, (err) => {
+        console.warn("Orders listener notice:", err.message);
       });
 
       return () => {
@@ -832,6 +851,11 @@ const App: React.FC = () => {
 
   const handleUpdateOrderStatus = async (orderId: string, status: Order['status']) => {
     await updateOrderStatusInDb(orderId, status);
+    await refreshData();
+  };
+
+  const handleClearOrders = async () => {
+    await clearAllOrdersInDb();
     await refreshData();
   };
   

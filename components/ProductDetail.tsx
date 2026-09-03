@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler, Heart, Video, Camera, X, Loader } from 'lucide-react';
+import { Star, Truck, ShieldCheck, Sparkles, User, Send, AlertCircle, Clock, Ruler, Heart, Video, Camera, X, Loader, Bell } from 'lucide-react';
 import { Product, Vendor, User as AppUser, Order, Review, ProductVariant } from '../types.ts';
 import { getStyleMatch } from '../services/geminiService.ts';
-import { fetchProductReviews, submitReview, trackProductEvent } from '../services/dataService.ts';
+import { fetchProductReviews, submitReview, trackProductEvent, joinWaitlistInDb } from '../services/dataService.ts';
 import { logUserAction } from '../services/loggingService.ts';
 import { useCurrency } from '../context/CurrencyContext.tsx';
 
@@ -35,6 +35,96 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
   const [styleTip, setStyleTip] = useState<string | null>(null);
   const [loadingStyle, setLoadingStyle] = useState(false);
   const [activeImage, setActiveImage] = useState(product.images?.[0] || product.image);
+
+  // Back-In-Stock Waitlist State
+  const [waitlistEmail, setWaitlistEmail] = useState(currentUser?.email || '');
+  const [waitlistSuccess, setWaitlistSuccess] = useState(false);
+  const [submittingWaitlist, setSubmittingWaitlist] = useState(false);
+
+  // Complete-The-Look State
+  const [completeLook, setCompleteLook] = useState<{ items: Array<{ title: string; category: string; price: number; description: string; imageUrl: string }>; stylistNote: string } | null>(null);
+  const [loadingCompleteLook, setLoadingCompleteLook] = useState(false);
+
+  // Selected variant stock check
+  const selectedVariant = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) return null;
+    return product.variants.find(v => 
+      (!selectedSize || v.size === selectedSize) && (!selectedColor || v.color === selectedColor)
+    );
+  }, [product.variants, selectedSize, selectedColor]);
+
+  const isCurrentSelectionOutOfStock = useMemo(() => {
+    if (product.stock === 0) return true;
+    if (selectedVariant) return selectedVariant.stock === 0;
+    return false;
+  }, [product.stock, selectedVariant]);
+
+  const handleJoinWaitlist = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!waitlistEmail.trim()) {
+      alert("Please provide an email address for restock notifications.");
+      return;
+    }
+
+    // Request browser push notification permission if available
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      try {
+        await Notification.requestPermission();
+      } catch (err) {
+        console.warn("Notification permission prompt skipped:", err);
+      }
+    }
+
+    setSubmittingWaitlist(true);
+    try {
+      await joinWaitlistInDb({
+        id: `${waitlistEmail.toLowerCase().trim()}_${product.id}_${selectedSize || 'all'}`,
+        email: waitlistEmail.toLowerCase().trim(),
+        productId: product.id,
+        productName: product.name,
+        size: selectedSize || 'all',
+        date: new Date().toISOString()
+      });
+      setWaitlistSuccess(true);
+    } catch (err) {
+      console.error("Waitlist error:", err);
+      alert("Failed to join waitlist. Please try again.");
+    } finally {
+      setSubmittingWaitlist(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchCompleteLook() {
+      setLoadingCompleteLook(true);
+      try {
+        const res = await fetch('/api/complete-the-look', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productName: product.name,
+            category: product.category,
+            price: product.price,
+            description: product.description,
+            designer: vendor?.name || product.designer
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.success) {
+            setCompleteLook({ items: data.items, stylistNote: data.stylistNote });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch complete the look:", err);
+      } finally {
+        if (isMounted) setLoadingCompleteLook(false);
+      }
+    }
+    fetchCompleteLook();
+    return () => { isMounted = false; };
+  }, [product.id]);
 
   // Reviews State
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -433,12 +523,75 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
               )}
             </div>
 
-            <button 
-              onClick={handleAddToCartClick}
-              className="hidden md:block w-full bg-black text-white py-5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
-            >
-              {product.isPreOrder ? 'Pre-Order Now' : 'Add to Bag'}
-            </button>
+            {isCurrentSelectionOutOfStock ? (
+              <div className="bg-gray-50 p-6 border border-gray-200 rounded-sm space-y-4">
+                <div className="flex items-center gap-2 text-black font-serif italic text-lg">
+                  <Bell size={18} className="text-luxury-gold" />
+                  <span>
+                    {selectedSize ? `Size ${selectedSize} is Out of Stock` : 'Get Notified When Restocked'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  {selectedSize 
+                    ? `Size ${selectedSize} is currently unavailable in the atelier. Register below for instant email and browser push notifications the second it is restocked.`
+                    : 'This luxury piece is currently sold out. Register below for instant email and browser push notifications when the atelier restocks.'}
+                </p>
+                {waitlistSuccess ? (
+                  <div className="bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 font-medium flex items-center gap-2">
+                    <span className="text-emerald-600 font-bold">✓</span>
+                    <span>Restock alert active! You will receive an instant email and push notification when {selectedSize ? `size ${selectedSize}` : 'this piece'} is restocked.</span>
+                  </div>
+                ) : (
+                  <form onSubmit={handleJoinWaitlist} className="space-y-3">
+                    <div className="flex gap-2">
+                      <input 
+                        type="email" 
+                        value={waitlistEmail}
+                        onChange={(e) => setWaitlistEmail(e.target.value)}
+                        placeholder="Enter your email address" 
+                        required
+                        className="flex-1 bg-white border border-gray-200 px-4 py-3 text-xs focus:border-black outline-none"
+                      />
+                      <button 
+                        type="submit"
+                        disabled={submittingWaitlist}
+                        className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2"
+                      >
+                        {submittingWaitlist ? <Loader size={14} className="animate-spin" /> : <Bell size={14} />}
+                        <span>Notify Me</span>
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400">
+                      * Includes instantaneous browser push notification and restock inbox alert.
+                    </p>
+                  </form>
+                )}
+              </div>
+            ) : (
+              <>
+                <button 
+                  onClick={handleAddToCartClick}
+                  className="hidden md:block w-full bg-black text-white py-5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
+                >
+                  {product.isPreOrder ? 'Pre-Order Now' : 'Add to Bag'}
+                </button>
+                
+                {/* Back-In-Stock Alert toggle for in-stock items */}
+                <div className="pt-2 text-right">
+                  {waitlistSuccess ? (
+                    <span className="text-xs text-emerald-600 font-medium">✓ Restock alert enabled for this piece</span>
+                  ) : (
+                    <button 
+                      onClick={() => handleJoinWaitlist()}
+                      type="button"
+                      className="text-[11px] text-gray-500 hover:text-black underline tracking-wide flex items-center gap-1.5 ml-auto"
+                    >
+                      <Bell size={12} /> Sign up for size & restock notifications
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
             
             {product.isPreOrder && (
               <p className="text-[10px] text-gray-500 text-center italic">
@@ -457,6 +610,85 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product, vendor, o
               </div>
             </div>
           </div>
+        </div>
+
+        {/* AI Complete-The-Look Assistant */}
+        <div className="mt-20 pt-16 border-t border-gray-100">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-8 h-8 rounded-full bg-luxury-gold/10 flex items-center justify-center text-luxury-gold">
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <h3 className="text-xl font-serif italic">AI Complete-The-Look Assistant</h3>
+              <p className="text-xs text-gray-500 uppercase tracking-widest">Dynamically curated matching accessories by Gemini</p>
+            </div>
+          </div>
+
+          {loadingCompleteLook ? (
+            <div className="py-12 flex flex-col items-center justify-center space-y-3 bg-gray-50 rounded-sm">
+              <Loader className="animate-spin text-luxury-gold" size={24} />
+              <p className="text-xs text-gray-500 italic">Curating matching handbags, footwear, and jewelry for this piece...</p>
+            </div>
+          ) : completeLook ? (
+            <div className="space-y-8">
+              {completeLook.stylistNote && (
+                <div className="bg-amber-50/50 p-4 border border-amber-200/60 rounded-sm">
+                  <p className="text-xs text-amber-900 font-serif italic">"{completeLook.stylistNote}"</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {completeLook.items.map((item, idx) => (
+                  <div key={idx} className="bg-white border border-gray-200/80 rounded-sm overflow-hidden flex flex-col group hover:shadow-md transition-shadow">
+                    <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                      <img 
+                        src={item.imageUrl} 
+                        alt={item.title} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 text-black">
+                        {item.category}
+                      </span>
+                    </div>
+                    <div className="p-5 flex flex-col flex-1 justify-between">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start">
+                          <h4 className="text-sm font-bold text-black font-sans">{item.title}</h4>
+                          <span className="text-sm font-serif font-bold text-luxury-gold">{formatPrice(item.price)}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 leading-relaxed">{item.description}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const accessoryProduct: Product = {
+                            id: `acc_${Date.now()}_${idx}`,
+                            name: item.title,
+                            designer: product.designer,
+                            price: item.price,
+                            category: item.category,
+                            image: item.imageUrl,
+                            images: [item.imageUrl],
+                            description: item.description,
+                            sizes: ['One Size'],
+                            rating: 5,
+                            stock: 10,
+                            isApproved: true
+                          };
+                          onAddToCart(accessoryProduct, 'One Size');
+                        }}
+                        className="mt-4 w-full bg-black text-white py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2"
+                      >
+                        Add Accessory to Bag
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic py-6 text-center">No recommendations available at this moment.</p>
+          )}
         </div>
 
         {/* Reviews Section */}

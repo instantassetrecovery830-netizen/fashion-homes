@@ -10,9 +10,10 @@ interface OrdersViewProps {
   onUpdateStatus?: (orderId: string, status: Order['status']) => Promise<void>;
   role?: UserRole;
   onNavigate?: (view: ViewState) => void;
+  onClearOrders?: () => Promise<void>;
 }
 
-export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOpen, onUpdateStatus, role, onNavigate }) => {
+export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOpen, onUpdateStatus, role, onNavigate, onClearOrders }) => {
   const { formatPrice } = useCurrency();
   const [updatingId, setUpdatingId] = React.useState<string | null>(null);
   const [showTrackingInput, setShowTrackingInput] = React.useState<string | null>(null);
@@ -75,6 +76,18 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOp
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {onClearOrders && (
+            <button
+              onClick={async () => {
+                if (window.confirm('Are you sure you want to clear all order history and start afresh?')) {
+                  await onClearOrders();
+                }
+              }}
+              className="px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors"
+            >
+              Clear Order History
+            </button>
+          )}
           <div className="relative hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input 

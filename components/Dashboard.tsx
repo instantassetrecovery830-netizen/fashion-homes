@@ -72,6 +72,7 @@ interface DashboardProps {
   followers?: Follower[];
   onOpenDirectMessaging?: () => void;
   currentUser?: AppUser | Vendor | null;
+  onClearOrders?: () => Promise<void>;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -103,7 +104,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onDesignerClick,
   followers = [],
   onOpenDirectMessaging,
-  currentUser
+  currentUser,
+  onClearOrders
 }) => {
   const [activeTab, setActiveTab] = useState(initialTab || 'OVERVIEW');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -356,6 +358,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       try {
           const currentVendor = role === UserRole.VENDOR ? vendors.find(v => v.email === currentUser?.email) : null;
           
+          const variantTotalStock = (productForm.variants && productForm.variants.length > 0)
+            ? productForm.variants.reduce((acc, v) => acc + (Number(v.stock) || 0), 0)
+            : null;
+
           const newProduct: Product = {
               id: productForm.id || `prod_${Date.now()}`,
               name: productForm.name!,
@@ -367,11 +373,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
               video: productForm.video,
               description: productForm.description || '',
               rating: productForm.rating || 5,
-              stock: Number(productForm.stock) || 0,
+              stock: variantTotalStock !== null ? variantTotalStock : (Number(productForm.stock) || 0),
+              variants: productForm.variants || [],
               sizes: Array.isArray(productForm.sizes) ? productForm.sizes : (typeof productForm.sizes === 'string' ? (productForm.sizes as string).split(',').map((s: string) => s.trim()) : ['S', 'M', 'L']),
               isNewSeason: !!productForm.isNewSeason,
               isPreOrder: !!productForm.isPreOrder,
+              preOrderDepositPercentage: Number(productForm.preOrderDepositPercentage) || 50,
               isApproved: productForm.id ? !!productForm.isApproved : false,
+              status: productForm.status || 'approved',
               createdAt: productForm.createdAt || new Date().toISOString()
           };
 
@@ -625,6 +634,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             onUpdateStatus={onUpdateOrderStatus}
             role={role}
             onNavigate={onNavigate}
+            onClearOrders={onClearOrders}
           />
         );
 
@@ -633,9 +643,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return (
           <AnalyticsView 
             products={myProducts}
-            orders={myOrders}
+            orders={orders}
             vendorId={vendor?.id}
             vendorName={vendor?.name}
+            role={role}
           />
         );
 
@@ -649,6 +660,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             setProductForm={setProductForm}
             handleDeleteProduct={onDeleteProduct!}
             onUpdateProduct={onUpdateProduct}
+            onAddProduct={onAddProduct}
             onProductSelect={onProductSelect}
           />
         );

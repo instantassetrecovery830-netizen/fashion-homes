@@ -56,15 +56,104 @@ service cloud.firestore {
              (!('location' in data) || (data.location is string && data.location.size() < 100));
     }
 
-    match /{document=**} {
-      allow read, write: if true; // Temporarily allow all for migration
-    }
-    
+    // Users Collection
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      allow read: if true;
+      allow create: if true;
+      allow update: if isAuthenticated() || isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // Products Collection (Public Catalog)
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || isAdmin();
+    }
+
+    // Vendors Collection (Public Profiles)
+    match /vendors/{vendorId} {
+      allow read: if true;
+      allow create: if isAuthenticated() || isAdmin();
+      allow update: if isAuthenticated() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow read, create: if true; // Allows guest & buyer checkout and order tracking
+      allow update, delete: if isAuthenticated() || isAdmin();
+    }
+
+    // Notifications Collection
+    match /notifications/{notificationId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // Back-In-Stock Waitlist Collection
+    match /waitlist/{waitlistId} {
+      allow read: if true;
+      allow create: if true; // Buyers & guests can sign up for restock notifications
+      allow update, delete: if true;
+    }
+
+    // Reviews Collection
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || isAdmin();
+    }
+
+    // Followers Collection
+    match /followers/{followerId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() || isAdmin();
+    }
+
+    // Direct Messages Collection
+    match /direct_messages/{messageId} {
+      allow read, write: if true;
+    }
+
+    // Shopping Cart Items
+    match /cart_items/{cartItemId} {
+      allow read, write: if true;
+    }
+
+    // Saved Items / Wishlist
+    match /saved_items/{savedItemId} {
+      allow read, write: if true;
+    }
+
+    // Product Votes (The Drop)
+    match /votes/{voteId} {
+      allow read, write: if true;
+    }
+
+    // CMS & Store Design
+    match /cms/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isAdmin();
+    }
+
+    // Landing Content & Customizer
+    match /landing_content/{contentId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isAdmin();
+    }
+
+    // Concierge & Support Messages
+    match /messages/{messageId} {
+      allow read, write: if true;
+    }
+
+    // Contact Inquiries
+    match /contact_submissions/{submissionId} {
+      allow read, write: if true;
+    }
+
+    // Shipments
+    match /shipments/{shipmentId} {
+      allow read, write: if isAuthenticated() || isAdmin();
     }
   }
 }

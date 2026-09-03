@@ -1,5 +1,6 @@
 {
   "name": "MyFitStore",
   "description": "A high-fashion luxury marketplace connecting designers and buyers with AI-driven curation.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

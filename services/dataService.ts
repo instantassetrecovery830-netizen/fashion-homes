@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, addDoc, orderBy } from 'firebase/firestore';
 import { db } from './firebase.ts';
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Follower, AppNotification, CartItem, ChatMessage, DirectMessage, Review, UserRole } from '../types.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Follower, AppNotification, CartItem, ChatMessage, DirectMessage, Review, UserRole, WaitlistEntry } from '../types.ts';
 
 // Helper to convert Firestore docs to array
 const getArray = async (q: any) => {
@@ -52,12 +52,20 @@ export const fetchUserFollowedVendors = async (userId: string): Promise<Vendor[]
     return vendors;
 };
 
-export const fetchNotifications = async (userId?: string): Promise<AppNotification[]> => {
-    let q = collection(db, 'notifications');
-    if (userId && userId !== 'all') {
-        q = query(q, where('userId', '==', userId)) as any;
+export const fetchNotifications = async (userId?: string, userEmail?: string): Promise<AppNotification[]> => {
+    try {
+        const allNotifs = await getArray(collection(db, 'notifications')) as AppNotification[];
+        if (!userId && !userEmail) return allNotifs;
+        
+        return allNotifs.filter(n => 
+            n.userId === 'all' || 
+            (userId && n.userId === userId) || 
+            (userEmail && n.userId?.toLowerCase() === userEmail.toLowerCase())
+        ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } catch (e) {
+        console.error("Error fetching notifications:", e);
+        return [];
     }
-    return getArray(q) as Promise<AppNotification[]>;
 };
 
 export const fetchLandingContent = async (): Promise<LandingPageContent> => {
@@ -75,7 +83,59 @@ export const fetchLandingContent = async (): Promise<LandingPageContent> => {
 export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> => getArray(collection(db, 'contact_submissions')) as Promise<ContactSubmission[]>;
 
 export const addProductToDb = async (product: Product) => setDoc(doc(db, 'products', product.id), cleanData(product));
-export const updateProductInDb = async (product: Product) => updateDoc(doc(db, 'products', product.id), cleanData(product));
+export const updateProductInDb = async (product: Product) => {
+    try {
+        const docRef = doc(db, 'products', product.id);
+        const prevDoc = await getDoc(docRef);
+        const prevData = prevDoc.exists() ? prevDoc.data() : null;
+        const prevStock = prevData ? (prevData.stock ?? 0) : 0;
+        const prevVariants = prevData?.variants || [];
+
+        // Determine if overall product or specific size variants were restocked
+        const isRestockedOverall = prevStock === 0 && (Number(product.stock) > 0);
+        
+        // Check size variant restocks
+        const restockedSizes: string[] = [];
+        if (product.variants && product.variants.length > 0) {
+            product.variants.forEach((v: any) => {
+                const prevV = prevVariants.find((pv: any) => pv.size === v.size && pv.color === v.color);
+                const prevVStock = prevV ? (Number(prevV.stock) || 0) : 0;
+                if (prevVStock === 0 && (Number(v.stock) || 0) > 0) {
+                    restockedSizes.push(v.size);
+                }
+            });
+        }
+
+        if (isRestockedOverall || restockedSizes.length > 0) {
+            const waitlist = await fetchWaitlistEntries(product.id);
+            for (const entry of waitlist) {
+                const matchesSize = isRestockedOverall || 
+                                    !entry.size || 
+                                    entry.size === 'all' || 
+                                    restockedSizes.includes(entry.size);
+
+                if (matchesSize) {
+                    const notifId = `notif_restock_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                    const sizeLabel = entry.size && entry.size !== 'all' ? ` (Size: ${entry.size})` : '';
+                    await setDoc(doc(db, 'notifications', notifId), cleanData({
+                        id: notifId,
+                        userId: entry.email,
+                        title: 'Back-In-Stock Alert!',
+                        message: `Exquisite news! "${product.name}"${sizeLabel} is now back in stock by ${product.designer || 'the atelier'}. Claim yours before it sells out.`,
+                        read: false,
+                        date: new Date().toISOString(),
+                        type: 'RESTOCK',
+                        link: product.id
+                    }));
+                    await deleteDoc(doc(db, 'waitlist', entry.id));
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Restock notification trigger error:", e);
+    }
+    await updateDoc(doc(db, 'products', product.id), cleanData(product));
+};
 export const deleteProductFromDb = async (productId: string) => deleteDoc(doc(db, 'products', productId));
 
 export const createVendorInDb = async (vendor: Vendor) => setDoc(doc(db, 'vendors', vendor.id), cleanData(vendor));
@@ -108,11 +168,26 @@ const cleanData = (obj: any) => {
 
 export const createOrderInDb = async (order: Order) => setDoc(doc(db, 'orders', order.id), cleanData(order));
 
+export const clearAllOrdersInDb = async () => {
+    const orders = await fetchOrders();
+    for (const order of orders) {
+        await deleteDoc(doc(db, 'orders', order.id));
+    }
+};
+
 export const markNotificationRead = async (notificationId: string) => updateDoc(doc(db, 'notifications', notificationId), { read: true });
 
 export const submitContactFormInDb = async (submission: ContactSubmission) => setDoc(doc(db, 'contact_submissions', submission.id), cleanData(submission));
 
-export const joinWaitlistInDb = async (entry: any) => setDoc(doc(db, 'waitlist', entry.email), cleanData(entry));
+export const joinWaitlistInDb = async (entry: WaitlistEntry) => {
+    const id = `${entry.email}_${entry.productId}_${entry.size || 'all'}`;
+    await setDoc(doc(db, 'waitlist', id), cleanData({ ...entry, id }));
+};
+
+export const fetchWaitlistEntries = async (productId: string): Promise<WaitlistEntry[]> => {
+    const q = query(collection(db, 'waitlist'), where('productId', '==', productId));
+    return getArray(q) as Promise<WaitlistEntry[]>;
+};
 
 export const fetchCartItems = async (userId: string): Promise<CartItem[]> => {
     const q = query(collection(db, 'cart_items'), where('userId', '==', userId));

@@ -5,9 +5,19 @@ import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
 import cors from "cors";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 async function startServer() {
   try {
@@ -28,6 +38,92 @@ async function startServer() {
   // API routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // AI Complete-The-Look Assistant Endpoint
+  app.post("/api/complete-the-look", async (req, res) => {
+    try {
+      const { productName, category, price, description, designer } = req.body;
+      if (!productName) {
+        return res.status(400).json({ error: "Product name is required" });
+      }
+
+      const prompt = `Given the luxury fashion item:
+Name: ${productName}
+Category: ${category || 'Apparel'}
+Price: $${price || 0}
+Designer: ${designer || 'Independent Atelier'}
+Description: ${description || ''}
+
+Recommend 3 complementary luxury accessories to complete the look (e.g., handbag/clutch, footwear/heels/boots, and piece of jewelry).
+Return JSON matching the schema.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              items: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING, description: "Name of the recommended accessory" },
+                    category: { type: Type.STRING, description: "Category like Handbag, Footwear, or Jewelry" },
+                    price: { type: Type.NUMBER, description: "Estimated price in USD" },
+                    description: { type: Type.STRING, description: "Why this matches and completes the outfit" },
+                    imageUrl: { type: Type.STRING, description: "Unsplash image URL for this type of luxury accessory" }
+                  },
+                  required: ["title", "category", "price", "description", "imageUrl"]
+                }
+              },
+              stylistNote: { type: Type.STRING, description: "Overall styling advice for this look" }
+            },
+            required: ["items", "stylistNote"]
+          }
+        }
+      });
+
+      let data;
+      try {
+        data = JSON.parse(response.text.trim());
+      } catch (e) {
+        data = {
+          items: [
+            {
+              title: "Structured Leather Clutch",
+              category: "Handbag",
+              price: 450,
+              description: "A sleek accent piece that balances the silhouette.",
+              imageUrl: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=600&q=80"
+            },
+            {
+              title: "Minimalist Strappy Stilettos",
+              category: "Footwear",
+              price: 620,
+              description: "Elongates the leg and adds sophisticated evening polish.",
+              imageUrl: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=600&q=80"
+            },
+            {
+              title: "Gilded Vermeil Cuff",
+              category: "Jewelry",
+              price: 290,
+              description: "Subtle metallic sheen framing the wrist.",
+              imageUrl: "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=600&q=80"
+            }
+          ],
+          stylistNote: "Pair with clean updo and confident posture for an unforgettable architectural silhouette."
+        };
+      }
+
+      res.json({ success: true, ...data });
+    } catch (err: any) {
+      console.error("Complete-The-Look Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate recommendations" });
+    }
   });
 
   // Shippo Order Tracking API Endpoint

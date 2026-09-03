@@ -15,12 +15,127 @@
         "location": { "type": "string" }
       },
       "required": ["name", "email", "role", "joined", "status"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A luxury fashion piece in the marketplace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "designer": { "type": "string" },
+        "price": { "type": "number" },
+        "vendorId": { "type": "string" },
+        "category": { "type": "string" },
+        "image": { "type": "string" },
+        "description": { "type": "string" },
+        "stock": { "type": "number" },
+        "sizes": { "type": "array", "items": { "type": "string" } },
+        "rating": { "type": "number" }
+      },
+      "required": ["name", "price", "category", "stock"]
+    },
+    "Vendor": {
+      "title": "Vendor",
+      "description": "A verified designer or fashion atelier",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "bio": { "type": "string" },
+        "verificationStatus": { "type": "string", "enum": ["PENDING", "VERIFIED", "REJECTED"] },
+        "subscriptionStatus": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+      },
+      "required": ["name", "email", "verificationStatus", "subscriptionStatus"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer purchase order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "date": { "type": "string" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["Processing", "Shipped", "Delivered"] },
+        "items": { "type": "array" }
+      },
+      "required": ["customerName", "total", "status", "items"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "System, order, or restock notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "date": { "type": "string" },
+        "type": { "type": "string" },
+        "link": { "type": "string" }
+      },
+      "required": ["title", "message", "date", "type"]
+    },
+    "Waitlist": {
+      "title": "Waitlist",
+      "description": "Back-in-stock waitlist entry for out-of-stock items",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "size": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["email", "productId", "date"]
+    },
+    "LandingContent": {
+      "title": "LandingContent",
+      "description": "CMS landing page content and customizer data",
+      "type": "object"
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Customer support or concierge message",
+      "type": "object"
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User profiles"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Curated designer fashion products"
+    },
+    "/vendors/{vendorId}": {
+      "schema": { "$ref": "#/entities/Vendor" },
+      "description": "Fashion ateliers and vendor accounts"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer purchase orders"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "Restock and system notifications"
+    },
+    "/waitlist/{waitlistId}": {
+      "schema": { "$ref": "#/entities/Waitlist" },
+      "description": "Back-in-stock alert waitlist entries"
+    },
+    "/landing_content/{contentId}": {
+      "schema": { "$ref": "#/entities/LandingContent" },
+      "description": "CMS landing content"
+    },
+    "/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Support chat messages"
     }
   }
 }

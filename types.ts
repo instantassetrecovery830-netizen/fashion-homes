@@ -42,7 +42,7 @@ export interface AppNotification {
   message: string;
   read: boolean;
   date: string; // ISO string
-  type: 'ORDER' | 'SYSTEM' | 'PROMO' | 'ALERT';
+  type: 'ORDER' | 'SYSTEM' | 'PROMO' | 'ALERT' | 'RESTOCK';
   link?: string;
 }
 
@@ -165,6 +165,8 @@ export interface WaitlistEntry {
   id: string;
   email: string;
   productId: string;
+  size?: string;
+  productName?: string;
   date: string;
 }
 

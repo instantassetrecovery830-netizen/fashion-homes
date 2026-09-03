@@ -1,5 +1,5 @@
-import React from 'react';
-import { Package, Search, Plus, Filter, MoreVertical, Edit2, Trash2, Eye, Star, Archive, AlertCircle, CheckCircle } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Package, Search, Plus, Filter, MoreVertical, Edit2, Trash2, Eye, Star, Archive, AlertCircle, CheckCircle, Download, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Product, UserRole } from '../../types';
 import { useCurrency } from '../../context/CurrencyContext.tsx';
@@ -12,6 +12,7 @@ interface ProductsViewProps {
   setProductForm: (product: Partial<Product>) => void;
   handleDeleteProduct: (id: string) => void;
   onUpdateProduct?: (product: Product) => Promise<void>;
+  onAddProduct?: (product: Product) => Promise<void>;
   onProductSelect?: (product: Product) => void;
 }
 
@@ -23,9 +24,141 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   setProductForm,
   handleDeleteProduct,
   onUpdateProduct,
+  onAddProduct,
   onProductSelect
 }) => {
   const { formatPrice } = useCurrency();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportCSV = () => {
+    // Shopify CSV standard header
+    const headers = ['Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Tags', 'Published', 'Variant Price', 'Variant Inventory Qty', 'Image Src'];
+    const rows = products.map(p => [
+      p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      `"${p.name.replace(/"/g, '""')}"`,
+      `"${(p.description || '').replace(/"/g, '""')}"`,
+      `"${(p.designer || '').replace(/"/g, '""')}"`,
+      `"${(p.category || '').replace(/"/g, '""')}"`,
+      p.isPreOrder ? 'Pre-Order, Luxury' : 'Luxury',
+      'TRUE',
+      p.price,
+      p.stock,
+      p.image || ''
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `myfitstore_catalog_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split('\n');
+      if (lines.length < 2) return;
+
+      // Detect header format (Shopify CSV or custom)
+      const headerLine = lines[0].toLowerCase();
+      const isShopify = headerLine.includes('handle') && headerLine.includes('variant price');
+
+      let importedCount = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Simple CSV parser handling quotes
+        const row: string[] = [];
+        let inQuote = false;
+        let currentValue = '';
+        for (let charIndex = 0; charIndex < line.length; charIndex++) {
+          const char = line[charIndex];
+          if (char === '"') {
+            inQuote = !inQuote;
+          } else if (char === ',' && !inQuote) {
+            row.push(currentValue);
+            currentValue = '';
+          } else {
+            currentValue += char;
+          }
+        }
+        row.push(currentValue);
+
+        if (isShopify && row.length >= 8) {
+          // Shopify CSV: Handle, Title, Body (HTML), Vendor, Type, Tags, Published, Variant Price, Variant Inventory Qty, Image Src
+          const title = row[1]?.replace(/^"|"$/g, '').trim();
+          const description = row[2]?.replace(/^"|"$/g, '').trim();
+          const vendor = row[3]?.replace(/^"|"$/g, '').trim() || 'Atelier';
+          const type = row[4]?.replace(/^"|"$/g, '').trim() || 'Apparel';
+          const price = parseFloat(row[7]) || 100;
+          const stock = parseInt(row[8]) || 10;
+          const imageSrc = row[9]?.replace(/^"|"$/g, '').trim() || 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=800&q=80';
+
+          if (title && onAddProduct) {
+            const newProd: Product = {
+              id: `prod_${Date.now()}_${i}`,
+              name: title,
+              designer: vendor,
+              price: price,
+              category: type,
+              image: imageSrc,
+              images: [imageSrc],
+              description: description || 'Exquisite luxury piece imported via Shopify CSV.',
+              sizes: ['XS', 'S', 'M', 'L', 'XL'],
+              stock: stock,
+              rating: 5,
+              isApproved: true
+            };
+            await onAddProduct(newProd);
+            importedCount++;
+          }
+        } else if (row.length >= 4) {
+          // Standard CSV: Name, Category, Price, Stock, Image, Description, Designer
+          const name = row[0]?.replace(/^"|"$/g, '').trim();
+          const category = row[1]?.replace(/^"|"$/g, '').trim() || 'Apparel';
+          const price = parseFloat(row[2]) || 100;
+          const stock = parseInt(row[3]) || 10;
+          const image = row[4]?.replace(/^"|"$/g, '').trim() || 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=800&q=80';
+          const description = row[5]?.replace(/^"|"$/g, '').trim() || 'Luxury bespoke creation.';
+          const designer = row[6]?.replace(/^"|"$/g, '').trim() || 'Atelier';
+
+          if (name && onAddProduct) {
+            const newProd: Product = {
+              id: `prod_${Date.now()}_${i}`,
+              name,
+              designer,
+              price,
+              category,
+              image,
+              images: [image],
+              description,
+              sizes: ['XS', 'S', 'M', 'L', 'XL'],
+              stock,
+              rating: 5,
+              isApproved: true
+            };
+            await onAddProduct(newProd);
+            importedCount++;
+          }
+        }
+      }
+
+      alert(`Successfully imported ${importedCount} products into your catalog!`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
   return (
     <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
       <div className="flex items-center justify-between">
@@ -33,13 +166,34 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           <h2 className="text-3xl font-serif italic">Collection Management</h2>
           <p className="text-gray-500 text-sm mt-1">Curate and manage your luxury pieces</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleImportCSV} 
+            accept=".csv" 
+            className="hidden" 
+          />
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="px-4 py-2 border border-gray-300 text-black text-xs font-bold uppercase tracking-widest hover:border-black transition-colors flex items-center gap-2 bg-white"
+            title="Import CSV or Shopify CSV"
+          >
+            <Upload size={14} /> Import CSV
+          </button>
+          <button 
+            onClick={handleExportCSV}
+            className="px-4 py-2 border border-gray-300 text-black text-xs font-bold uppercase tracking-widest hover:border-black transition-colors flex items-center gap-2 bg-white"
+            title="Export Catalog as CSV"
+          >
+            <Download size={14} /> Export CSV
+          </button>
           <div className="relative hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input 
               type="text" 
               placeholder="Search products..." 
-              className="pl-10 pr-4 py-2 border border-gray-200 rounded-sm text-sm focus:border-black outline-none w-64 transition-all"
+              className="pl-10 pr-4 py-2 border border-gray-200 rounded-sm text-sm focus:border-black outline-none w-56 transition-all"
             />
           </div>
           <button 
@@ -49,7 +203,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 price: 0,
                 description: '',
                 category: '',
-                designer: role === UserRole.VENDOR ? '' : '', // Will be set in Dashboard
+                designer: role === UserRole.VENDOR ? '' : '',
                 image: '',
                 images: [],
                 stock: 0,
@@ -57,7 +211,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
               });
               setIsProductFormOpen(true);
             }}
-            className="bg-black text-white px-6 py-2 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2 shadow-md"
+            className="bg-black text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center gap-2 shadow-md"
           >
             <Plus size={16} /> Add Piece
           </button>

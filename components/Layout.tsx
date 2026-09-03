@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight, Instagram, Twitter, Facebook, Heart, Share2, Copy, Shirt } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
@@ -58,6 +59,7 @@ export const Layout: React.FC<LayoutProps> = ({
   onRefreshNotifications,
   onOpenDirectMessaging
 }) => {
+  const navigate = useNavigate();
   const { formatPrice, currency, convertPrice } = useCurrency();
   const [isScrolled, setIsScrolled] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
@@ -154,7 +156,7 @@ export const Layout: React.FC<LayoutProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- NOTIFICATION TOAST LOGIC ---
+  // --- NOTIFICATION TOAST & BROWSER PUSH LOGIC ---
   useEffect(() => {
       if (notifications.length > 0) {
           const newest = notifications[0];
@@ -162,13 +164,26 @@ export const Layout: React.FC<LayoutProps> = ({
           // Determine if we should show toast
           const isNew = newest.id !== latestNotificationIdRef.current;
           const isRelevant = !newest.read; // Only show unread as toasts
-          const isRecent = (new Date().getTime() - new Date(newest.date).getTime()) < 60000; // Created in last minute
+          const isRecent = (new Date().getTime() - new Date(newest.date).getTime()) < 120000; // Created in last 2 minutes
 
           // Handle first load vs updates
           if (isNew) {
               if (initializedRef.current && isRelevant && isRecent) {
                   setActiveToast(newest);
-                  setTimeout(() => setActiveToast(null), 6000);
+                  setTimeout(() => setActiveToast(null), 7000);
+
+                  // Native browser push notification if permitted
+                  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                      try {
+                          new Notification(newest.title || 'MyFitStore Luxury Alert', {
+                              body: newest.message,
+                              icon: '/favicon.ico',
+                              tag: newest.id
+                          });
+                      } catch (err) {
+                          console.warn("Browser push notification error:", err);
+                      }
+                  }
               }
               // Update ref
               latestNotificationIdRef.current = newest.id;
@@ -184,10 +199,14 @@ export const Layout: React.FC<LayoutProps> = ({
       }
       setActiveToast(null); // Dismiss toast if clicked
       if (notif.link) {
-          onNavigate(notif.link as ViewState);
+          if (notif.link.startsWith('prod_') || notif.type === 'RESTOCK') {
+              navigate(`/product/${notif.link}`);
+          } else {
+              onNavigate(notif.link as ViewState);
+          }
           setShowNotifications(false);
       }
-  }, [onRefreshNotifications, onNavigate]);
+  }, [onRefreshNotifications, onNavigate, navigate]);
 
   const markAllRead = useCallback(async () => {
       const unread = notifications.filter(n => !n.read);
