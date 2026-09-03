@@ -12,6 +12,8 @@ import { useCurrency } from '../context/CurrencyContext.tsx';
 import { generateOrderPDF } from '../utils/pdfGenerator.ts';
 import { sendOrderConfirmationEmail } from '../utils/emailService.ts';
 import { ShareWishlistModal } from './ShareWishlistModal.tsx';
+import { PWAInstallButton } from './PWAInstallButton.tsx';
+import { OfflineIndicator } from './OfflineIndicator.tsx';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -608,6 +610,9 @@ export const Layout: React.FC<LayoutProps> = ({
                   </button>
                 )}
               </div>
+
+              {/* In-App PWA Install Prompt */}
+              <PWAInstallButton variant="navbar" />
 
               {/* Saved Items (Heart) */}
               <div 
@@ -1401,6 +1406,9 @@ export const Layout: React.FC<LayoutProps> = ({
         savedItems={savedItems}
         currentUser={currentUser}
       />
+
+      {/* Offline Connectivity Indicator */}
+      <OfflineIndicator />
     </div>
   );
 };

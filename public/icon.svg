@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E5C17C"/>
+      <stop offset="50%" stop-color="#C5A059"/>
+      <stop offset="100%" stop-color="#9A7736"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="100" fill="#0A0A0A"/>
+  <rect x="20" y="20" width="472" height="472" rx="80" fill="none" stroke="url(#gold)" stroke-width="4" opacity="0.3"/>
+  <!-- Elegant Monogram M -->
+  <path d="M 140 380 L 140 130 L 256 310 L 372 130 L 372 380" fill="none" stroke="url(#gold)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="380" r="12" fill="url(#gold)"/>
+</svg>
