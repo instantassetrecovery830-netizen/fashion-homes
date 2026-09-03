@@ -173,6 +173,58 @@ const cleanData = (obj: any) => {
 
 export const createOrderInDb = async (order: Order) => setDoc(doc(db, 'orders', order.id), cleanData(order));
 
+export const fetchOrderById = async (orderId: string): Promise<Order | null> => {
+    try {
+        const cleanId = orderId.trim().replace(/^#/, '');
+        if (!cleanId) return null;
+        const snap = await getDoc(doc(db, 'orders', cleanId));
+        if (snap.exists()) {
+            return { id: snap.id, ...snap.data() } as Order;
+        }
+        return null;
+    } catch (e) {
+        console.warn("Notice fetching order by id:", e);
+        return null;
+    }
+};
+
+export const searchOrderInDb = async (searchTerm: string): Promise<Order | null> => {
+    const term = searchTerm.trim().replace(/^#/, '');
+    if (!term) return null;
+
+    // 1. Direct document ID lookup
+    const direct = await fetchOrderById(term);
+    if (direct) return direct;
+
+    // 2. Query by trackingNumber field
+    try {
+        const qTrack = query(collection(db, 'orders'), where('trackingNumber', '==', term));
+        const snapTrack = await getDocs(qTrack);
+        if (!snapTrack.empty) {
+            const d = snapTrack.docs[0];
+            return { id: d.id, ...d.data() } as Order;
+        }
+    } catch (e) {
+        console.warn("Notice searching order by tracking number:", e);
+    }
+
+    // 3. Query by customer email if search term contains @
+    if (term.includes('@')) {
+        try {
+            const qEmail = query(collection(db, 'orders'), where('customerName', '==', term));
+            const snapEmail = await getDocs(qEmail);
+            if (!snapEmail.empty) {
+                const d = snapEmail.docs[0];
+                return { id: d.id, ...d.data() } as Order;
+            }
+        } catch (e) {
+            console.warn("Notice searching order by customer email:", e);
+        }
+    }
+
+    return null;
+};
+
 export const clearAllOrdersInDb = async () => {
     const orders = await fetchOrders();
     for (const order of orders) {

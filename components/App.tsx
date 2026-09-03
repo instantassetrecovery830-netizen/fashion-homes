@@ -1188,6 +1188,11 @@ const App: React.FC = () => {
             <TrackOrderView orders={orders} onNavigate={handleNavigate} />
           </Suspense>
         } />
+        <Route path="/track-order/:orderId" element={
+          <Suspense fallback={<LoadingFallback />}>
+            <TrackOrderView orders={orders} onNavigate={handleNavigate} />
+          </Suspense>
+        } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       

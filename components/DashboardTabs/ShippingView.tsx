@@ -7,9 +7,10 @@ import { Shipment } from '../../types';
 interface ShippingViewProps {
   setIsSidebarOpen: (open: boolean) => void;
   vendorId?: string;
+  onNavigate?: (view: any) => void;
 }
 
-export const ShippingView: React.FC<ShippingViewProps> = ({ setIsSidebarOpen, vendorId }) => {
+export const ShippingView: React.FC<ShippingViewProps> = ({ setIsSidebarOpen, vendorId, onNavigate }) => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,6 +205,20 @@ export const ShippingView: React.FC<ShippingViewProps> = ({ setIsSidebarOpen, ve
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {onNavigate && (
+                        <button 
+                          onClick={() => {
+                            try {
+                              window.history.pushState(null, '', `/track-order?id=${encodeURIComponent(shipment.tracking_number || shipment.order_id)}`);
+                            } catch {}
+                            onNavigate('TRACK_ORDER');
+                          }}
+                          className="px-2.5 py-1 bg-black text-white text-[10px] font-bold uppercase tracking-wider rounded hover:bg-luxury-gold transition-colors flex items-center gap-1 shrink-0"
+                          title="Track Shipment in Logistics Portal"
+                        >
+                          <Truck size={12} /> Track
+                        </button>
+                      )}
                       <button className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-black transition-colors">
                         <Package size={16} />
                       </button>

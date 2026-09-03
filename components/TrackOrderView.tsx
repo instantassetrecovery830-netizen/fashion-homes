@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { 
   Truck, Package, Search, MapPin, CheckCircle2, Clock, 
   ArrowLeft, Copy, Check, RefreshCw, AlertCircle, ExternalLink, 
-  ShieldCheck, ArrowRight, FileText, PhoneCall
+  ShieldCheck, ArrowRight, FileText, PhoneCall, Share2, Sparkles, User
 } from 'lucide-react';
 import { Order, ViewState } from '../types.ts';
 import { useCurrency } from '../context/CurrencyContext.tsx';
+import { searchOrderInDb } from '../services/dataService.ts';
+import { generateOrderPDF } from '../utils/pdfGenerator.ts';
 
 interface TrackOrderViewProps {
   initialTrackingQuery?: string;
@@ -41,53 +44,103 @@ export const TrackOrderView: React.FC<TrackOrderViewProps> = ({
   onSelectOrderForSupport
 }) => {
   const { formatPrice } = useCurrency();
-  const [searchQuery, setSearchQuery] = useState(initialTrackingQuery);
+  const { orderId: paramOrderId } = useParams<{ orderId?: string }>();
+  const [searchQuery, setSearchQuery] = useState(initialTrackingQuery || paramOrderId || '');
   const [selectedCarrier, setSelectedCarrier] = useState('usps');
   const [matchedOrder, setMatchedOrder] = useState<Order | null>(null);
   const [trackingData, setTrackingData] = useState<TrackingResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
-  // Auto-search if initial query passed
+  // Auto-search if query passed via prop, route params, or URL search param (?id=... or ?tracking=...)
   useEffect(() => {
-    if (initialTrackingQuery) {
-      handleTrack(initialTrackingQuery);
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryFromUrl = paramOrderId ||
+                         urlParams.get('id') || 
+                         urlParams.get('orderId') || 
+                         urlParams.get('tracking') || 
+                         urlParams.get('trackingNumber') || 
+                         initialTrackingQuery;
+
+    if (queryFromUrl) {
+      setSearchQuery(queryFromUrl);
+      handleTrack(queryFromUrl);
     } else if (orders.length > 0) {
       // Default to most recent order if available
       const latest = orders[0];
       setSearchQuery(latest.id);
       handleTrack(latest.id, latest);
     }
-  }, [initialTrackingQuery]);
+  }, [initialTrackingQuery, paramOrderId]);
 
   const handleTrack = async (queryToUse?: string, directOrderObj?: Order) => {
-    const query = (queryToUse || searchQuery).trim();
-    if (!query) return;
+    const rawQuery = (queryToUse || searchQuery).trim();
+    if (!rawQuery) return;
+
+    // Clean leading # and spaces
+    const cleanQuery = rawQuery.replace(/^#/, '').trim();
+    if (!cleanQuery) return;
 
     setIsLoading(true);
     setErrorMsg(null);
     setTrackingData(null);
     setMatchedOrder(null);
 
-    // 1. Check if query matches a known Order ID or Order's tracking number in Firestore/local state
+    // 1. Check if query matches a known Order ID or Order's tracking number in props
     let targetOrder: Order | undefined = directOrderObj;
     if (!targetOrder) {
       targetOrder = orders.find(
-        o => o.id.toLowerCase() === query.toLowerCase() || 
-             (o.trackingNumber && o.trackingNumber.toLowerCase() === query.toLowerCase())
+        o => o.id.toLowerCase() === cleanQuery.toLowerCase() || 
+             (o.trackingNumber && o.trackingNumber.toLowerCase() === cleanQuery.toLowerCase())
       );
+    }
+
+    // 2. If not found in props (e.g. Guest user or direct link), search Firestore directly
+    if (!targetOrder) {
+      try {
+        const dbOrder = await searchOrderInDb(cleanQuery);
+        if (dbOrder) {
+          targetOrder = dbOrder;
+        }
+      } catch (dbErr) {
+        console.warn("Notice searching order in database:", dbErr);
+      }
     }
 
     if (targetOrder) {
       setMatchedOrder(targetOrder);
+      if (targetOrder.carrier) {
+        setSelectedCarrier(targetOrder.carrier.toLowerCase());
+      }
     }
 
-    const trackingNumToSearch = targetOrder?.trackingNumber || query;
-    const carrierToUse = targetOrder?.carrier || selectedCarrier;
+    // Auto-detect carrier prefix if user entered a standard carrier tracking number
+    let carrierToUse = targetOrder?.carrier || selectedCarrier;
+    const upperQuery = cleanQuery.toUpperCase();
+    if (upperQuery.startsWith('1Z')) {
+      carrierToUse = 'ups';
+      setSelectedCarrier('ups');
+    } else if (upperQuery.startsWith('94') || upperQuery.startsWith('92') || upperQuery.startsWith('93')) {
+      carrierToUse = 'usps';
+      setSelectedCarrier('usps');
+    } else if (upperQuery.startsWith('MFS') || upperQuery.startsWith('ORD_')) {
+      carrierToUse = carrierToUse || 'shippo';
+    }
+
+    const trackingNumToSearch = targetOrder?.trackingNumber || cleanQuery;
+
+    // Sync shareable URL with current query
+    try {
+      window.history.replaceState(null, '', `/track-order?id=${encodeURIComponent(cleanQuery)}`);
+    } catch {
+      // Ignore if iframe restricts replaceState
+    }
 
     try {
-      const response = await fetch(`/api/track-order?trackingNumber=${encodeURIComponent(trackingNumToSearch)}&carrier=${encodeURIComponent(carrierToUse)}`);
+      const orderStatusParam = targetOrder?.status ? `&orderStatus=${encodeURIComponent(targetOrder.status)}` : '';
+      const response = await fetch(`/api/track-order?trackingNumber=${encodeURIComponent(trackingNumToSearch)}&carrier=${encodeURIComponent(carrierToUse)}${orderStatusParam}`);
       if (!response.ok) {
         throw new Error("Unable to locate tracking details for this number.");
       }
@@ -98,7 +151,7 @@ export const TrackOrderView: React.FC<TrackOrderViewProps> = ({
       setTrackingData(data);
     } catch (err: any) {
       console.warn("Tracking API error:", err);
-      setErrorMsg(err.message || "Unable to track package. Please check the tracking number and carrier.");
+      setErrorMsg(err.message || "Unable to track package. Please verify the order number or carrier tracking code.");
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +164,13 @@ export const TrackOrderView: React.FC<TrackOrderViewProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Determine active milestone step (0: Order Placed, 1: Processing, 2: In Transit, 3: Out for Delivery, 4: Delivered)
+  const handleCopyShareLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  // Determine active milestone step (0: Order Confirmed, 1: Processing, 2: In Transit, 3: Out for Delivery, 4: Delivered)
   const getMilestoneIndex = (status?: string, orderStatus?: string) => {
     const s = (status || '').toUpperCase();
     const os = (orderStatus || '').toUpperCase();
@@ -119,18 +178,18 @@ export const TrackOrderView: React.FC<TrackOrderViewProps> = ({
     if (s === 'DELIVERED' || os === 'DELIVERED') return 4;
     if (s === 'OUT_FOR_DELIVERY' || s === 'OUT FOR DELIVERY') return 3;
     if (s === 'TRANSIT' || s === 'IN_TRANSIT' || os === 'SHIPPED') return 2;
-    if (os === 'PROCESSING') return 1;
-    return 1;
+    if (s === 'PROCESSING' || os === 'PROCESSING') return 1;
+    return 0;
   };
 
   const milestoneStep = getMilestoneIndex(trackingData?.status, matchedOrder?.status);
 
   const steps = [
-    { label: 'Order Confirmed', description: 'Atelier received order' },
-    { label: 'Processing', description: 'Quality inspection & packed' },
-    { label: 'In Transit', description: 'Carrier in route' },
-    { label: 'Out for Delivery', description: 'Local courier assigned' },
-    { label: 'Delivered', description: 'Package handed over' },
+    { label: 'Order Confirmed', description: 'Payment verified & order queued' },
+    { label: 'Atelier Processing', description: 'Garment crafted & inspected' },
+    { label: 'In Transit', description: 'Carrier collected & moving' },
+    { label: 'Out for Delivery', description: 'Courier out for handover' },
+    { label: 'Delivered', description: 'Delivered to destination' },
   ];
 
   return (
@@ -275,6 +334,14 @@ export const TrackOrderView: React.FC<TrackOrderViewProps> = ({
                       >
                         {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
                       </button>
+                      <button
+                        onClick={handleCopyShareLink}
+                        className="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 hover:text-black transition-colors flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider"
+                        title="Copy Shareable Tracking Link"
+                      >
+                        {copiedLink ? <Check size={12} className="text-green-600" /> : <Share2 size={12} />}
+                        {copiedLink ? 'Link Copied' : 'Share Link'}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -408,6 +475,19 @@ export const TrackOrderView: React.FC<TrackOrderViewProps> = ({
                       <p className="text-[10px] text-gray-400 mt-0.5">Placed on {matchedOrder.date}</p>
                     </div>
 
+                    {/* Bespoke Pre-Order Info */}
+                    {matchedOrder.isDepositOrder && (
+                      <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-sm text-xs space-y-1">
+                        <div className="flex items-center gap-1.5 text-amber-900 font-bold">
+                          <Sparkles size={13} className="text-luxury-gold" />
+                          <span>Bespoke Pre-Order</span>
+                        </div>
+                        <p className="text-amber-800 text-[11px] leading-relaxed">
+                          Deposit Paid: <span className="font-semibold">{formatPrice(matchedOrder.depositAmount || 0)}</span> • Remaining Balance: <span className="font-semibold">{formatPrice(matchedOrder.remainingBalance || 0)}</span>
+                        </p>
+                      </div>
+                    )}
+
                     {/* Shipping Destination */}
                     {matchedOrder.shippingAddress && (
                       <div className="p-3 bg-gray-50 rounded-sm text-xs space-y-1">
@@ -452,19 +532,28 @@ export const TrackOrderView: React.FC<TrackOrderViewProps> = ({
                       <span className="font-bold text-base text-luxury-black">{formatPrice(matchedOrder.total)}</span>
                     </div>
 
-                    {/* Support Button */}
-                    <button
-                      onClick={() => {
-                        if (onSelectOrderForSupport) {
-                          onSelectOrderForSupport(matchedOrder.id);
-                        } else {
-                          onNavigate('AI_CONCIERGE');
-                        }
-                      }}
-                      className="w-full py-2.5 border border-black text-black text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-2"
-                    >
-                      <PhoneCall size={12} /> Contact Order Concierge
-                    </button>
+                    {/* Support & PDF Invoice Buttons */}
+                    <div className="space-y-2 pt-1">
+                      <button
+                        onClick={() => generateOrderPDF(matchedOrder, matchedOrder.customerName)}
+                        className="w-full py-2.5 bg-luxury-black text-white text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 rounded-xs shadow-xs"
+                      >
+                        <FileText size={13} /> Download PDF Invoice
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (onSelectOrderForSupport) {
+                            onSelectOrderForSupport(matchedOrder.id);
+                          } else {
+                            onNavigate('AI_CONCIERGE');
+                          }
+                        }}
+                        className="w-full py-2.5 border border-black text-black text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-2 rounded-xs"
+                      >
+                        <PhoneCall size={12} /> Contact Order Concierge
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="bg-white border border-gray-100 p-6 rounded-sm shadow-sm text-center space-y-3">

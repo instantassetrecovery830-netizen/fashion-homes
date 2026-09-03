@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight, Instagram, Twitter, Facebook, Heart, Share2, Copy, Shirt } from 'lucide-react';
+import { ShoppingBag, X, Search, User, Globe, Trash2, ArrowRight, LogOut, Settings, CheckCircle, Ruler, Loader, Camera, Lock, ArrowLeft, Mail, Home, Store, Bell, Info, AlertTriangle, ChevronRight, Instagram, Twitter, Facebook, Heart, Share2, Copy, Shirt, Truck, AlertCircle, ShieldAlert, FileText, Download, Send } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { NAV_LINKS } from '../constants.ts';
 import { UserRole, ViewState, CartItem, Order, AppNotification, Product } from '../types.ts';
@@ -9,6 +9,8 @@ import { auth } from '../services/firebase.ts';
 import { markNotificationRead, getShippingRates } from '../services/dataService.ts';
 import { CurrencySelector } from './CurrencySelector.tsx';
 import { useCurrency } from '../context/CurrencyContext.tsx';
+import { generateOrderPDF } from '../utils/pdfGenerator.ts';
+import { sendOrderConfirmationEmail } from '../utils/emailService.ts';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -63,6 +65,7 @@ export const Layout: React.FC<LayoutProps> = ({
   const { formatPrice, currency, convertPrice } = useCurrency();
   const [isScrolled, setIsScrolled] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
+  const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
   const [measurementError, setMeasurementError] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -94,6 +97,13 @@ export const Layout: React.FC<LayoutProps> = ({
   const [selectedRate, setSelectedRate] = useState<any>(null);
   const [isFetchingRates, setIsFetchingRates] = useState(false);
   const [customerEmail, setCustomerEmail] = useState('');
+  
+  // Terms & Compliance State
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [termsError, setTermsError] = useState<string | null>(null);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [emailNotice, setEmailNotice] = useState<string | null>(null);
   
   // --- PAYSTACK CONFIGURATION ---
   const PAYSTACK_PUBLIC_KEY = useMemo(() => import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', []); 
@@ -314,8 +324,11 @@ export const Layout: React.FC<LayoutProps> = ({
     }, 0);
     const remainingBalanceAmt = totalFullPrice - totalDepositAmt;
 
+    const orderId = `ord_${Date.now()}`;
+    const trackingNum = `MFS${Math.floor(100000000 + Math.random() * 900000000)}`;
+
     const newOrder: Order = {
-        id: `ord_${Date.now()}`,
+        id: orderId,
         customerName: customerEmail || 'Guest User', 
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         total: orderTotal,
@@ -323,6 +336,16 @@ export const Layout: React.FC<LayoutProps> = ({
         status: 'Processing',
         items: [...cart],
         buyerId: auth.currentUser?.uid,
+        shippingAddress: shippingAddress ? {
+          street: shippingAddress.street1,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          zip: shippingAddress.zip,
+          country: shippingAddress.country || 'US'
+        } : undefined,
+        carrier: selectedRate?.provider || 'USPS',
+        trackingNumber: trackingNum,
+        estimatedDelivery: new Date(Date.now() + 86400000 * 4).toISOString(),
         isDepositOrder: hasDeposit,
         depositAmount: hasDeposit ? totalDepositAmt : undefined,
         remainingBalance: hasDeposit ? remainingBalanceAmt : undefined,
@@ -333,19 +356,26 @@ export const Layout: React.FC<LayoutProps> = ({
         if (onPlaceOrder) {
             await onPlaceOrder(newOrder);
         }
+        setLastPlacedOrder(newOrder);
         setOrderComplete(true);
-        setTimeout(() => {
-          setOrderComplete(false);
-          setIsCartOpen(false);
-          handleDashboardClick();
-        }, 2000);
+
+        // Trigger Automated Email Confirmation
+        if (customerEmail) {
+            sendOrderConfirmationEmail(newOrder, customerEmail)
+                .then(res => {
+                    if (res.success) {
+                        setEmailNotice(`Confirmation email dispatched to ${customerEmail}`);
+                    }
+                })
+                .catch(err => console.warn('Email dispatch warning:', err));
+        }
     } catch (e) {
         console.error("Checkout failed", e);
         alert("Order creation failed. Please contact support.");
     } finally {
         setIsProcessingCheckout(false);
     }
-  }, [customerEmail, cart, onPlaceOrder, setIsCartOpen, handleDashboardClick, orderTotal, shippingCost]);
+  }, [customerEmail, cart, onPlaceOrder, setIsCartOpen, orderTotal, shippingCost, shippingAddress, selectedRate]);
 
   const onPaystackClose = useCallback(() => {
       console.log('Payment closed');
@@ -357,10 +387,15 @@ export const Layout: React.FC<LayoutProps> = ({
         alert("Please enter your email address for the receipt.");
         return;
     }
+    if (!acceptedTerms) {
+        setTermsError("You must accept the Terms of Service and Privacy Policy to place your order.");
+        return;
+    }
+    setTermsError(null);
     setIsProcessingCheckout(true);
     // @ts-ignore
     initializePayment(onPaystackSuccess, onPaystackClose);
-  }, [customerEmail, initializePayment, onPaystackSuccess, onPaystackClose]);
+  }, [customerEmail, acceptedTerms, initializePayment, onPaystackSuccess, onPaystackClose]);
 
   // Logic for Nav Appearance
   const isNavTransparent = currentView === 'LANDING' && !isScrolled;
@@ -534,6 +569,13 @@ export const Layout: React.FC<LayoutProps> = ({
                           className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
                         >
                           <Settings size={14} /> Dashboard
+                        </button>
+
+                        <button
+                          onClick={() => { onNavigate('TRACK_ORDER'); setShowUserMenu(false); }}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <Truck size={14} /> Track Orders
                         </button>
 
                         <button
@@ -722,10 +764,112 @@ export const Layout: React.FC<LayoutProps> = ({
 
           <div className="flex-1 overflow-y-auto p-6 space-y-8 text-black">
             {orderComplete ? (
-              <div className="h-full flex flex-col items-center justify-center text-center animate-fade-in">
-                <CheckCircle size={64} className="text-green-500 mb-6" />
-                <h3 className="text-2xl font-serif italic mb-2">Order Confirmed</h3>
-                <p className="text-gray-500 text-sm max-w-xs">Your pieces are being prepared by the atelier. You will receive a confirmation shortly.</p>
+              <div className="h-full flex flex-col items-center justify-center text-center p-4 animate-fade-in space-y-4">
+                <CheckCircle size={56} className="text-green-500" />
+                <div>
+                  <h3 className="text-2xl font-serif italic mb-1">Order Confirmed</h3>
+                  <p className="text-gray-500 text-xs max-w-xs">
+                    Your pieces are being prepared with artisan care by the atelier.
+                  </p>
+                </div>
+
+                {lastPlacedOrder && (
+                  <div className="w-full max-w-xs bg-gray-50 border border-gray-100 p-4 rounded-sm text-left space-y-2 text-xs">
+                    <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                      <span className="text-gray-400 uppercase text-[10px] font-bold tracking-wider">Order Reference</span>
+                      <span className="font-mono font-bold text-black">#{lastPlacedOrder.id}</span>
+                    </div>
+                    {lastPlacedOrder.trackingNumber && (
+                      <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                        <span className="text-gray-400 uppercase text-[10px] font-bold tracking-wider">Logistics Tracking</span>
+                        <span className="font-mono font-bold text-luxury-gold">{lastPlacedOrder.trackingNumber}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-1 text-[11px]">
+                      <span className="text-gray-500">Carrier Partner</span>
+                      <span className="font-bold text-black uppercase">{lastPlacedOrder.carrier || 'USPS'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* PDF & Email Actions */}
+                {lastPlacedOrder && (
+                  <div className="w-full max-w-xs space-y-2 p-3 bg-amber-50/50 border border-amber-200/60 rounded-sm">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-900 mb-1 text-left flex items-center gap-1.5">
+                      <FileText size={13} className="text-luxury-gold" /> Official Receipt & Documents
+                    </p>
+                    
+                    <button
+                      onClick={() => generateOrderPDF(lastPlacedOrder, customerEmail)}
+                      className="w-full py-2.5 bg-luxury-black text-white text-xs font-bold uppercase tracking-wider hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 rounded-xs"
+                    >
+                      <Download size={14} /> Download PDF Invoice
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        setEmailNotice('Sending confirmation email...');
+                        const res = await sendOrderConfirmationEmail(lastPlacedOrder, customerEmail || 'guest@myfitstore.com');
+                        if (res.success) {
+                          setEmailNotice(`Email receipt dispatched to ${customerEmail || 'your email'}`);
+                        } else {
+                          setEmailNotice('Email queued. Download your PDF receipt above.');
+                        }
+                      }}
+                      className="w-full py-2 bg-white border border-gray-300 text-gray-800 text-[11px] font-bold uppercase tracking-wider hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 rounded-xs"
+                    >
+                      <Mail size={13} /> Send Email Confirmation
+                    </button>
+
+                    {emailNotice && (
+                      <p className="text-[10px] text-emerald-700 font-bold text-left pt-1 flex items-center gap-1">
+                        <CheckCircle size={11} /> {emailNotice}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="w-full max-w-xs space-y-2 pt-2">
+                  <button 
+                    onClick={() => {
+                      setIsCartOpen(false);
+                      setOrderComplete(false);
+                      if (lastPlacedOrder) {
+                        try {
+                          window.history.pushState(null, '', `/track-order?id=${encodeURIComponent(lastPlacedOrder.id)}`);
+                        } catch {}
+                      }
+                      onNavigate('TRACK_ORDER');
+                    }}
+                    className="w-full py-3 bg-black text-white text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <Truck size={14} /> Track Order Live
+                  </button>
+
+                  {isLoggedIn ? (
+                    <button 
+                      onClick={() => {
+                        setIsCartOpen(false);
+                        setOrderComplete(false);
+                        handleDashboardClick();
+                      }}
+                      className="w-full py-2.5 border border-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider hover:bg-gray-100 transition-colors"
+                    >
+                      View in Dashboard
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        setIsCartOpen(false);
+                        setOrderComplete(false);
+                        onNavigate('MARKETPLACE');
+                      }}
+                      className="w-full py-2.5 border border-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider hover:bg-gray-100 transition-colors"
+                    >
+                      Continue Shopping
+                    </button>
+                  )}
+                </div>
               </div>
             ) : cart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-gray-400">
@@ -946,6 +1090,46 @@ export const Layout: React.FC<LayoutProps> = ({
                             We accept Card, Bank Transfer, and USSD.
                         </p>
                     </div>
+
+                    {/* Terms of Service & Privacy Policy Compliance Requirement */}
+                    <div className={`p-4 rounded-sm border transition-all ${termsError ? 'bg-red-50 border-red-300 shadow-xs' : 'bg-gray-50/80 border-gray-200'}`}>
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                            <input 
+                                type="checkbox"
+                                id="checkout-terms-checkbox"
+                                checked={acceptedTerms}
+                                onChange={(e) => {
+                                    setAcceptedTerms(e.target.checked);
+                                    if (e.target.checked) setTermsError(null);
+                                }}
+                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer accent-black"
+                            />
+                            <span className="text-xs text-gray-700 leading-snug">
+                                I have read and agree to the{' '}
+                                <button 
+                                    type="button" 
+                                    onClick={(e) => { e.stopPropagation(); setShowTermsModal(true); }} 
+                                    className="font-bold text-black underline hover:text-luxury-gold transition-colors"
+                                >
+                                    Terms of Service
+                                </button>{' '}
+                                and{' '}
+                                <button 
+                                    type="button" 
+                                    onClick={(e) => { e.stopPropagation(); setShowPrivacyModal(true); }} 
+                                    className="font-bold text-black underline hover:text-luxury-gold transition-colors"
+                                >
+                                    Privacy Policy
+                                </button>.
+                            </span>
+                        </label>
+
+                        {termsError && (
+                            <p className="text-[10px] text-red-600 font-bold mt-2 flex items-center gap-1">
+                                <AlertCircle size={12} /> {termsError}
+                            </p>
+                        )}
+                    </div>
                 </div>
             )}
           </div>
@@ -982,8 +1166,8 @@ export const Layout: React.FC<LayoutProps> = ({
               ) : (
                 <button 
                   onClick={handleFinalizeOrder}
-                  disabled={isProcessingCheckout}
-                  className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group disabled:opacity-70"
+                  disabled={isProcessingCheckout || !acceptedTerms}
+                  className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                    {isProcessingCheckout ? (
                        <>Processing <Loader className="animate-spin" size={14} /></>
@@ -1065,7 +1249,7 @@ export const Layout: React.FC<LayoutProps> = ({
               <li>FAQ</li>
               <li>Shipping & Returns</li>
               <li>Size Guide</li>
-              <li>Track Order</li>
+              <li className="cursor-pointer hover:text-luxury-gold transition-colors" onClick={() => onNavigate('TRACK_ORDER')}>Track Order</li>
             </ul>
           </div>
           <div>
@@ -1088,10 +1272,129 @@ export const Layout: React.FC<LayoutProps> = ({
         <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-gray-900 flex justify-between items-center text-xs text-gray-600">
           <div>© 2024 MyFitStore. ALL RIGHTS RESERVED.</div>
           <div className="flex gap-4">
+             <button type="button" onClick={() => setShowTermsModal(true)} className="hover:text-white transition-colors">Terms of Service</button>
+             <span>•</span>
+             <button type="button" onClick={() => setShowPrivacyModal(true)} className="hover:text-white transition-colors">Privacy Policy</button>
+             <span>•</span>
              <Globe size={14} /> <span>US / USD</span>
           </div>
         </div>
       </footer>
+
+      {/* Terms of Service Modal */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white max-w-2xl w-full max-h-[85vh] rounded-sm shadow-2xl flex flex-col overflow-hidden border border-gray-100">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
+              <div className="flex items-center gap-2">
+                <ShieldAlert size={18} className="text-black" />
+                <h3 className="font-serif text-lg uppercase tracking-tight font-bold">Terms of Service</h3>
+              </div>
+              <button 
+                onClick={() => setShowTermsModal(false)}
+                className="p-1.5 hover:bg-gray-200 rounded-full transition-colors text-gray-500 hover:text-black"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-5 text-xs text-gray-600 leading-relaxed font-sans">
+              <div>
+                <h4 className="font-bold text-black uppercase tracking-wider mb-1">1. Acceptance of Terms</h4>
+                <p>By placing an order on MyFitStore, you agree to be bound by these Terms of Service. Please review carefully before completing your purchase.</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-black uppercase tracking-wider mb-1">2. Custom & Made-to-Order Items</h4>
+                <p>Items marked as Made-to-Measure or Pre-Order require precise customer size measurements provided at or after checkout. Custom tailored garments are crafted specifically to your requested measurements and cannot be cancelled once cutting has commenced.</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-black uppercase tracking-wider mb-1">3. Pre-Orders & Deposit Payments</h4>
+                <p>Pre-order items may offer deposit payments (e.g. 50% down). The remaining balance will be automatically invoiced prior to white-glove dispatch. Deposit payments lock in production slot priority.</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-black uppercase tracking-wider mb-1">4. Shipping & Delivery</h4>
+                <p>All luxury shipments are insured and tracked. Estimated delivery dates are approximate and depend on carrier schedules and international customs clearance.</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-black uppercase tracking-wider mb-1">5. Returns & Exchanges</h4>
+                <p>Unworn, non-custom items in original packaging with security tags intact are eligible for return or exchange within 14 days of delivery. Custom-made garments qualify for complimentary luxury alterations.</p>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => {
+                  setAcceptedTerms(true);
+                  setTermsError(null);
+                  setShowTermsModal(false);
+                }}
+                className="px-6 py-2.5 bg-black hover:bg-luxury-gold text-white text-xs font-bold uppercase tracking-widest transition-colors rounded-xs"
+              >
+                Accept & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Privacy Policy Modal */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white max-w-2xl w-full max-h-[85vh] rounded-sm shadow-2xl flex flex-col overflow-hidden border border-gray-100">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
+              <div className="flex items-center gap-2">
+                <Lock size={18} className="text-black" />
+                <h3 className="font-serif text-lg uppercase tracking-tight font-bold">Privacy Policy</h3>
+              </div>
+              <button 
+                onClick={() => setShowPrivacyModal(false)}
+                className="p-1.5 hover:bg-gray-200 rounded-full transition-colors text-gray-500 hover:text-black"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-5 text-xs text-gray-600 leading-relaxed font-sans">
+              <div>
+                <h4 className="font-bold text-black uppercase tracking-wider mb-1">1. Information Collection</h4>
+                <p>We collect essential order information including your email, shipping address, and sizing measurements to process and deliver your luxury garments.</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-black uppercase tracking-wider mb-1">2. Payment Security</h4>
+                <p>All payment transactions are handled directly through certified, PCI-DSS compliant payment gateways (Paystack). MyFitStore does not store your credit card or payment credentials on our servers.</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-black uppercase tracking-wider mb-1">3. Data Usage & Protection</h4>
+                <p>Your personal data is strictly used for order fulfillment, shipment tracking, customer support, and tailored style consultations. We never sell or lease customer information to third parties.</p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-black uppercase tracking-wider mb-1">4. Your Rights</h4>
+                <p>You have the right to request access to, correction of, or deletion of your personal data at any time by contacting client services.</p>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => {
+                  setAcceptedTerms(true);
+                  setTermsError(null);
+                  setShowPrivacyModal(false);
+                }}
+                className="px-6 py-2.5 bg-black hover:bg-luxury-gold text-white text-xs font-bold uppercase tracking-widest transition-colors rounded-xs"
+              >
+                Accept & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

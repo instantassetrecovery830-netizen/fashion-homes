@@ -273,10 +273,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
   }, [newPassword]);
 
-  const handleCMSUpdate = useCallback(async () => {
-      if (cmsForm && onUpdateCMSContent) {
-          await onUpdateCMSContent(cmsForm);
-          alert("Landing page updated successfully.");
+  const handleCMSUpdate = useCallback(async (customForm?: any) => {
+      const formToSave = customForm || cmsForm;
+      if (formToSave && onUpdateCMSContent) {
+          await onUpdateCMSContent(formToSave);
       }
   }, [cmsForm, onUpdateCMSContent]);
 
@@ -623,7 +623,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       case 'SHIPPING': {
         const currentVendor = vendors.find(v => v.email === currentUser?.email);
-        return <ShippingView setIsSidebarOpen={setIsSidebarOpen} vendorId={currentVendor?.id} />;
+        return <ShippingView setIsSidebarOpen={setIsSidebarOpen} vendorId={currentVendor?.id} onNavigate={onNavigate} />;
       }
 
       case 'ORDERS':
@@ -719,6 +719,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               handleCMSUpdate={handleCMSUpdate}
               setIsSidebarOpen={setIsSidebarOpen}
               products={products}
+              onNavigate={onNavigate}
             />
           );
       

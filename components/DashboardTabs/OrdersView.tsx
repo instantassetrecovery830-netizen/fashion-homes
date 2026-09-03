@@ -1,8 +1,9 @@
 import React from 'react';
-import { ShoppingBag, Search, Filter, MoreVertical, ExternalLink, Package, Truck, CheckCircle, Clock } from 'lucide-react';
+import { ShoppingBag, Search, Filter, MoreVertical, ExternalLink, Package, Truck, CheckCircle, Clock, FileText, Download } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Order, UserRole, ViewState } from '../../types';
 import { useCurrency } from '../../context/CurrencyContext.tsx';
+import { generateOrderPDF } from '../../utils/pdfGenerator.ts';
 
 interface OrdersViewProps {
   myOrders: Order[];
@@ -231,13 +232,25 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ myOrders, setIsSidebarOp
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => generateOrderPDF(order, order.customerName)}
+                        className="px-2.5 py-1 bg-gray-100 hover:bg-black hover:text-white text-gray-700 text-[10px] font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-1.5 border border-gray-200"
+                        title="Download PDF Official Invoice"
+                      >
+                        <FileText size={12} /> PDF Invoice
+                      </button>
                       {onNavigate && (
                         <button 
-                          onClick={() => onNavigate('TRACK_ORDER')}
-                          className="px-2.5 py-1 bg-black text-white text-[10px] font-bold uppercase tracking-wider rounded hover:bg-luxury-gold transition-colors flex items-center gap-1"
-                          title="Track Order via Shippo Portal"
+                          onClick={() => {
+                            try {
+                              window.history.pushState(null, '', `/track-order?id=${encodeURIComponent(order.id)}`);
+                            } catch {}
+                            onNavigate('TRACK_ORDER');
+                          }}
+                          className="px-2.5 py-1 bg-black text-white text-[10px] font-bold uppercase tracking-wider rounded hover:bg-luxury-gold transition-colors flex items-center gap-1.5 shadow-xs"
+                          title="Track Order via Live Logistics Portal"
                         >
-                          <Truck size={12} /> Track
+                          <Truck size={12} /> Track Live
                         </button>
                       )}
                       <button className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-black transition-colors">
