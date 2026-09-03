@@ -32,6 +32,7 @@ const TrackOrderView = React.lazy(() => import('./TrackOrderView.tsx').then(m =>
 const AiConcierge = React.lazy(() => import('./AiConcierge.tsx').then(m => ({ default: m.AiConcierge })));
 const TheDropView = React.lazy(() => import('./TheDropView.tsx').then(m => ({ default: m.TheDropView })));
 const DirectMessaging = React.lazy(() => import('./DirectMessaging.tsx').then(m => ({ default: m.DirectMessaging })));
+const SharedWishlistView = React.lazy(() => import('./SharedWishlistView.tsx').then(m => ({ default: m.SharedWishlistView })));
 
 const LoadingFallback = () => (
   <div className="h-[50vh] flex items-center justify-center">
@@ -99,6 +100,7 @@ const App: React.FC = () => {
     else if (path === '/about') view = 'ABOUT';
     else if (path === '/concierge') view = 'AI_CONCIERGE';
     else if (path.startsWith('/track-order')) view = 'TRACK_ORDER';
+    else if (path.startsWith('/wishlist')) view = 'SHARED_WISHLIST';
 
     if (view !== currentView) {
       setCurrentView(view);
@@ -140,6 +142,7 @@ const App: React.FC = () => {
       case 'ABOUT': path = '/about'; break;
       case 'AI_CONCIERGE': path = '/concierge'; break;
       case 'TRACK_ORDER': path = '/track-order'; break;
+      case 'SHARED_WISHLIST': path = '/wishlist'; break;
     }
     navigate(path);
   }, [navigate, selectedVendor, selectedProduct]);
@@ -919,6 +922,7 @@ const App: React.FC = () => {
       onRoleChange={setUserRole}
       currentView={currentView}
       isLoggedIn={isLoggedIn}
+      currentUser={currentUser}
       onLogout={handleLogout}
       onPlaceOrder={handlePlaceOrder}
       onVisualSearch={handleVisualSearch}
@@ -993,7 +997,7 @@ const App: React.FC = () => {
         } />
         <Route path="/the-drop" element={
           <Suspense fallback={<LoadingFallback />}>
-            <TheDropView products={products} onNavigate={handleNavigate} cmsContent={cmsContent?.drop} />
+            <TheDropView products={products} onNavigate={handleNavigate} cmsContent={cmsContent?.drop} allDrops={cmsContent?.drops} />
           </Suspense>
         } />
         <Route path="/vendor/:vendorId" element={
@@ -1191,6 +1195,18 @@ const App: React.FC = () => {
         <Route path="/track-order/:orderId" element={
           <Suspense fallback={<LoadingFallback />}>
             <TrackOrderView orders={orders} onNavigate={handleNavigate} />
+          </Suspense>
+        } />
+        <Route path="/wishlist" element={
+          <Suspense fallback={<LoadingFallback />}>
+            <SharedWishlistView 
+              products={products}
+              onAddToCart={handleAddToCart}
+              onToggleSave={handleToggleSave}
+              savedItems={savedItems}
+              onNavigate={handleNavigate}
+              onProductSelect={handleProductSelect}
+            />
           </Suspense>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />

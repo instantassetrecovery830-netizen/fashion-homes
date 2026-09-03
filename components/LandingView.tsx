@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check, ThumbsUp } from 'lucide-react';
+import { ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check, ThumbsUp, ChevronLeft, ChevronRight, Play, Pause, LayoutGrid, Image as ImageIcon } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService.ts';
 import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types.ts';
 import { useCurrency } from '../context/CurrencyContext.tsx';
@@ -88,6 +88,32 @@ export const LandingView: React.FC<LandingViewProps> = ({
     image4: "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886&auto=format&fit=crop",
     overlayText1: "Street Edition"
   }, [cmsContent]);
+
+  // Landing Page Campaign Slideshow State
+  const [currentCampaignSlide, setCurrentCampaignSlide] = useState(0);
+  const [isCampaignSlideshowPlaying, setIsCampaignSlideshowPlaying] = useState(true);
+  const [campaignViewMode, setCampaignViewMode] = useState<'SLIDESHOW' | 'GRID'>('SLIDESHOW');
+
+  const campaignSlides = useMemo(() => {
+    const list = [
+      campaign.image1 || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887",
+      campaign.image2 || "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888",
+      campaign.image3 || "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070",
+      campaign.image4 || "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886",
+      ...(campaign.images || []),
+      ...(cmsContent?.galleryImages || []),
+      ...(cmsContent?.editorialImages || [])
+    ].filter(Boolean);
+    return Array.from(new Set(list));
+  }, [campaign, cmsContent]);
+
+  useEffect(() => {
+    if (!isCampaignSlideshowPlaying || campaignSlides.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentCampaignSlide(prev => (prev + 1) % campaignSlides.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isCampaignSlideshowPlaying, campaignSlides]);
 
   const designersSection = useMemo(() => cmsContent?.designers || { subtitle: "The Ateliers", title: "Shop by Designer" }, [cmsContent]);
   const spotlightSection = useMemo(() => cmsContent?.spotlight || { title: "Editor's Picks" }, [cmsContent]);
@@ -356,56 +382,145 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </div>
       </section>
 
-      {/* Campaign / Visual Section */}
+      {/* Campaign / Visual Slideshow Section */}
       <section className="py-16 md:py-24 bg-luxury-cream">
         <div className="max-w-7xl mx-auto px-6">
-           <div className="mb-12 text-center">
-              <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-luxury-taupe mb-2 block">{campaign.subtitle}</span>
-              <h2 className="text-3xl md:text-4xl font-serif italic text-luxury-black">{campaign.title}</h2>
-           </div>
-           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 h-auto md:h-[600px] auto-rows-fr">
-              <div 
-                onClick={() => onNavigate('MARKETPLACE')}
-                className="col-span-2 md:col-span-2 row-span-2 relative group overflow-hidden h-[300px] md:h-full cursor-pointer"
-              >
-                 <img src={campaign.image1 || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 1" />
-                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-                 <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 text-white opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                    <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest">{campaign.overlayText1}</p>
-                 </div>
+           <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-200 pb-6">
+              <div>
+                 <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-luxury-taupe mb-2 block">{campaign.subtitle}</span>
+                 <h2 className="text-3xl md:text-5xl font-serif italic text-luxury-black">{campaign.title}</h2>
               </div>
-              <div 
-                onClick={() => onNavigate('MARKETPLACE')}
-                className="col-span-1 relative group overflow-hidden h-[150px] md:h-full cursor-pointer"
-              >
-                 <img src={campaign.image2 || "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 2" />
-              </div>
-              <div 
-                onClick={() => onNavigate('MARKETPLACE')}
-                className="col-span-1 relative group overflow-hidden h-[150px] md:h-full cursor-pointer"
-              >
-                 <img src={campaign.image3 || "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 3" />
-              </div>
-               <div 
-                 onClick={() => onNavigate('MARKETPLACE')}
-                 className="col-span-2 relative group overflow-hidden h-[150px] md:h-full cursor-pointer"
-               >
-                 <img src={campaign.image4 || "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 4" />
+
+              {/* View Switcher & Controls */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCampaignViewMode(campaignViewMode === 'SLIDESHOW' ? 'GRID' : 'SLIDESHOW')}
+                  className="px-4 py-2 bg-white border border-gray-200 hover:border-black text-xs font-bold uppercase tracking-wider text-luxury-black rounded-sm shadow-xs flex items-center gap-2 transition-colors"
+                >
+                  {campaignViewMode === 'SLIDESHOW' ? (
+                    <>
+                      <LayoutGrid size={14} /> Grid View
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon size={14} /> Slideshow View
+                    </>
+                  )}
+                </button>
               </div>
            </div>
 
-           {/* Additional Uploaded Campaign Photos */}
-           {campaign.images && campaign.images.length > 0 && (
-             <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-               {campaign.images.map((img, i) => (
-                 <div 
-                   key={i} 
-                   onClick={() => onNavigate('MARKETPLACE')}
-                   className="aspect-square relative group overflow-hidden cursor-pointer bg-gray-100 rounded-sm"
+           {campaignViewMode === 'SLIDESHOW' ? (
+             /* Full Interactive Campaign Slideshow */
+             <div className="relative w-full h-[450px] sm:h-[550px] md:h-[650px] bg-luxury-black rounded-sm overflow-hidden shadow-2xl group border border-gray-100">
+               {/* Slide Images */}
+               {campaignSlides.map((imgUrl, idx) => (
+                 <div
+                   key={idx}
+                   className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+                     idx === currentCampaignSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                   }`}
                  >
-                   <img src={img} alt={`Campaign gallery ${i+1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                   <img 
+                     src={imgUrl} 
+                     alt={`Campaign Slide ${idx + 1}`}
+                     className="w-full h-full object-cover transition-transform duration-[8s] scale-100 group-hover:scale-105"
+                   />
+                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                  </div>
                ))}
+
+               {/* Overlay Content */}
+               <div className="absolute bottom-8 left-8 right-8 z-20 flex flex-col md:flex-row md:items-end justify-between gap-4 text-white">
+                 <div>
+                   <span className="text-luxury-gold text-xs font-bold uppercase tracking-[0.3em] block mb-1">
+                     Editorial Look #{currentCampaignSlide + 1} of {campaignSlides.length}
+                   </span>
+                   <h3 className="text-2xl md:text-4xl font-serif italic">
+                     {campaign.overlayText1 || 'Visual Chronicles'}
+                   </h3>
+                 </div>
+
+                 {/* Slideshow Control Buttons */}
+                 <div className="flex items-center gap-3 bg-black/60 backdrop-blur-md p-2 rounded-full border border-white/20 self-start md:self-auto">
+                   <button
+                     type="button"
+                     onClick={() => setIsCampaignSlideshowPlaying(!isCampaignSlideshowPlaying)}
+                     className="p-2 text-white hover:text-luxury-gold transition-colors"
+                     title={isCampaignSlideshowPlaying ? 'Pause Slideshow' : 'Play Slideshow'}
+                   >
+                     {isCampaignSlideshowPlaying ? <Pause size={16} /> : <Play size={16} />}
+                   </button>
+                   <span className="w-px h-4 bg-white/20" />
+                   <button
+                     type="button"
+                     onClick={() => setCurrentCampaignSlide((currentCampaignSlide - 1 + campaignSlides.length) % campaignSlides.length)}
+                     className="p-2 text-white hover:text-luxury-gold transition-colors"
+                     title="Previous Slide"
+                   >
+                     <ChevronLeft size={18} />
+                   </button>
+                   <span className="text-xs font-mono font-bold px-2 text-gray-300">
+                     {currentCampaignSlide + 1} / {campaignSlides.length}
+                   </span>
+                   <button
+                     type="button"
+                     onClick={() => setCurrentCampaignSlide((currentCampaignSlide + 1) % campaignSlides.length)}
+                     className="p-2 text-white hover:text-luxury-gold transition-colors"
+                     title="Next Slide"
+                   >
+                     <ChevronRight size={18} />
+                   </button>
+                 </div>
+               </div>
+
+               {/* Thumbnail Tray Bar */}
+               <div className="absolute top-4 right-4 z-20 hidden sm:flex items-center gap-2 bg-black/60 backdrop-blur-md p-2 rounded-lg border border-white/10 max-w-[320px] overflow-x-auto">
+                 {campaignSlides.map((img, idx) => (
+                   <button
+                     key={idx}
+                     onClick={() => setCurrentCampaignSlide(idx)}
+                     className={`w-10 h-10 rounded overflow-hidden border-2 transition-all shrink-0 ${
+                       idx === currentCampaignSlide ? 'border-luxury-gold scale-105' : 'border-transparent opacity-60 hover:opacity-100'
+                     }`}
+                   >
+                     <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                   </button>
+                 ))}
+               </div>
+             </div>
+           ) : (
+             /* Editorial Grid View */
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 h-auto md:h-[600px] auto-rows-fr">
+                <div 
+                  onClick={() => onNavigate('MARKETPLACE')}
+                  className="col-span-2 md:col-span-2 row-span-2 relative group overflow-hidden h-[300px] md:h-full cursor-pointer"
+                >
+                   <img src={campaign.image1 || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 1" />
+                   <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                   <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 text-white opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                      <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest">{campaign.overlayText1}</p>
+                   </div>
+                </div>
+                <div 
+                  onClick={() => onNavigate('MARKETPLACE')}
+                  className="col-span-1 relative group overflow-hidden h-[150px] md:h-full cursor-pointer"
+                >
+                   <img src={campaign.image2 || "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 2" />
+                </div>
+                <div 
+                  onClick={() => onNavigate('MARKETPLACE')}
+                  className="col-span-1 relative group overflow-hidden h-[150px] md:h-full cursor-pointer"
+                >
+                   <img src={campaign.image3 || "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 3" />
+                </div>
+                 <div 
+                   onClick={() => onNavigate('MARKETPLACE')}
+                   className="col-span-2 relative group overflow-hidden h-[150px] md:h-full cursor-pointer"
+                 >
+                   <img src={campaign.image4 || "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 4" />
+                </div>
              </div>
            )}
         </div>

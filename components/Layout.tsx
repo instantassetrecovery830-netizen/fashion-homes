@@ -11,6 +11,7 @@ import { CurrencySelector } from './CurrencySelector.tsx';
 import { useCurrency } from '../context/CurrencyContext.tsx';
 import { generateOrderPDF } from '../utils/pdfGenerator.ts';
 import { sendOrderConfirmationEmail } from '../utils/emailService.ts';
+import { ShareWishlistModal } from './ShareWishlistModal.tsx';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -28,6 +29,7 @@ interface LayoutProps {
   onRoleChange: (role: UserRole) => void;
   currentView: ViewState;
   isLoggedIn: boolean;
+  currentUser?: any;
   onLogout: () => void;
   onPlaceOrder?: (order: Order) => Promise<void>;
   onVisualSearch?: (file: File) => Promise<void>;
@@ -53,6 +55,7 @@ export const Layout: React.FC<LayoutProps> = ({
   onRoleChange,
   currentView,
   isLoggedIn,
+  currentUser,
   onLogout,
   onPlaceOrder,
   onVisualSearch,
@@ -104,6 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [emailNotice, setEmailNotice] = useState<string | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   
   // --- PAYSTACK CONFIGURATION ---
   const PAYSTACK_PUBLIC_KEY = useMemo(() => import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', []); 
@@ -301,13 +305,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
   const handleShareSaved = useCallback(() => {
       if (savedItems.length === 0) return;
-      const ids = savedItems.map(p => p.id).join(',');
-      const shareUrl = `${window.location.origin}${window.location.pathname}?outfit=${ids}`;
-      
-      navigator.clipboard.writeText(shareUrl).then(() => {
-          setCopiedLink(true);
-          setTimeout(() => setCopiedLink(false), 2000);
-      });
+      setIsShareModalOpen(true);
   }, [savedItems]);
 
   // Called when Paystack success callback fires
@@ -1166,8 +1164,8 @@ export const Layout: React.FC<LayoutProps> = ({
               ) : (
                 <button 
                   onClick={handleFinalizeOrder}
-                  disabled={isProcessingCheckout || !acceptedTerms}
-                  className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isProcessingCheckout}
+                  className="w-full bg-luxury-black text-white py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2 group disabled:opacity-50"
                 >
                    {isProcessingCheckout ? (
                        <>Processing <Loader className="animate-spin" size={14} /></>
@@ -1395,6 +1393,14 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
         </div>
       )}
+
+      {/* Share Wishlist Modal */}
+      <ShareWishlistModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        savedItems={savedItems}
+        currentUser={currentUser}
+      />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, addDoc, orderBy } from 'firebase/firestore';
 import { db } from './firebase.ts';
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Follower, AppNotification, CartItem, ChatMessage, DirectMessage, Review, UserRole, WaitlistEntry } from '../types.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Follower, AppNotification, CartItem, ChatMessage, DirectMessage, Review, UserRole, WaitlistEntry, SharedWishlist } from '../types.ts';
 
 // Helper to convert Firestore docs to array
 const getArray = async (q: any) => {
@@ -237,13 +237,30 @@ export const markNotificationRead = async (notificationId: string) => updateDoc(
 export const submitContactFormInDb = async (submission: ContactSubmission) => setDoc(doc(db, 'contact_submissions', submission.id), cleanData(submission));
 
 export const joinWaitlistInDb = async (entry: WaitlistEntry) => {
-    const id = `${entry.email}_${entry.productId}_${entry.size || 'all'}`;
+    const id = entry.id || `${entry.email}_${entry.productId}_${entry.size || 'all'}`;
     await setDoc(doc(db, 'waitlist', id), cleanData({ ...entry, id }));
 };
 
 export const fetchWaitlistEntries = async (productId: string): Promise<WaitlistEntry[]> => {
     const q = query(collection(db, 'waitlist'), where('productId', '==', productId));
     return getArray(q) as Promise<WaitlistEntry[]>;
+};
+
+export const fetchAllWaitlistEntries = async (): Promise<WaitlistEntry[]> => {
+    return getArray(collection(db, 'waitlist')) as Promise<WaitlistEntry[]>;
+};
+
+export const deleteWaitlistEntryFromDb = async (id: string) => {
+    await deleteDoc(doc(db, 'waitlist', id));
+};
+
+export const clearAllWaitlistEntriesInDb = async () => {
+    const entries = await fetchAllWaitlistEntries();
+    for (const entry of entries) {
+        if (entry.id) {
+            await deleteDoc(doc(db, 'waitlist', entry.id));
+        }
+    }
 };
 
 export const fetchCartItems = async (userId: string): Promise<CartItem[]> => {
@@ -422,4 +439,21 @@ export const apiSignUp = async (email: string, name: string) => {
         };
         await createUserInDb(newUser);
     }
+};
+
+export const saveSharedWishlistToDb = async (wishlist: SharedWishlist) => {
+    await setDoc(doc(db, 'shared_wishlists', wishlist.id), cleanData(wishlist));
+    return wishlist.id;
+};
+
+export const fetchSharedWishlistFromDb = async (id: string): Promise<SharedWishlist | null> => {
+    try {
+        const d = await getDoc(doc(db, 'shared_wishlists', id));
+        if (d.exists()) {
+            return { id: d.id, ...d.data() } as SharedWishlist;
+        }
+    } catch (e) {
+        console.warn("Error fetching shared wishlist from DB:", e);
+    }
+    return null;
 };

@@ -249,7 +249,17 @@ export type ViewState =
   | 'PRICING'
   | 'ABOUT'
   | 'AI_CONCIERGE'
-  | 'TRACK_ORDER';
+  | 'TRACK_ORDER'
+  | 'SHARED_WISHLIST';
+
+export interface SharedWishlist {
+  id: string;
+  title: string;
+  ownerName: string;
+  productIds: string[];
+  createdAt: string;
+  note?: string;
+}
 
 export interface TrendAnalysis {
   title: string;
@@ -339,12 +349,15 @@ export interface ThemeSettings {
 }
 
 export interface DropPageContent {
+  id?: string;
   title: string;
   subtitle: string;
   description: string;
   backgroundImages: string[];
   countdownDate: string;
   productIds: string[];
+  status?: 'ACTIVE' | 'UPCOMING' | 'EXPIRED' | 'ARCHIVED';
+  createdAt?: string;
 }
 
 export interface LandingPageContent {
@@ -388,6 +401,7 @@ export interface LandingPageContent {
     title: string;
   };
   drop?: DropPageContent;
+  drops?: DropPageContent[];
   about: AboutPageContent;
   auth?: AuthPageContent;
   pricing?: PricingPageContent;

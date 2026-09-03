@@ -23,6 +23,7 @@ import { FollowersView } from './DashboardTabs/FollowersView';
 import { ProductEditor } from './DashboardTabs/ProductEditor';
 import { VendorEditor } from './DashboardTabs/VendorEditor';
 import { VendorReviewView } from './DashboardTabs/VendorReviewView';
+import { WaitlistManagementView } from './DashboardTabs/WaitlistManagementView';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend
@@ -474,6 +475,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'VENDORS', label: 'Ateliers', icon: Store, roles: [UserRole.ADMIN] },
       { id: 'VENDOR_REVIEW', label: 'Review Applications', icon: ShieldCheck, roles: [UserRole.ADMIN] },
       { id: 'MESSAGES', label: 'Contact Forms', icon: Inbox, roles: [UserRole.ADMIN] },
+      { id: 'WAITLIST', label: 'Waitlist', icon: Mail, roles: [UserRole.ADMIN, UserRole.VENDOR] },
       { id: 'STORE_DESIGN', label: 'Design Store', icon: Palette, roles: [UserRole.ADMIN] },
       { id: 'FOLLOWING', label: 'Following', icon: Heart, roles: [UserRole.BUYER, UserRole.VENDOR] },
       { id: 'PROFILE', label: 'Settings', icon: Settings, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
@@ -707,6 +709,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <MessagesView 
             contactSubmissions={contactSubmissions}
             onUpdateContact={onUpdateContact}
+            setIsSidebarOpen={setIsSidebarOpen}
+          />
+        );
+
+      case 'WAITLIST':
+        return (
+          <WaitlistManagementView
+            products={products}
+            cmsContent={cmsContent}
             setIsSidebarOpen={setIsSidebarOpen}
           />
         );

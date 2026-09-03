@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
     Menu, Palette, ChevronDown, Video, Type, Sparkles, Image as ImageIcon, 
     FileText, DollarSign, Plus, Trash2, ExternalLink, Calendar, RefreshCw, 
@@ -69,6 +69,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
     onNavigate
 }) => {
     const [expandedSection, setExpandedSection] = useState<string | null>('theme');
+    const [selectedDropIndex, setSelectedDropIndex] = useState(0);
     const [isSavingDrop, setIsSavingDrop] = useState(false);
     const [dropNotification, setDropNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [newImageUrl, setNewImageUrl] = useState('');
@@ -79,6 +80,30 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
     const dropFileInputRef = useRef<HTMLInputElement>(null);
     const heroPosterInputRef = useRef<HTMLInputElement>(null);
     const campaignInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+
+    // Multi-Drop list computed property
+    const activeDrops: DropPageContent[] = useMemo(() => {
+        if (cmsForm?.drops && Array.isArray(cmsForm.drops) && cmsForm.drops.length > 0) {
+            return cmsForm.drops;
+        }
+        if (cmsForm?.drop) {
+            return [cmsForm.drop];
+        }
+        return [];
+    }, [cmsForm]);
+
+    const activeDrop = activeDrops[selectedDropIndex] || activeDrops[0];
+
+    const updateSelectedDrop = (updatedDrop: DropPageContent) => {
+        const currentDrops = activeDrops.length > 0 ? [...activeDrops] : [updatedDrop];
+        const indexToUpdate = Math.min(selectedDropIndex, currentDrops.length - 1);
+        currentDrops[indexToUpdate] = updatedDrop;
+        setCmsForm({
+            ...cmsForm,
+            drop: currentDrops[0],
+            drops: currentDrops
+        });
+    };
 
     // Date input safety helpers to prevent timezone jumping & invalid date crashes
     const toLocalDateTimeInput = (isoDate?: string): string => {
@@ -94,25 +119,20 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
     };
 
     const handleDateChange = (val: string) => {
+        if (!activeDrop) return;
         if (!val) {
-            setCmsForm({
-                ...cmsForm,
-                drop: {
-                    ...(cmsForm.drop || {}),
-                    countdownDate: new Date(Date.now() + 7 * 86400000).toISOString()
-                }
+            updateSelectedDrop({
+                ...activeDrop,
+                countdownDate: new Date(Date.now() + 7 * 86400000).toISOString()
             });
             return;
         }
         try {
             const d = new Date(val);
             if (!isNaN(d.getTime())) {
-                setCmsForm({
-                    ...cmsForm,
-                    drop: {
-                        ...(cmsForm.drop || {}),
-                        countdownDate: d.toISOString()
-                    }
+                updateSelectedDrop({
+                    ...activeDrop,
+                    countdownDate: d.toISOString()
                 });
             }
         } catch (e) {
@@ -121,20 +141,19 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
     };
 
     const setCountdownPreset = (daysFromNow: number) => {
+        if (!activeDrop) return;
         const targetDate = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000).toISOString();
-        setCmsForm({
-            ...cmsForm,
-            drop: {
-                ...(cmsForm.drop || {}),
-                countdownDate: targetDate
-            }
+        updateSelectedDrop({
+            ...activeDrop,
+            countdownDate: targetDate
         });
     };
 
-    const getDropStatus = () => {
-        if (!cmsForm?.drop) return null;
-        if (!cmsForm.drop.countdownDate) return { label: 'Draft', color: 'bg-gray-100 text-gray-700' };
-        const target = new Date(cmsForm.drop.countdownDate).getTime();
+    const getDropStatus = (dropTarget?: DropPageContent) => {
+        const dropToEvaluate = dropTarget || activeDrop || cmsForm?.drop;
+        if (!dropToEvaluate) return null;
+        if (!dropToEvaluate.countdownDate) return { label: 'Draft', color: 'bg-gray-100 text-gray-700' };
+        const target = new Date(dropToEvaluate.countdownDate).getTime();
         const now = Date.now();
         const diff = target - now;
         if (diff <= 0) {
@@ -143,7 +162,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
         const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
         return { 
-            label: `Live Countdown: ${days}d ${hours}h left`, 
+            label: `Live: ${days}d ${hours}h left`, 
             color: 'bg-amber-50 text-amber-900 border-amber-200' 
         };
     };
@@ -155,38 +174,44 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
             : [];
             
         const initialDrop: DropPageContent = {
-            title: cmsForm?.drop?.title || 'Summer Solstice Capsule',
-            subtitle: cmsForm?.drop?.subtitle || 'Limited Edition • 50 Pieces Worldwide',
-            description: cmsForm?.drop?.description || 'An exclusive atelier exploration of ethereal textures, hand-draped silhouettes, and bespoke craftsmanship. Once the countdown reaches zero, the capsule unlocks for 24 hours only. No restocks will be produced.',
+            id: `drop_${Date.now()}`,
+            title: 'Summer Solstice Capsule',
+            subtitle: 'Limited Edition • 50 Pieces Worldwide',
+            description: 'An exclusive atelier exploration of ethereal textures, hand-draped silhouettes, and bespoke craftsmanship. Once the countdown reaches zero, the capsule unlocks for 24 hours only. No restocks will be produced.',
             backgroundImages: [
                 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600',
                 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1600'
             ],
             countdownDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            productIds: initialProductIds
+            productIds: initialProductIds,
+            status: 'UPCOMING',
+            createdAt: new Date().toISOString()
         };
+
+        const currentDrops = activeDrops.length > 0 ? activeDrops : [];
+        const newDrops = [...currentDrops, initialDrop];
 
         const updatedCms = {
             ...(cmsForm || {}),
-            drop: initialDrop
+            drop: newDrops[0],
+            drops: newDrops
         };
 
-        // Update local state immediately
         setCmsForm(updatedCms);
+        setSelectedDropIndex(newDrops.length - 1);
         setExpandedSection('drop');
 
-        // Automatically persist to Firestore so it is live immediately
         try {
             await handleCMSUpdate(updatedCms);
             setDropNotification({
                 type: 'success',
-                message: 'The Drop initialized and saved to storefront with curated editorial assets and 7-day countdown!'
+                message: 'New Drop initialized and saved to storefront!'
             });
         } catch (err: any) {
             console.error("Error saving initialized drop:", err);
             setDropNotification({
                 type: 'success',
-                message: 'The Drop initialized in editor. Click Save All Changes to confirm sync.'
+                message: 'New Drop initialized in editor. Click Save All Changes to confirm sync.'
             });
         } finally {
             setIsSavingDrop(false);
@@ -194,19 +219,49 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
         }
     };
 
+    const handleAddNewDrop = () => {
+        const initialProductIds = products && products.length > 0 ? products.slice(0, 3).map(p => p.id) : [];
+        const nextNum = activeDrops.length + 1;
+        const newDrop: DropPageContent = {
+            id: `drop_${Date.now()}`,
+            title: `Capsule Drop #${nextNum}`,
+            subtitle: `Edition #${nextNum} • Exclusive Atelier Release`,
+            description: `An exclusive atelier exploration of bespoke craftsmanship. Unlocks for a limited time only.`,
+            backgroundImages: [
+                'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600',
+                'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1600'
+            ],
+            countdownDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+            productIds: initialProductIds,
+            status: 'UPCOMING',
+            createdAt: new Date().toISOString()
+        };
+
+        const updatedDrops = [...activeDrops, newDrop];
+        setCmsForm({
+            ...cmsForm,
+            drop: updatedDrops[0],
+            drops: updatedDrops
+        });
+        setSelectedDropIndex(updatedDrops.length - 1);
+        setDropNotification({
+            type: 'success',
+            message: `Created Drop #${nextNum}. Edit details below.`
+        });
+    };
+
     const handleSaveDropOnly = async () => {
-        if (!cmsForm?.drop) return;
         setIsSavingDrop(true);
         try {
             await handleCMSUpdate(cmsForm);
             setDropNotification({
                 type: 'success',
-                message: 'The Drop configuration saved and published successfully!'
+                message: `All ${activeDrops.length} Drop(s) saved and published to storefront successfully!`
             });
         } catch (err: any) {
             setDropNotification({
                 type: 'error',
-                message: 'Failed to save drop: ' + (err.message || 'Error occurred')
+                message: 'Failed to save drops: ' + (err.message || 'Error occurred')
             });
         } finally {
             setIsSavingDrop(false);
@@ -214,20 +269,34 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
         }
     };
 
-    const handleRemoveDrop = async () => {
-        if (!window.confirm("Are you sure you want to remove The Drop? The drop will be uninitialized from the store.")) {
-            return;
-        }
+    const handleRemoveCurrentDrop = async (indexToDelete: number) => {
+        if (!window.confirm("Are you sure you want to delete this Drop?")) return;
+        
         setIsSavingDrop(true);
-        const updated = { ...cmsForm };
-        delete updated.drop;
-        setCmsForm(updated);
+        const currentDrops = [...activeDrops];
+        
+        if (currentDrops.length <= 1) {
+            const updated = { ...cmsForm };
+            delete updated.drop;
+            delete updated.drops;
+            setCmsForm(updated);
+            setSelectedDropIndex(0);
+        } else {
+            currentDrops.splice(indexToDelete, 1);
+            const updatedCms = {
+                ...cmsForm,
+                drop: currentDrops[0],
+                drops: currentDrops
+            };
+            setCmsForm(updatedCms);
+            setSelectedDropIndex(Math.max(0, indexToDelete - 1));
+        }
 
         try {
-            await handleCMSUpdate(updated);
+            await handleCMSUpdate(cmsForm);
             setDropNotification({
                 type: 'success',
-                message: 'The Drop has been removed from the storefront.'
+                message: 'Drop removed successfully.'
             });
         } catch (e: any) {
             setDropNotification({
@@ -241,7 +310,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
     };
 
     const handleDropImagesUpload = async (files: FileList | null) => {
-        if (!files || files.length === 0) return;
+        if (!files || files.length === 0 || !activeDrop) return;
         setIsUploadingDropImages(true);
         try {
             const fileArray = Array.from(files);
@@ -255,17 +324,14 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                 }
             }
             if (uploadedUrls.length > 0) {
-                const currentImages = cmsForm?.drop?.backgroundImages || [];
-                setCmsForm({
-                    ...cmsForm,
-                    drop: {
-                        ...(cmsForm.drop || {}),
-                        backgroundImages: [...currentImages, ...uploadedUrls]
-                    }
+                const currentImages = activeDrop.backgroundImages || [];
+                updateSelectedDrop({
+                    ...activeDrop,
+                    backgroundImages: [...currentImages, ...uploadedUrls]
                 });
                 setDropNotification({
                     type: 'success',
-                    message: `Successfully uploaded ${uploadedUrls.length} image${uploadedUrls.length > 1 ? 's' : ''} to The Drop.`
+                    message: `Uploaded ${uploadedUrls.length} image(s) to ${activeDrop.title || 'Drop'}.`
                 });
                 setTimeout(() => setDropNotification(null), 3500);
             }
@@ -307,36 +373,29 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
     };
 
     const handleAddImage = () => {
-        if (!newImageUrl.trim()) return;
-        const currentImages = cmsForm?.drop?.backgroundImages || [];
-        setCmsForm({
-            ...cmsForm,
-            drop: {
-                ...(cmsForm.drop || {}),
-                backgroundImages: [...currentImages, newImageUrl.trim()]
-            }
+        if (!newImageUrl.trim() || !activeDrop) return;
+        const currentImages = activeDrop.backgroundImages || [];
+        updateSelectedDrop({
+            ...activeDrop,
+            backgroundImages: [...currentImages, newImageUrl.trim()]
         });
         setNewImageUrl('');
     };
 
     const handleRemoveImage = (indexToRemove: number) => {
-        const currentImages = cmsForm?.drop?.backgroundImages || [];
-        setCmsForm({
-            ...cmsForm,
-            drop: {
-                ...(cmsForm.drop || {}),
-                backgroundImages: currentImages.filter((_: any, idx: number) => idx !== indexToRemove)
-            }
+        if (!activeDrop) return;
+        const currentImages = activeDrop.backgroundImages || [];
+        updateSelectedDrop({
+            ...activeDrop,
+            backgroundImages: currentImages.filter((_, i) => i !== indexToRemove)
         });
     };
 
     const handleToggleAllProducts = (selectAll: boolean) => {
-        setCmsForm({
-            ...cmsForm,
-            drop: {
-                ...(cmsForm.drop || {}),
-                productIds: selectAll ? products.map(p => p.id) : []
-            }
+        if (!activeDrop) return;
+        updateSelectedDrop({
+            ...activeDrop,
+            productIds: selectAll ? products.map(p => p.id) : []
         });
     };
 
@@ -598,17 +657,17 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
 
                     {/* Right Column */}
                     <div className="space-y-6">
-                        {/* The Drop */}
+                        {/* The Drops Manager (Multi-Drop) */}
                         <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
                             <button 
                                 onClick={() => setExpandedSection(expandedSection === 'drop' ? null : 'drop')}
                                 className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors text-left"
                             >
                                 <div className="flex items-center gap-3">
-                                    <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><Sparkles size={14} className="text-luxury-gold" /> The Drop</span>
-                                    {getDropStatus() && (
-                                        <span className={`text-[9px] px-2.5 py-0.5 uppercase tracking-wider font-bold rounded-full border ${getDropStatus()?.color}`}>
-                                            {getDropStatus()?.label}
+                                    <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><Sparkles size={14} className="text-luxury-gold" /> Storefront Drops ({activeDrops.length})</span>
+                                    {getDropStatus(activeDrop) && (
+                                        <span className={`text-[9px] px-2.5 py-0.5 uppercase tracking-wider font-bold rounded-full border ${getDropStatus(activeDrop)?.color}`}>
+                                            {getDropStatus(activeDrop)?.label}
                                         </span>
                                     )}
                                 </div>
@@ -633,13 +692,46 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                         </div>
                                     )}
 
-                                    {cmsForm.drop ? (
-                                        <div className="p-6 space-y-6">
+                                    {/* Multi-Drop Navigation Tabs */}
+                                    <div className="p-6 pb-0">
+                                        <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-3 mb-6 overflow-x-auto">
+                                            <div className="flex items-center gap-2 min-w-max">
+                                                {activeDrops.map((drop, idx) => (
+                                                    <button
+                                                        key={drop.id || idx}
+                                                        type="button"
+                                                        onClick={() => setSelectedDropIndex(idx)}
+                                                        className={`px-3.5 py-2 rounded-sm text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all ${
+                                                            selectedDropIndex === idx
+                                                                ? 'bg-black text-white shadow-sm'
+                                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                        }`}
+                                                    >
+                                                        <span>Drop #{idx + 1}</span>
+                                                        <span className="text-[10px] opacity-75 font-serif italic truncate max-w-[100px]">{drop.title || 'Untitled'}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleAddNewDrop}
+                                                className="px-3.5 py-2 bg-luxury-gold hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm flex items-center gap-1.5 shrink-0 transition-colors shadow-xs"
+                                            >
+                                                <Plus size={14} /> Add New Drop
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {activeDrop ? (
+                                        <div className="p-6 pt-0 space-y-6">
                                             {/* Action Bar inside Drop */}
                                             <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-gray-50 rounded-sm border border-gray-100">
                                                 <div className="flex items-center gap-2">
                                                     <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-                                                    <span className="text-xs font-bold uppercase tracking-wider text-gray-700">Drop Capsule Active</span>
+                                                    <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                                                        Editing Drop #{selectedDropIndex + 1}: {activeDrop.title}
+                                                    </span>
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     {onNavigate && (
@@ -659,16 +751,16 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                         className="px-4 py-1.5 bg-black hover:bg-luxury-gold text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors disabled:opacity-50"
                                                     >
                                                         {isSavingDrop ? <RefreshCw size={12} className="animate-spin" /> : <Check size={12} />}
-                                                        Save Drop
+                                                        Publish All Drops
                                                     </button>
                                                     <button 
                                                         type="button"
-                                                        onClick={handleRemoveDrop}
+                                                        onClick={() => handleRemoveCurrentDrop(selectedDropIndex)}
                                                         disabled={isSavingDrop}
                                                         className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors"
-                                                        title="Remove Drop from Storefront"
+                                                        title="Delete Selected Drop"
                                                     >
-                                                        <Trash2 size={12} /> Reset
+                                                        <Trash2 size={12} /> Delete Drop
                                                     </button>
                                                 </div>
                                             </div>
@@ -676,8 +768,8 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                             <div>
                                                 <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Drop Title</label>
                                                 <input 
-                                                    value={cmsForm.drop?.title || ''}
-                                                    onChange={e => setCmsForm({...cmsForm, drop: {...(cmsForm.drop || {}), title: e.target.value}})}
+                                                    value={activeDrop.title || ''}
+                                                    onChange={e => updateSelectedDrop({ ...activeDrop, title: e.target.value })}
                                                     className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                                     placeholder="e.g. Summer Solstice Capsule"
                                                 />
@@ -686,8 +778,8 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                             <div>
                                                 <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Subtitle / Edition Badge</label>
                                                 <input 
-                                                    value={cmsForm.drop?.subtitle || ''}
-                                                    onChange={e => setCmsForm({...cmsForm, drop: {...(cmsForm.drop || {}), subtitle: e.target.value}})}
+                                                    value={activeDrop.subtitle || ''}
+                                                    onChange={e => updateSelectedDrop({ ...activeDrop, subtitle: e.target.value })}
                                                     className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                                     placeholder="e.g. Limited Edition • 50 Pieces Worldwide"
                                                 />
@@ -696,8 +788,8 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                             <div>
                                                 <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Editorial Narrative / Description</label>
                                                 <textarea 
-                                                    value={cmsForm.drop?.description || ''}
-                                                    onChange={e => setCmsForm({...cmsForm, drop: {...(cmsForm.drop || {}), description: e.target.value}})}
+                                                    value={activeDrop.description || ''}
+                                                    onChange={e => updateSelectedDrop({ ...activeDrop, description: e.target.value })}
                                                     className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white h-24"
                                                     placeholder="Describe the inspiration, craftsmanship, and exclusivity of this drop..."
                                                 />
@@ -710,12 +802,12 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                         <Clock size={13} className="text-luxury-gold" /> Countdown Target Date
                                                     </label>
                                                     <span className="text-[10px] text-gray-400 font-mono">
-                                                        {cmsForm.drop?.countdownDate ? new Date(cmsForm.drop.countdownDate).toUTCString() : 'Not Set'}
+                                                        {activeDrop.countdownDate ? new Date(activeDrop.countdownDate).toUTCString() : 'Not Set'}
                                                     </span>
                                                 </div>
                                                 <input 
                                                     type="datetime-local"
-                                                    value={toLocalDateTimeInput(cmsForm.drop?.countdownDate)}
+                                                    value={toLocalDateTimeInput(activeDrop.countdownDate)}
                                                     onChange={e => handleDateChange(e.target.value)}
                                                     className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-white font-mono"
                                                 />
@@ -743,7 +835,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                             {/* Background Images Upload */}
                                             <div className="space-y-3">
                                                 <div className="flex items-center justify-between">
-                                                    <label className="text-[10px] text-gray-400 uppercase font-bold block">Editorial Background Images</label>
+                                                    <label className="text-[10px] text-gray-400 uppercase font-bold block">Editorial Background Images (Slideshow)</label>
                                                     <button 
                                                         type="button"
                                                         onClick={() => setShowDropUrlFallback(!showDropUrlFallback)}
@@ -778,7 +870,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                         </div>
                                                         <div>
                                                             <p className="text-xs font-bold uppercase tracking-wider text-gray-800">
-                                                                {isUploadingDropImages ? 'Processing & Optimizing Images...' : 'Upload Editorial Photos'}
+                                                                {isUploadingDropImages ? 'Processing & Optimizing Images...' : 'Upload Drop Photos'}
                                                             </p>
                                                             <p className="text-[10px] text-gray-400 mt-0.5">
                                                                 Drag and drop photos here or click below to select multiple files
@@ -805,11 +897,11 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                 </div>
 
                                                 {/* Visual Gallery Thumbnails */}
-                                                {cmsForm.drop?.backgroundImages && cmsForm.drop.backgroundImages.length > 0 && (
+                                                {activeDrop.backgroundImages && activeDrop.backgroundImages.length > 0 && (
                                                     <div className="space-y-1.5">
-                                                        <p className="text-[10px] text-gray-400 uppercase font-bold">Uploaded Gallery ({cmsForm.drop.backgroundImages.length})</p>
+                                                        <p className="text-[10px] text-gray-400 uppercase font-bold">Slideshow Gallery ({activeDrop.backgroundImages.length})</p>
                                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                            {cmsForm.drop.backgroundImages.map((imgUrl: string, idx: number) => (
+                                                            {activeDrop.backgroundImages.map((imgUrl: string, idx: number) => (
                                                                 <div key={idx} className="relative group rounded-sm overflow-hidden border border-gray-200 aspect-video bg-gray-100 shadow-xs">
                                                                     <img 
                                                                         src={imgUrl} 
@@ -866,13 +958,13 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                     <div className="flex items-center gap-2">
                                                         <label className="text-[10px] text-gray-400 uppercase font-bold">Capsule Products</label>
                                                         <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-700 font-bold rounded-full">
-                                                            {cmsForm.drop?.productIds?.length || 0} / {products.length}
+                                                            {activeDrop.productIds?.length || 0} / {products.length}
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
                                                         <button 
                                                             type="button"
-                                                            onClick={() => handleToggleAllProducts(true)}
+                                                            onClick={() => updateSelectedDrop({ ...activeDrop, productIds: products.map(p => p.id) })}
                                                             className="text-[10px] font-bold text-luxury-gold hover:underline uppercase tracking-wider"
                                                         >
                                                             Select All
@@ -880,7 +972,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                         <span className="text-gray-300">|</span>
                                                         <button 
                                                             type="button"
-                                                            onClick={() => handleToggleAllProducts(false)}
+                                                            onClick={() => updateSelectedDrop({ ...activeDrop, productIds: [] })}
                                                             className="text-[10px] font-bold text-gray-400 hover:text-black uppercase tracking-wider"
                                                         >
                                                             Clear All
@@ -893,7 +985,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                 ) : (
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
                                                         {products.map(product => {
-                                                            const isChecked = cmsForm.drop?.productIds?.includes(product.id) || false;
+                                                            const isChecked = activeDrop.productIds?.includes(product.id) || false;
                                                             return (
                                                                 <label 
                                                                     key={product.id} 
@@ -907,11 +999,11 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                                         type="checkbox"
                                                                         checked={isChecked}
                                                                         onChange={e => {
-                                                                            const currentProductIds = cmsForm.drop?.productIds || [];
+                                                                            const currentProductIds = activeDrop.productIds || [];
                                                                             const newProductIds = e.target.checked 
                                                                                 ? [...currentProductIds, product.id]
                                                                                 : currentProductIds.filter((id: string) => id !== product.id);
-                                                                            setCmsForm({...cmsForm, drop: {...(cmsForm.drop || {}), productIds: newProductIds}});
+                                                                            updateSelectedDrop({ ...activeDrop, productIds: newProductIds });
                                                                         }}
                                                                         className="accent-black w-4 h-4"
                                                                     />
@@ -942,7 +1034,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                     className="w-full sm:w-auto px-8 py-3 bg-black hover:bg-luxury-gold text-white text-xs font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
                                                 >
                                                     {isSavingDrop ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                                                    Publish Drop Settings
+                                                    Publish All Drops
                                                 </button>
                                             </div>
                                         </div>
@@ -956,7 +1048,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                     Timed Capsule & Drop System
                                                 </h4>
                                                 <p className="text-xs text-gray-500 leading-relaxed">
-                                                    Initialize an exclusive capsule release with an animated live countdown, architectural high-resolution visuals, limited edition inventory locks, and VIP email waitlist capture.
+                                                    Create multiple exclusive capsule releases with live countdowns, background slideshow galleries, limited edition inventory locks, and VIP email waitlists.
                                                 </p>
                                             </div>
                                             <div className="pt-2">
@@ -975,13 +1067,10 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                     ) : (
                                                         <>
                                                             <Plus size={16} />
-                                                            Initialize Drop
+                                                            Initialize First Drop
                                                         </>
                                                     )}
                                                 </button>
-                                                <p className="text-[10px] text-gray-400 mt-3 font-mono">
-                                                    Populates high-res editorial presets, 7-day countdown & automatically links available products.
-                                                </p>
                                             </div>
                                         </div>
                                     )}
