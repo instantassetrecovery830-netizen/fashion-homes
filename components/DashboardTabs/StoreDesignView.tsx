@@ -1225,6 +1225,28 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                             
                             {expandedSection === 'pricing' && (
                                 <div className="p-6 space-y-4 border-t border-gray-100">
+                                    {/* Global Free Subscriptions Toggle */}
+                                    <div className="bg-luxury-gold/10 border border-luxury-gold/30 p-4 rounded-sm flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-xs uppercase tracking-wide text-gray-900">Global Free Subscriptions Mode</h4>
+                                            <p className="text-[11px] text-gray-600 mt-0.5">Toggle ON to make all vendor membership plans 100% FREE ($0).</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const currentIsFree = cmsForm.pricing?.isFreeMode || false;
+                                                setCmsForm({
+                                                    ...cmsForm,
+                                                    pricing: { ...(cmsForm.pricing || { title: '', subtitle: '', description: '', plans: [] }), isFreeMode: !currentIsFree },
+                                                    subscriptionSettings: { ...(cmsForm.subscriptionSettings || {}), isFreeMode: !currentIsFree }
+                                                });
+                                            }}
+                                            className={`px-4 py-2 rounded-xs text-[10px] font-bold uppercase tracking-widest transition-colors ${cmsForm.pricing?.isFreeMode ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                        >
+                                            {cmsForm.pricing?.isFreeMode ? 'Free Subscriptions: ON' : 'Free Subscriptions: OFF'}
+                                        </button>
+                                    </div>
+
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Title</label>
@@ -1253,11 +1275,11 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                     </div>
                                     
                                     <div className="pt-4 border-t border-gray-100">
-                                        <h4 className="text-xs font-bold uppercase tracking-widest mb-4">Plans</h4>
+                                        <h4 className="text-xs font-bold uppercase tracking-widest mb-4">Plans & Tier Pricing</h4>
                                         <div className="space-y-6">
                                             {(cmsForm.pricing?.plans || []).map((plan: any, index: number) => (
-                                                <div key={index} className="border border-gray-200 p-4 rounded-sm bg-gray-50">
-                                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                                <div key={index} className="border border-gray-200 p-4 rounded-sm bg-gray-50 space-y-4">
+                                                    <div className="grid grid-cols-2 gap-4">
                                                         <div>
                                                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Plan Name</label>
                                                             <input 
@@ -1271,7 +1293,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Price</label>
+                                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Price Label (e.g. $99 or Free)</label>
                                                             <input 
                                                                 value={plan.price || ''}
                                                                 onChange={e => {
@@ -1283,6 +1305,28 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                             />
                                                         </div>
                                                     </div>
+
+                                                    <div className="flex items-center gap-3 bg-white p-3 border border-gray-200 rounded-xs">
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`cms-free-${index}`}
+                                                            checked={plan.isFree || cmsForm.pricing?.isFreeMode || false}
+                                                            onChange={e => {
+                                                                const newPlans = [...(cmsForm.pricing?.plans || [])];
+                                                                newPlans[index] = {
+                                                                    ...newPlans[index], 
+                                                                    isFree: e.target.checked,
+                                                                    price: e.target.checked ? '$0' : newPlans[index].price
+                                                                };
+                                                                setCmsForm({...cmsForm, pricing: {...(cmsForm.pricing || {}), plans: newPlans}});
+                                                            }}
+                                                            className="accent-luxury-gold"
+                                                        />
+                                                        <label htmlFor={`cms-free-${index}`} className="text-xs font-bold text-gray-700">
+                                                            Mark this subscription plan as FREE ($0)
+                                                        </label>
+                                                    </div>
+
                                                     <div>
                                                         <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Description</label>
                                                         <input 
@@ -1292,10 +1336,10 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                                 newPlans[index] = {...newPlans[index], description: e.target.value};
                                                                 setCmsForm({...cmsForm, pricing: {...(cmsForm.pricing || {}), plans: newPlans}});
                                                             }}
-                                                            className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white mb-4"
+                                                            className="w-full border border-gray-200 p-2 text-sm focus:border-black outline-none bg-white mb-2"
                                                         />
                                                     </div>
-                                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    <div className="grid grid-cols-2 gap-4">
                                                         <div>
                                                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Period</label>
                                                             <input 

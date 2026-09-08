@@ -107,56 +107,96 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
            </div>
        )}
 
-       {/* KPIs */}
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
-             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Revenue</h3>
-                <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><DollarSign size={20} /></div>
+       {/* Buyer Specific View */}
+       {role === UserRole.BUYER ? (
+          <div className="space-y-8">
+             <div className="bg-luxury-black text-white p-8 rounded-sm shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                <div>
+                   <h3 className="text-2xl font-serif italic mb-2">Welcome to Your Luxury Portal</h3>
+                   <p className="text-gray-400 text-xs max-w-md">Discover exclusive couture drops, track your bespoke orders, and manage saved designer creations.</p>
+                </div>
+                <div className="flex gap-3">
+                   <button onClick={() => onNavigate('MARKETPLACE')} className="bg-luxury-gold text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors rounded-xs">
+                      Shop Collection
+                   </button>
+                   <button onClick={() => onNavigate('BUYER_DASHBOARD')} className="border border-white/20 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:border-white transition-colors rounded-xs">
+                      My Orders
+                   </button>
+                </div>
              </div>
-             <p className="text-4xl font-serif">${totalRevenue.toLocaleString()}</p>
-             <p className="text-xs text-green-600 mt-2 flex items-center gap-1"><ArrowUpRight size={12} /> +12% this month</p>
-          </div>
-          <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
-             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Orders</h3>
-                <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><ShoppingBag size={20} /></div>
-             </div>
-             <p className="text-4xl font-serif">{totalSales}</p>
-             <p className="text-xs text-gray-400 mt-2">Processed successfully</p>
-          </div>
-          {role !== UserRole.BUYER && (
-            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Active Products</h3>
-                  <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><Shirt size={20} /></div>
-              </div>
-              <p className="text-4xl font-serif">{myProducts.length}</p>
-              <p className="text-xs text-gray-400 mt-2">Live in marketplace</p>
-            </div>
-          )}
-       </div>
 
-       {/* Charts Row */}
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-sm h-96">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-                  <Activity size={14} /> Revenue History
-              </h3>
-              <ResponsiveContainer width="100%" height="85%">
-                  <BarChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                      <XAxis dataKey="name" tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
-                      <YAxis tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
-                      <Tooltip 
-                          contentStyle={{ backgroundColor: '#fff', border: '1px solid #f3f4f6', borderRadius: '4px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                          cursor={{ fill: '#f9fafb' }}
-                      />
-                      <Bar dataKey="amount" fill="#C5A059" radius={[4, 4, 0, 0]} barSize={40} />
-                  </BarChart>
-              </ResponsiveContainer>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
+                   <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Orders Placed</h3>
+                      <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><ShoppingBag size={20} /></div>
+                   </div>
+                   <p className="text-4xl font-serif">{totalSales}</p>
+                   <p className="text-xs text-gray-400 mt-2">Active and completed purchases</p>
+                </div>
+
+                <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
+                   <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Atelier Favorites</h3>
+                      <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><Shirt size={20} /></div>
+                   </div>
+                   <p className="text-4xl font-serif">Curated</p>
+                   <p className="text-xs text-gray-400 mt-2">Personalized recommendations ready</p>
+                </div>
+             </div>
           </div>
-       </div>
+       ) : (
+          <>
+             {/* KPIs */}
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
+                   <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Revenue</h3>
+                      <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><DollarSign size={20} /></div>
+                   </div>
+                   <p className="text-4xl font-serif">${totalRevenue.toLocaleString()}</p>
+                   <p className="text-xs text-green-600 mt-2 flex items-center gap-1"><ArrowUpRight size={12} /> +12% this month</p>
+                </div>
+                <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
+                   <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Total Orders</h3>
+                      <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><ShoppingBag size={20} /></div>
+                   </div>
+                   <p className="text-4xl font-serif">{totalSales}</p>
+                   <p className="text-xs text-gray-400 mt-2">Processed successfully</p>
+                </div>
+                <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-sm hover:shadow-md transition-shadow">
+                   <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Active Products</h3>
+                      <div className="p-2 bg-luxury-gold/10 rounded-full text-luxury-gold"><Shirt size={20} /></div>
+                   </div>
+                   <p className="text-4xl font-serif">{myProducts.length}</p>
+                   <p className="text-xs text-gray-400 mt-2">Live in marketplace</p>
+                </div>
+             </div>
+
+             {/* Charts Row */}
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-sm h-96">
+                   <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+                      <Activity size={14} /> Revenue History
+                   </h3>
+                   <ResponsiveContainer width="100%" height="85%">
+                      <BarChart data={revenueData}>
+                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                         <XAxis dataKey="name" tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
+                         <YAxis tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
+                         <Tooltip 
+                            contentStyle={{ backgroundColor: '#fff', border: '1px solid #f3f4f6', borderRadius: '4px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                            cursor={{ fill: '#f9fafb' }}
+                         />
+                         <Bar dataKey="amount" fill="#C5A059" radius={[4, 4, 0, 0]} barSize={40} />
+                      </BarChart>
+                   </ResponsiveContainer>
+                </div>
+             </div>
+          </>
+       )}
     </motion.div>
   );
 };

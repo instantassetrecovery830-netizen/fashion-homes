@@ -172,6 +172,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                     instagram: '',
                     twitter: ''
                 });
+                await createUserInDb({
+                    id: user.uid,
+                    name: brandName || displayName,
+                    email: user.email,
+                    role: UserRole.VENDOR,
+                    avatar: photoURL,
+                    joined: new Date().toISOString(),
+                    status: 'ACTIVE'
+                });
             }
          } else {
             const dbUser = await getUserByEmail(user.email);
@@ -264,7 +273,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                 const newVendor: Vendor = {
                     id: user.uid,
                     name: brandName,
-                    bio: `Bio for ${name}`,
+                    bio: `Atelier bio for ${brandName}`,
                     avatar: finalAvatar,
                     verificationStatus: 'PENDING',
                     approvalStatus: 'PENDING',
@@ -275,6 +284,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onNavigate, cmsCont
                     subscriptionPlan: initialPlan || 'Atelier'
                 };
                 await createVendorInDb(newVendor);
+                await createUserInDb({
+                    id: user.uid,
+                    name: brandName || name,
+                    email: user.email || '',
+                    role: UserRole.VENDOR,
+                    avatar: finalAvatar,
+                    joined: new Date().toISOString(),
+                    status: 'ACTIVE'
+                });
             } else {
                 await createUserInDb({
                     id: user.uid,

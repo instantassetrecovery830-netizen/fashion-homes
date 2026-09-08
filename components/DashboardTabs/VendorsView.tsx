@@ -28,6 +28,40 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
     const [inspectVendor, setInspectVendor] = useState<Vendor | null>(null);
 
+    const handleGrantAllVendorAccess = async () => {
+        if (!setVendors || vendors.length === 0) return;
+        try {
+            const updated = vendors.map(v => ({
+                ...v,
+                subscriptionStatus: 'ACTIVE' as const,
+                approvalStatus: 'APPROVED' as const,
+                verificationStatus: 'VERIFIED' as const
+            }));
+            await setVendors(updated);
+            alert(`🎉 Successfully granted active subscription and full store access to all ${vendors.length} vendors!`);
+        } catch (e: any) {
+            alert('Failed to update vendors: ' + e.message);
+        }
+    };
+
+    const handleUpdateVendorSubscription = async (vendor: Vendor, plan?: string, status?: 'ACTIVE' | 'INACTIVE') => {
+        if (!setVendors) return;
+        try {
+            const updated: Vendor = {
+                ...vendor,
+                subscriptionPlan: (plan || vendor.subscriptionPlan || 'ATELIER') as any,
+                subscriptionStatus: status || vendor.subscriptionStatus || 'ACTIVE',
+                approvalStatus: (status === 'ACTIVE' || vendor.subscriptionStatus === 'ACTIVE') ? 'APPROVED' : vendor.approvalStatus
+            };
+            await setVendors([updated]);
+            if (inspectVendor && inspectVendor.id === vendor.id) {
+                setInspectVendor(updated);
+            }
+        } catch (e: any) {
+            alert('Failed to update vendor subscription: ' + e.message);
+        }
+    };
+
     const pendingCount = useMemo(() => vendors.filter(v => v.verificationStatus === 'PENDING' || v.approvalStatus === 'PENDING').length, [vendors]);
     const approvedCount = useMemo(() => vendors.filter(v => v.verificationStatus === 'VERIFIED' || v.approvalStatus === 'APPROVED').length, [vendors]);
     const rejectedCount = useMemo(() => vendors.filter(v => v.verificationStatus === 'REJECTED' || v.approvalStatus === 'REJECTED').length, [vendors]);
@@ -76,6 +110,15 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                             </button>
                         )}
                     </div>
+                    {setVendors && vendors.length > 0 && (
+                        <button 
+                            onClick={handleGrantAllVendorAccess}
+                            className="bg-emerald-600 text-white px-3.5 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5"
+                            title="Grant active subscription access to all vendors"
+                        >
+                            <Check size={14} /> Grant All Access
+                        </button>
+                    )}
                     {setVendorForm && (
                         <button 
                             onClick={() => setVendorForm({ name: '', email: '', location: '', bio: '', avatar: '', verificationStatus: 'PENDING', approvalStatus: 'PENDING' })}
@@ -170,9 +213,34 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <span className="font-bold px-2 py-0.5 bg-gray-100 text-gray-800 rounded text-[10px]">
-                                                {vendor.subscriptionPlan || 'Atelier'}
-                                            </span>
+                                            <div className="flex flex-col gap-1.5">
+                                                <select
+                                                    value={vendor.subscriptionPlan || 'Atelier'}
+                                                    onChange={e => handleUpdateVendorSubscription(vendor, e.target.value)}
+                                                    className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-800 outline-none cursor-pointer focus:border-black"
+                                                >
+                                                    <option value="Atelier">Atelier</option>
+                                                    <option value="Couture">Couture</option>
+                                                    <option value="Maison">Maison</option>
+                                                </select>
+                                                
+                                                <button
+                                                    onClick={() => handleUpdateVendorSubscription(
+                                                        vendor, 
+                                                        vendor.subscriptionPlan, 
+                                                        vendor.subscriptionStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+                                                    )}
+                                                    className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border text-left flex items-center justify-between gap-1 transition-colors ${
+                                                        vendor.subscriptionStatus === 'ACTIVE' 
+                                                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100' 
+                                                            : 'bg-red-50 text-red-800 border-red-200 hover:bg-red-100'
+                                                    }`}
+                                                    title="Click to toggle subscription access"
+                                                >
+                                                    <span>{vendor.subscriptionStatus === 'ACTIVE' ? 'Access: Active' : 'Access: Inactive'}</span>
+                                                    <span className="text-[8px] opacity-70">(Toggle)</span>
+                                                </button>
+                                            </div>
                                         </td>
                                         <td className="p-4">
                                             {isPending && (
@@ -278,14 +346,47 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                                 <p className="text-gray-600 leading-relaxed italic">{inspectVendor.bio || 'No brand story provided.'}</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="border border-gray-100 p-3 rounded">
-                                    <p className="text-[10px] uppercase font-bold text-gray-400">Location / Base</p>
-                                    <p className="font-bold text-gray-800 mt-0.5">{inspectVendor.location || 'Global'}</p>
+                            <div className="bg-gray-900 text-white p-4 rounded border border-gray-800 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <p className="font-bold text-luxury-gold uppercase tracking-wider text-[10px]">Subscription & Access Control</p>
+                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-full border ${inspectVendor.subscriptionStatus === 'ACTIVE' ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40' : 'bg-red-950 text-red-300 border-red-500/40'}`}>
+                                        {inspectVendor.subscriptionStatus === 'ACTIVE' ? 'Status: Active' : 'Status: Inactive'}
+                                    </span>
                                 </div>
-                                <div className="border border-gray-100 p-3 rounded">
-                                    <p className="text-[10px] uppercase font-bold text-gray-400">Subscription Tier</p>
-                                    <p className="font-bold text-gray-800 mt-0.5">{inspectVendor.subscriptionPlan || 'Atelier'}</p>
+
+                                <div className="grid grid-cols-2 gap-3 pt-1">
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Assigned Plan Tier</label>
+                                        <select
+                                            value={inspectVendor.subscriptionPlan || 'Atelier'}
+                                            onChange={e => handleUpdateVendorSubscription(inspectVendor, e.target.value)}
+                                            className="w-full bg-black text-white border border-gray-700 rounded p-1.5 text-xs font-bold focus:border-luxury-gold outline-none"
+                                        >
+                                            <option value="Atelier">Atelier</option>
+                                            <option value="Couture">Couture</option>
+                                            <option value="Maison">Maison</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Access Action</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleUpdateVendorSubscription(
+                                                inspectVendor, 
+                                                inspectVendor.subscriptionPlan, 
+                                                inspectVendor.subscriptionStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+                                            )}
+                                            className={`w-full py-1.5 px-3 rounded text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-colors ${
+                                                inspectVendor.subscriptionStatus === 'ACTIVE'
+                                                    ? 'bg-red-900 hover:bg-red-800 text-white'
+                                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                            }`}
+                                        >
+                                            {inspectVendor.subscriptionStatus === 'ACTIVE' ? <X size={12} /> : <Check size={12} />}
+                                            {inspectVendor.subscriptionStatus === 'ACTIVE' ? 'Revoke Access' : 'Grant Access'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 

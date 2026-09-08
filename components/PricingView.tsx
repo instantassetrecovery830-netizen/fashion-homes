@@ -100,7 +100,10 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate, onRegister
                 <h3 className="text-2xl font-serif italic mb-2">{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mb-4">
                   <span className="text-4xl font-bold">
-                    {formatPrice(parseFloat(plan.price.toString().replace(/[^0-9.]/g, '') || '0'))}
+                    {content.isFreeMode || plan.isFree 
+                      ? 'FREE ($0)' 
+                      : formatPrice(parseFloat(plan.price.toString().replace(/[^0-9.]/g, '') || '0'))
+                    }
                   </span>
                   <span className={`text-xs uppercase tracking-wide ${plan.highlight ? 'text-gray-400' : 'text-gray-500'}`}>{plan.period}</span>
                 </div>

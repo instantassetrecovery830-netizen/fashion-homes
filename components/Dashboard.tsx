@@ -350,6 +350,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, []);
 
   const handleSaveProduct = useCallback(async () => {
+      if (role === UserRole.VENDOR && !isSubscribed) {
+          alert("An active Atelier membership subscription is required to add or update products. Please choose a subscription plan to unlock full vendor access.");
+          setIsProductFormOpen(false);
+          setActiveTab('SUBSCRIPTION');
+          return;
+      }
+
       if (!productForm.name || !productForm.price || !productForm.category) {
           alert("Please fill in all required fields.");
           return;
@@ -467,7 +474,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'STOREFRONT', label: 'Design Store', icon: Palette, roles: [UserRole.VENDOR] },
       { id: 'FINANCE', label: 'Finance', icon: Wallet, roles: [UserRole.VENDOR] },
       { id: 'MARKETING', label: 'Marketing', icon: Tag, roles: [UserRole.VENDOR] },
-      { id: 'SUBSCRIPTION', label: 'Subscription', icon: CreditCard, roles: [UserRole.VENDOR] },
+      { id: 'SUBSCRIPTION', label: 'Subscription', icon: CreditCard, roles: [UserRole.ADMIN, UserRole.VENDOR] },
       { id: 'KYC', label: 'KYC Verification', icon: ShieldCheck, roles: [UserRole.VENDOR] },
       { id: 'SHIPPING', label: 'Delivery', icon: Truck, roles: [UserRole.VENDOR] },
       { id: 'USERS', label: 'Users', icon: Users, roles: [UserRole.ADMIN] },
@@ -499,16 +506,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
-                {tabs.filter(t => t.roles.includes(role)).map(tab => (
-                <button
-                    key={tab.id}
-                    onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); setIsProductFormOpen(false); setSelectedVendorForReview(null); }}
-                    className={`w-full flex items-center gap-4 p-3 text-sm font-medium transition-all rounded-sm ${activeTab === tab.id ? 'bg-luxury-black text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-black'}`}
-                >
-                    <tab.icon size={18} />
-                    <span className="tracking-wide">{tab.label}</span>
-                </button>
-                ))}
+                {tabs.filter(t => t.roles.includes(role)).map(tab => {
+                    const isLocked = role === UserRole.VENDOR && !isSubscribed && lockedVendorTabs.includes(tab.id);
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); setIsProductFormOpen(false); setSelectedVendorForReview(null); }}
+                            className={`w-full flex items-center justify-between p-3 text-sm font-medium transition-all rounded-sm ${activeTab === tab.id ? 'bg-luxury-black text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-black'}`}
+                        >
+                            <div className="flex items-center gap-4">
+                                <tab.icon size={18} />
+                                <span className="tracking-wide">{tab.label}</span>
+                            </div>
+                            {isLocked && <Lock size={12} className="text-luxury-gold shrink-0" />}
+                        </button>
+                    );
+                })}
             </div>
             
             <div className="p-6 border-t border-gray-100 space-y-2">
@@ -539,6 +552,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Render Content
   const renderContent = () => {
+    if (role === UserRole.VENDOR && !isSubscribed && lockedVendorTabs.includes(activeTab)) {
+      const tabNames: Record<string, string> = {
+        PRODUCTS: 'Products Management',
+        STOREFRONT: 'Storefront Customization',
+        ANALYTICS: 'Business Analytics',
+        FINANCE: 'Finance & Payouts',
+        MARKETING: 'Promotions & Marketing',
+        SHIPPING: 'Delivery Settings',
+        FOLLOWERS: 'Follower Insights'
+      };
+      return renderSubscriptionLockedState(tabNames[activeTab] || activeTab);
+    }
+
     switch (activeTab) {
       case 'OVERVIEW':
         return (
@@ -609,19 +635,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
           />
         );
 
-      case 'SUBSCRIPTION':
-        if (!storefrontForm) return <div className="p-8"><Loader className="animate-spin text-luxury-gold" /></div>;
+      case 'SUBSCRIPTION': {
+        const activeVendorForm = storefrontForm || (role === UserRole.ADMIN ? ({
+            id: 'admin_store',
+            name: 'Platform Admin Atelier',
+            brandName: 'Platform Admin',
+            email: currentUser?.email || 'admin@myfitstore.com',
+            subscriptionPlan: 'MAISON',
+            subscriptionStatus: 'ACTIVE',
+            approved: true
+        } as unknown as Vendor) : null);
+
+        if (!activeVendorForm) return <div className="p-8"><Loader className="animate-spin text-luxury-gold" /></div>;
         return (
           <SubscriptionView 
-            storefrontForm={storefrontForm}
+            storefrontForm={activeVendorForm}
             setIsSidebarOpen={setIsSidebarOpen}
             onUpdateVendor={async (v) => {
                 if (setVendors) {
                     await setVendors([v]);
                 }
             }}
+            userRole={role}
+            cmsContent={cmsContent}
+            onUpdateCMSContent={handleCMSUpdate}
+            vendors={vendors}
+            setVendors={setVendors}
           />
         );
+      }
 
       case 'SHIPPING': {
         const currentVendor = vendors.find(v => v.email === currentUser?.email);
@@ -777,8 +819,76 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const loggedInVendor = useMemo(() => {
     if (role !== UserRole.VENDOR) return null;
-    return vendors.find(v => v.email === currentUser?.email || v.id === currentUser?.email);
+    return vendors.find(v => v.email?.toLowerCase() === currentUser?.email?.toLowerCase() || v.id === currentUser?.id) || (currentUser as Vendor) || null;
   }, [role, vendors, currentUser]);
+
+  const globalFreeMode = useMemo(() => {
+    return cmsContent?.subscriptionSettings?.isFreeMode ?? cmsContent?.pricing?.isFreeMode ?? false;
+  }, [cmsContent]);
+
+  const isSubscribed = useMemo(() => {
+    if (role === UserRole.ADMIN) return true;
+    if (role === UserRole.BUYER) return true;
+    if (globalFreeMode) return true;
+    return loggedInVendor?.subscriptionStatus === 'ACTIVE' || storefrontForm?.subscriptionStatus === 'ACTIVE';
+  }, [role, loggedInVendor, storefrontForm, globalFreeMode]);
+
+  const lockedVendorTabs = useMemo(() => [
+    'PRODUCTS', 'STOREFRONT', 'ANALYTICS', 'FINANCE', 'MARKETING', 'SHIPPING', 'FOLLOWERS'
+  ], []);
+
+  const renderVendorSubscriptionBanner = () => {
+    if (role !== UserRole.VENDOR) return null;
+    if (isSubscribed) return null;
+
+    return (
+      <div className="mb-6 bg-luxury-black text-white border border-luxury-gold/50 rounded-sm p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 bg-luxury-gold/20 text-luxury-gold rounded-full shrink-0">
+            <Lock size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-serif italic text-base text-luxury-gold">Subscription Required for Full Access</h4>
+              <span className="px-2.5 py-0.5 text-[9px] uppercase tracking-widest font-bold bg-luxury-gold text-black rounded-full">Inactive</span>
+            </div>
+            <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+              Your Atelier subscription is currently inactive. Subscribe to an Atelier plan to activate product publishing, custom storefront design, sales analytics, and payouts.
+            </p>
+          </div>
+        </div>
+        <button 
+          onClick={() => setActiveTab('SUBSCRIPTION')} 
+          className="shrink-0 bg-luxury-gold text-black hover:bg-white px-5 py-2.5 rounded-xs text-xs font-bold uppercase tracking-widest transition-colors shadow-md flex items-center gap-2"
+        >
+          <Sparkles size={14} /> View Plans & Subscribe
+        </button>
+      </div>
+    );
+  };
+
+  const renderSubscriptionLockedState = (tabLabel: string) => (
+    <div className="bg-white border border-gray-100 rounded-sm p-12 text-center max-w-2xl mx-auto my-8 shadow-sm space-y-6 animate-fade-in">
+      <div className="w-16 h-16 bg-luxury-gold/10 text-luxury-gold rounded-full flex items-center justify-center mx-auto">
+        <Lock size={32} />
+      </div>
+      <div className="space-y-2">
+        <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-luxury-gold">Subscription Required</span>
+        <h3 className="text-2xl font-serif italic text-gray-900">Unlock {tabLabel}</h3>
+        <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
+          Full access to {tabLabel.toLowerCase()}, product catalog publishing, custom storefront tools, and payouts requires an active Atelier membership plan.
+        </p>
+      </div>
+      <div className="pt-2 flex flex-col sm:flex-row justify-center gap-4">
+        <button
+          onClick={() => setActiveTab('SUBSCRIPTION')}
+          className="bg-luxury-black text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold hover:text-black transition-colors rounded-xs shadow-md flex items-center justify-center gap-2"
+        >
+          <Sparkles size={14} /> Subscribe & Unlock Access
+        </button>
+      </div>
+    </div>
+  );
 
   const renderVendorApprovalBanner = () => {
     if (role !== UserRole.VENDOR || !loggedInVendor) return null;
@@ -864,6 +974,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="min-h-screen bg-gray-50 pt-20">
        {renderSidebar()}
        <div className={`transition-all duration-300 md:ml-64 p-4 md:p-12`}>
+           {renderVendorSubscriptionBanner()}
            {renderVendorApprovalBanner()}
            {renderContent()}
        </div>

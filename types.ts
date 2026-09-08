@@ -326,18 +326,27 @@ export interface PricingPlan {
   id: string;
   name: string;
   price: string;
+  numericPrice?: number;
   period: string;
   description: string;
   features: string[];
   cta: string;
   highlight: boolean;
+  isFree?: boolean;
 }
 
 export interface PricingPageContent {
   title: string;
   subtitle: string;
   description: string;
+  isFreeMode?: boolean;
   plans: PricingPlan[];
+}
+
+export interface VendorSubscriptionSettings {
+  isFreeMode?: boolean;
+  freeNotice?: string;
+  plans?: PricingPlan[];
 }
 
 export interface ThemeSettings {
@@ -405,4 +414,5 @@ export interface LandingPageContent {
   about: AboutPageContent;
   auth?: AuthPageContent;
   pricing?: PricingPageContent;
+  subscriptionSettings?: VendorSubscriptionSettings;
 }
