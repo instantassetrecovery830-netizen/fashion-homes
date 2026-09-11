@@ -396,11 +396,75 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                                 <p className="text-gray-700 font-mono text-[11px]">Social: {inspectVendor.instagram || 'None'}</p>
                             </div>
 
-                            <div className="bg-amber-50 border border-amber-200 p-3 rounded">
-                                <p className="text-[10px] font-bold uppercase text-amber-900">KYC Verification Check</p>
-                                <p className="text-[11px] text-amber-800 mt-0.5">
-                                    Identity credentials, email domain, and business registration filed under review.
-                                </p>
+                            <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded space-y-3">
+                                <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                                    <div className="flex items-center gap-2">
+                                        <ShieldCheck size={16} className="text-amber-600" />
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-amber-900">Uploaded KYC Verification Dossier</p>
+                                    </div>
+                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded border ${
+                                        inspectVendor.verificationStatus === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                                        inspectVendor.verificationStatus === 'REJECTED' ? 'bg-red-100 text-red-800 border-red-300' :
+                                        'bg-amber-100 text-amber-800 border-amber-300'
+                                    }`}>
+                                        KYC: {inspectVendor.verificationStatus || 'NOT SUBMITTED'}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-gray-700 font-mono">
+                                    <p><strong>Legal Name:</strong> {inspectVendor.kycDocuments?.businessName || inspectVendor.brandName || inspectVendor.name || 'N/A'}</p>
+                                    <p><strong>Reg Number (CAC):</strong> {inspectVendor.kycDocuments?.registrationNumber || 'N/A'}</p>
+                                    <p><strong>Tax ID (TIN):</strong> {inspectVendor.kycDocuments?.taxId || 'N/A'}</p>
+                                    <p><strong>Phone:</strong> {inspectVendor.kycDocuments?.phone || 'N/A'}</p>
+                                    <p className="md:col-span-2"><strong>Address:</strong> {inspectVendor.kycDocuments?.businessAddress || 'N/A'}</p>
+                                </div>
+
+                                <div className="border-t border-amber-500/20 pt-2 text-[11px] text-gray-700 font-mono">
+                                    <p className="font-bold text-[10px] uppercase text-amber-900 mb-1">Bank Payout Info:</p>
+                                    <p><strong>Bank:</strong> {inspectVendor.kycDocuments?.bankName || inspectVendor.bankDetails?.bankName || 'N/A'} | <strong>Acc #:</strong> {inspectVendor.kycDocuments?.accountNumber || inspectVendor.bankDetails?.accountNumber || 'N/A'} | <strong>Name:</strong> {inspectVendor.kycDocuments?.accountName || inspectVendor.bankDetails?.accountName || 'N/A'}</p>
+                                </div>
+
+                                {/* Documents Grid */}
+                                <div className="border-t border-amber-500/20 pt-3">
+                                    <p className="text-[10px] font-bold uppercase text-amber-900 mb-2">Submitted Identification Files & Credentials:</p>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        {[
+                                            { title: 'ID Front', url: inspectVendor.kycDocuments?.idFront },
+                                            { title: 'ID Back', url: inspectVendor.kycDocuments?.idBack },
+                                            { title: 'Proof of Address', url: inspectVendor.kycDocuments?.proofOfAddress },
+                                            { title: 'CAC / Reg Cert', url: inspectVendor.kycDocuments?.businessRegistrationDoc }
+                                        ].map((docItem, idx) => (
+                                            <div key={idx} className="border border-gray-200 bg-white p-2 rounded text-center space-y-1">
+                                                <p className="text-[9px] font-bold uppercase text-gray-700 truncate">{docItem.title}</p>
+                                                {docItem.url ? (
+                                                    <div className="space-y-1">
+                                                        <div className="h-16 bg-gray-100 rounded overflow-hidden border relative group">
+                                                            {docItem.url.startsWith('data:image') || docItem.url.startsWith('http') ? (
+                                                                <img src={docItem.url} alt={docItem.title} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                                    <FileText size={20} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <a
+                                                            href={docItem.url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-block w-full py-0.5 text-[8px] font-bold uppercase bg-black text-white rounded hover:bg-luxury-gold transition-colors"
+                                                        >
+                                                            Open File
+                                                        </a>
+                                                    </div>
+                                                ) : (
+                                                    <div className="h-16 border border-dashed border-gray-300 rounded flex flex-col items-center justify-center text-[9px] text-gray-400 italic">
+                                                        Not Uploaded
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

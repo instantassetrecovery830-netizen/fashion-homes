@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Vendor, KycDocuments, UserRole } from '../../types.ts';
 import { ShieldCheck, Upload, AlertCircle, CheckCircle, FileText, Eye, Building2, CreditCard, User, Clock, X, Check, RefreshCw, AlertTriangle, ArrowRight, Lock, Image as ImageIcon } from 'lucide-react';
 
@@ -23,6 +23,16 @@ export const KycView: React.FC<KycViewProps> = ({ vendor, onUpdateVendor, userRo
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [previewDoc, setPreviewDoc] = useState<{ title: string; url: string } | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState(vendor.kycDocuments?.adminNote || '');
+
+  useEffect(() => {
+    setKycForm(vendor.kycDocuments || {
+      businessName: vendor.brandName || vendor.name || '',
+      bankName: vendor.bankDetails?.bankName || '',
+      accountNumber: vendor.bankDetails?.accountNumber || '',
+      accountName: vendor.bankDetails?.accountName || ''
+    });
+    setAdminNoteInput(vendor.kycDocuments?.adminNote || '');
+  }, [vendor]);
 
   // File Input Refs
   const idFrontRef = useRef<HTMLInputElement>(null);
