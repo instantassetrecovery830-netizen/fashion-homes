@@ -2,13 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { 
   Wallet, Clock, TrendingUp, Activity, Download, CheckCircle, Menu, ArrowUpRight, 
   CreditCard, DollarSign, Percent, ShieldCheck, Filter, Search, ArrowDownRight, 
-  Building, RefreshCw, AlertCircle, FileText, Check, ChevronRight, HelpCircle
+  Building, RefreshCw, AlertCircle, FileText, Check, ChevronRight, HelpCircle,
+  FileCheck, Calendar, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Order, User, Vendor } from '../../types';
 import { useCurrency } from '../../context/CurrencyContext.tsx';
 import { getCommissionRate, getCommissionPercent, getPotentialSavingsMessage } from '../../utils/commission.ts';
+import { generateTaxStatementData, downloadTaxStatementCSV, TaxStatementData } from '../../utils/taxStatement.ts';
 
 interface FinanceViewProps {
   totalRevenue: number;
@@ -40,11 +42,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   // Date Range Filter State
   const [dateRange, setDateRange] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_90_DAYS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'LEDGER' | 'PAYOUTS' | 'BANK_SETTINGS'>('LEDGER');
+  const [activeTab, setActiveTab] = useState<'LEDGER' | 'PAYOUTS' | 'PORTAL' | 'BANK_SETTINGS'>('PORTAL');
 
   // Modals
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
+  const [selectedTaxPeriod, setSelectedTaxPeriod] = useState<string>('FY_2026');
   const [payoutAmountInput, setPayoutAmountInput] = useState('');
   const [payoutMethod, setPayoutMethod] = useState<'BANK_TRANSFER' | 'STRIPE' | 'PAYSTACK'>('BANK_TRANSFER');
   const [payoutSuccessMsg, setPayoutSuccessMsg] = useState<string | null>(null);
@@ -257,6 +261,15 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     document.body.removeChild(link);
   };
 
+  // Generate Current Tax Statement Data
+  const taxStatementData = useMemo(() => {
+    return generateTaxStatementData(myOrders, vendor, selectedTaxPeriod.replace('_', ' '));
+  }, [myOrders, vendor, selectedTaxPeriod]);
+
+  const handleDownloadTaxStatement = () => {
+    downloadTaxStatementCSV(taxStatementData);
+  };
+
   // Submit Payout Request Handler
   const handleRequestPayout = (e: React.FormEvent) => {
     e.preventDefault();
@@ -319,6 +332,15 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <option value="LAST_MONTH">Last Month</option>
             <option value="LAST_90_DAYS">Last 90 Days</option>
           </select>
+
+          {/* Download Tax & Commission Breakdown Statement Button */}
+          <button
+            onClick={() => setIsTaxModalOpen(true)}
+            className="bg-gray-100 text-black border border-gray-200 px-4 py-2.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-black hover:text-white transition-colors shadow-sm"
+            title="Download official tax & commission breakdown statements"
+          >
+            <FileCheck size={15} className="text-luxury-gold" /> <span className="hidden sm:inline">Tax Statement</span>
+          </button>
 
           {/* Export CSV Statement Button */}
           <button 
@@ -512,10 +534,20 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       {/* Main Tab Navigation & Content */}
       <div className="bg-white border border-gray-100 rounded-sm shadow-sm overflow-hidden">
         {/* Navigation Bar */}
-        <div className="flex border-b border-gray-100 bg-gray-50/50">
+        <div className="flex overflow-x-auto border-b border-gray-100 bg-gray-50/50">
+          <button
+            onClick={() => setActiveTab('PORTAL')}
+            className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'PORTAL'
+                ? 'border-black text-black bg-white'
+                : 'border-transparent text-gray-400 hover:text-black'
+            }`}
+          >
+            <Wallet size={14} className="text-luxury-gold" /> Wallet Portal & Withdrawal
+          </button>
           <button
             onClick={() => setActiveTab('LEDGER')}
-            className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
+            className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'LEDGER'
                 ? 'border-black text-black bg-white'
                 : 'border-transparent text-gray-400 hover:text-black'
@@ -525,7 +557,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('PAYOUTS')}
-            className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
+            className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'PAYOUTS'
                 ? 'border-black text-black bg-white'
                 : 'border-transparent text-gray-400 hover:text-black'
@@ -535,7 +567,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('BANK_SETTINGS')}
-            className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
+            className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'BANK_SETTINGS'
                 ? 'border-black text-black bg-white'
                 : 'border-transparent text-gray-400 hover:text-black'
@@ -544,6 +576,266 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <Building size={14} /> Bank & Payment Setup
           </button>
         </div>
+
+        {/* Tab 0: Dedicated Wallet Withdrawal Portal */}
+        {activeTab === 'PORTAL' && (
+          <div className="p-6 md:p-8 space-y-8 bg-gray-50/40">
+            {/* Wallet Portal Summary Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Wallet Main Card */}
+              <div className="lg:col-span-2 bg-gradient-to-br from-black via-gray-900 to-luxury-black text-white p-6 rounded-sm shadow-xl border border-luxury-gold/30 relative overflow-hidden flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs uppercase tracking-widest text-luxury-gold font-bold flex items-center gap-1.5">
+                      <Wallet size={16} /> Vendor Wallet & Disbursal Portal
+                    </span>
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                      Account Status: Verified
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/10">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">Available for Withdrawal</span>
+                      <div className="text-3xl font-serif font-bold text-white">{formatPrice(availableBalance)}</div>
+                      <span className="text-[10px] text-emerald-400 mt-1 block">Cleared & ready for transfer</span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">Pending Clearance</span>
+                      <div className="text-2xl font-serif font-bold text-amber-300">{formatPrice(pendingClearance)}</div>
+                      <span className="text-[10px] text-gray-400 mt-1 block">Under 24h security hold</span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">Total Lifetime Net</span>
+                      <div className="text-2xl font-serif font-bold text-gray-200">{formatPrice(totalLifetimeNet)}</div>
+                      <span className="text-[10px] text-gray-400 mt-1 block">Net after {commissionPercentStr} fee</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Direct Withdrawal Actions */}
+                <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-xs text-gray-300">
+                    <Building size={16} className="text-luxury-gold shrink-0" />
+                    <div>
+                      <span className="block text-[10px] text-gray-400 uppercase font-bold">Disbursement Destination</span>
+                      <span className="font-semibold text-white">{bankInfo.bankName} ({bankInfo.accountNumber.slice(-8)})</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={() => setIsBankModalOpen(true)}
+                      className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold uppercase tracking-wider rounded-xs transition-colors"
+                    >
+                      Update Bank
+                    </button>
+                    <button
+                      onClick={() => setIsPayoutModalOpen(true)}
+                      disabled={availableBalance <= 0}
+                      className={`px-6 py-2.5 text-xs font-bold uppercase tracking-widest rounded-xs flex items-center justify-center gap-2 transition-all shadow-lg ${
+                        availableBalance > 0
+                          ? 'bg-luxury-gold text-black hover:bg-white'
+                          : 'bg-white/10 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      <ArrowUpRight size={16} /> Request Withdrawal
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Withdrawal Portal Widget */}
+              <div className="bg-white p-6 border border-gray-200 rounded-sm shadow-sm space-y-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-black flex items-center gap-1.5">
+                      <Zap size={15} className="text-luxury-gold" /> Instant Withdrawal Quick Select
+                    </h4>
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-2">
+                    Select a quick withdrawal amount or enter custom sum to initiate direct wire disbursal:
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <button
+                      onClick={() => {
+                        setPayoutAmountInput('500');
+                        setIsPayoutModalOpen(true);
+                      }}
+                      disabled={availableBalance < 500}
+                      className="p-2.5 border border-gray-200 rounded-xs text-xs font-bold font-mono text-gray-800 hover:border-black hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-center"
+                    >
+                      $500.00
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPayoutAmountInput('1000');
+                        setIsPayoutModalOpen(true);
+                      }}
+                      disabled={availableBalance < 1000}
+                      className="p-2.5 border border-gray-200 rounded-xs text-xs font-bold font-mono text-gray-800 hover:border-black hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-center"
+                    >
+                      $1,000.00
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPayoutAmountInput('2500');
+                        setIsPayoutModalOpen(true);
+                      }}
+                      disabled={availableBalance < 2500}
+                      className="p-2.5 border border-gray-200 rounded-xs text-xs font-bold font-mono text-gray-800 hover:border-black hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-center"
+                    >
+                      $2,500.00
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPayoutAmountInput(availableBalance.toFixed(2));
+                        setIsPayoutModalOpen(true);
+                      }}
+                      disabled={availableBalance <= 0}
+                      className="p-2.5 bg-black text-luxury-gold border border-black rounded-xs text-xs font-bold uppercase tracking-wider hover:bg-luxury-gold hover:text-black transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-center"
+                    >
+                      Max ({formatPrice(availableBalance)})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-gray-100 text-[11px] text-gray-500 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Minimum Withdrawal:</span>
+                    <strong className="text-black font-mono">$50.00 USD</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Disbursal Fee:</span>
+                    <strong className="text-emerald-600 font-bold uppercase">0% (Waived)</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tier Clearance Time:</span>
+                    <strong className="text-black font-semibold">
+                      {vendor?.subscriptionPlan === 'Maison' ? 'Instant (< 1 hr)' : vendor?.subscriptionPlan === 'Couture' ? '24 Hours' : '48 Hours'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Official Tax & Commission Breakdown Statements Portal */}
+            <div className="bg-white border border-gray-200 rounded-sm p-6 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-black flex items-center gap-2">
+                    <FileCheck size={18} className="text-luxury-gold" /> Downloadable Tax & Commission Statements
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Official platform tax withholding, VAT summaries, and itemized commission breakdown reports for tax compliance.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setIsTaxModalOpen(true)}
+                  className="bg-black text-white hover:bg-luxury-gold hover:text-black px-5 py-2.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors shadow-sm self-start sm:self-auto"
+                >
+                  <FileCheck size={15} /> Open Tax Statement Generator
+                </button>
+              </div>
+
+              {/* Statement Download Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Statement Card 1: FY 2026 Full Year */}
+                <div className="border border-gray-200 p-4 rounded-sm hover:border-black transition-colors bg-gray-50/50 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase font-bold">
+                      <span>Annual Statement</span>
+                      <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[9px]">Verified</span>
+                    </div>
+                    <h5 className="font-bold text-sm text-black mt-1">FY 2026 Full Year Report</h5>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Comprehensive gross sales, VAT output, and {commissionPercentStr} platform fee ledger.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedTaxPeriod('FY_2026');
+                      const data = generateTaxStatementData(myOrders, vendor, 'FY 2026 Full Year');
+                      downloadTaxStatementCSV(data);
+                    }}
+                    className="w-full py-2 bg-white border border-gray-300 text-xs font-bold uppercase tracking-wider text-black hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Download size={13} /> Download Statement
+                  </button>
+                </div>
+
+                {/* Statement Card 2: FY 2026 Q2 */}
+                <div className="border border-gray-200 p-4 rounded-sm hover:border-black transition-colors bg-gray-50/50 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase font-bold">
+                      <span>Quarterly Statement</span>
+                      <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[9px]">Q2 2026</span>
+                    </div>
+                    <h5 className="font-bold text-sm text-black mt-1">Q2 2026 Tax & Fee Report</h5>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Quarterly breakdown statement covering April – June 2026.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedTaxPeriod('Q2_2026');
+                      const data = generateTaxStatementData(myOrders, vendor, 'Q2 2026');
+                      downloadTaxStatementCSV(data);
+                    }}
+                    className="w-full py-2 bg-white border border-gray-300 text-xs font-bold uppercase tracking-wider text-black hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Download size={13} /> Download Statement
+                  </button>
+                </div>
+
+                {/* Statement Card 3: FY 2026 Q1 */}
+                <div className="border border-gray-200 p-4 rounded-sm hover:border-black transition-colors bg-gray-50/50 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase font-bold">
+                      <span>Quarterly Statement</span>
+                      <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[9px]">Q1 2026</span>
+                    </div>
+                    <h5 className="font-bold text-sm text-black mt-1">Q1 2026 Tax & Fee Report</h5>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Quarterly breakdown statement covering January – March 2026.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedTaxPeriod('Q1_2026');
+                      const data = generateTaxStatementData(myOrders, vendor, 'Q1 2026');
+                      downloadTaxStatementCSV(data);
+                    }}
+                    className="w-full py-2 bg-white border border-gray-300 text-xs font-bold uppercase tracking-wider text-black hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Download size={13} /> Download Statement
+                  </button>
+                </div>
+
+                {/* Statement Card 4: All Time Cumulative */}
+                <div className="border border-gray-200 p-4 rounded-sm hover:border-black transition-colors bg-gray-50/50 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase font-bold">
+                      <span>Cumulative Audit</span>
+                      <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-[9px]">All Time</span>
+                    </div>
+                    <h5 className="font-bold text-sm text-black mt-1">Cumulative All-Time Statement</h5>
+                    <p className="text-[11px] text-gray-500 mt-0.5">All historic orders, cumulative commission fees, and total disbursements.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedTaxPeriod('ALL_TIME');
+                      const data = generateTaxStatementData(myOrders, vendor, 'All Time Cumulative');
+                      downloadTaxStatementCSV(data);
+                    }}
+                    className="w-full py-2 bg-white border border-gray-300 text-xs font-bold uppercase tracking-wider text-black hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Download size={13} /> Download Statement
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Search Bar for Ledger */}
         {activeTab === 'LEDGER' && (
@@ -925,6 +1217,156 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Tax & Commission Breakdown Statement Generator Modal */}
+      <AnimatePresence>
+        {isTaxModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-sm shadow-2xl max-w-xl w-full p-6 md:p-8 space-y-6 border border-gray-100 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-luxury-gold block">Official Platform Accounting</span>
+                  <h3 className="text-xl font-serif italic font-bold text-black flex items-center gap-2 mt-0.5">
+                    <FileCheck size={20} className="text-luxury-gold" /> Tax & Commission Statement
+                  </h3>
+                </div>
+                <button onClick={() => setIsTaxModalOpen(false)} className="text-gray-400 hover:text-black font-bold text-xl">×</button>
+              </div>
+
+              {/* Period Selector */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">
+                  Select Tax & Accounting Period
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTaxPeriod('FY_2026')}
+                    className={`p-2 rounded text-xs font-bold uppercase tracking-wider border transition-colors ${
+                      selectedTaxPeriod === 'FY_2026' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    FY 2026 Full
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTaxPeriod('Q2_2026')}
+                    className={`p-2 rounded text-xs font-bold uppercase tracking-wider border transition-colors ${
+                      selectedTaxPeriod === 'Q2_2026' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    Q2 2026
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTaxPeriod('Q1_2026')}
+                    className={`p-2 rounded text-xs font-bold uppercase tracking-wider border transition-colors ${
+                      selectedTaxPeriod === 'Q1_2026' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    Q1 2026
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTaxPeriod('THIS_MONTH')}
+                    className={`p-2 rounded text-xs font-bold uppercase tracking-wider border transition-colors ${
+                      selectedTaxPeriod === 'THIS_MONTH' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    Current Month
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTaxPeriod('ALL_TIME')}
+                    className={`p-2 rounded text-xs font-bold uppercase tracking-wider border transition-colors ${
+                      selectedTaxPeriod === 'ALL_TIME' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    All Time
+                  </button>
+                </div>
+              </div>
+
+              {/* Realtime Statement Document Preview */}
+              <div className="bg-gray-900 text-white p-6 rounded-sm border border-gray-800 space-y-4 font-sans shadow-inner">
+                <div className="flex items-center justify-between border-b border-gray-800 pb-3 text-xs">
+                  <div>
+                    <span className="text-gray-400 text-[10px] uppercase font-bold block">Document Reference</span>
+                    <span className="font-mono text-luxury-gold font-bold">{taxStatementData.statementId}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-400 text-[10px] uppercase font-bold block">Tax ID / VAT Registration</span>
+                    <span className="font-mono text-gray-200">{taxStatementData.taxId}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-gray-400 text-[10px] uppercase font-bold block">Atelier Partner</span>
+                    <span className="font-bold text-white block">{taxStatementData.vendorName}</span>
+                    <span className="text-[10px] text-gray-400">{taxStatementData.vendorEmail}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-400 text-[10px] uppercase font-bold block">Subscription Tier</span>
+                    <span className="font-bold text-luxury-gold block uppercase">{taxStatementData.tier} ({taxStatementData.commissionRateStr} Commission)</span>
+                    <span className="text-[10px] text-gray-400">Total Transactions: {taxStatementData.orderCount}</span>
+                  </div>
+                </div>
+
+                {/* Financial Breakdown Ledger */}
+                <div className="bg-black/80 p-4 rounded border border-gray-800 space-y-2 text-xs font-mono">
+                  <div className="flex justify-between text-gray-300">
+                    <span>Gross Platform Revenue:</span>
+                    <span className="text-white font-bold">{formatPrice(taxStatementData.grossSales)}</span>
+                  </div>
+                  <div className="flex justify-between text-purple-400">
+                    <span>Platform Commission ({taxStatementData.commissionRateStr}):</span>
+                    <span>-{formatPrice(taxStatementData.totalCommission)}</span>
+                  </div>
+                  <div className="flex justify-between text-amber-400 text-[11px] pt-1 border-t border-gray-800">
+                    <span>Est. Output VAT / Tax (5%):</span>
+                    <span>${taxStatementData.estimatedTaxVAT.toFixed(2)} USD</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-400 font-bold pt-2 border-t border-gray-700 text-sm">
+                    <span>Net Disbursable Vendor Earnings:</span>
+                    <span>{formatPrice(taxStatementData.netPayoutAmount)}</span>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-gray-400 italic">
+                  * Generated electronically under MyFitStore Merchant Terms of Service. Verified for accounting & tax reporting compliance.
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsTaxModalOpen(false)}
+                  className="w-full sm:w-1/3 py-2.5 border border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadTaxStatement();
+                    setIsTaxModalOpen(false);
+                  }}
+                  className="w-full sm:w-2/3 py-2.5 bg-black text-white hover:bg-luxury-gold hover:text-black text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 shadow-md"
+                >
+                  <Download size={15} /> Download Official Statement (CSV)
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
