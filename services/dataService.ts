@@ -144,7 +144,7 @@ export const updateProductInDb = async (product: Product) => {
 export const deleteProductFromDb = async (productId: string) => deleteDoc(doc(db, 'products', productId));
 
 export const createVendorInDb = async (vendor: Vendor) => setDoc(doc(db, 'vendors', vendor.id), cleanData(vendor));
-export const updateVendorInDb = async (vendor: Vendor) => updateDoc(doc(db, 'vendors', vendor.id), cleanData(vendor));
+export const updateVendorInDb = async (vendor: Vendor) => setDoc(doc(db, 'vendors', vendor.id), cleanData(vendor), { merge: true });
 export const deleteVendorFromDb = async (vendorId: string) => deleteDoc(doc(db, 'vendors', vendorId));
 
 export const createUserInDb = async (user: User) => setDoc(doc(db, 'users', user.id), cleanData(user));
