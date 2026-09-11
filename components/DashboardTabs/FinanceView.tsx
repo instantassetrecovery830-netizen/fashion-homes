@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Order, User, Vendor } from '../../types';
 import { useCurrency } from '../../context/CurrencyContext.tsx';
+import { getCommissionRate, getCommissionPercent, getPotentialSavingsMessage } from '../../utils/commission.ts';
 
 interface FinanceViewProps {
   totalRevenue: number;
@@ -89,15 +90,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     }
   ]);
 
-  // Commission Rate calculation based on subscription plan
+  // Commission Rate calculation based on vendor active subscription plan (Atelier 15%, Couture 10%, Maison 5%)
   const commissionRate = useMemo(() => {
-    const plan = vendor?.subscriptionPlan || 'BASIC';
-    if (plan === 'Couture' || plan === 'Maison') return 0.10; // 10% Couture/Maison plan
-    if (plan === 'Atelier') return 0.12; // 12% Atelier plan
-    return 0.15; // 15% Standard/BASIC plan
-  }, [vendor]);
+    return getCommissionRate(vendor?.subscriptionPlan);
+  }, [vendor?.subscriptionPlan]);
 
-  const commissionPercentStr = `${(commissionRate * 100).toFixed(0)}%`;
+  const commissionPercentStr = useMemo(() => {
+    return getCommissionPercent(vendor?.subscriptionPlan);
+  }, [vendor?.subscriptionPlan]);
 
   // Date Filter Logic
   const filteredOrders = useMemo(() => {
@@ -170,6 +170,11 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     const balance = totalClearedNet - totalPayoutsRequested;
     return Math.max(0, balance);
   }, [totalLifetimeNet, pendingClearance, totalPayoutsRequested]);
+
+  // Potential Commission Savings if vendor upgrades plan tier
+  const potentialSavings = useMemo(() => {
+    return getPotentialSavingsMessage(grossSales, vendor?.subscriptionPlan);
+  }, [grossSales, vendor?.subscriptionPlan]);
 
   // Chart Data preparation
   const monthlyChartData = useMemo(() => {
@@ -342,6 +347,38 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <span>{payoutSuccessMsg}</span>
           </div>
           <button onClick={() => setPayoutSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900 font-bold">×</button>
+        </motion.div>
+      )}
+
+      {/* Tiered Commission Savings Callout */}
+      {potentialSavings && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-luxury-black via-gray-900 to-black text-white p-4 rounded-sm border border-luxury-gold/30 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md"
+        >
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-luxury-gold/20 text-luxury-gold rounded shrink-0 mt-0.5">
+              <Percent size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-luxury-gold">Tiered Commission Split Insight</span>
+                <span className="text-[9px] bg-luxury-gold/20 text-luxury-gold border border-luxury-gold/30 px-2 py-0.5 rounded font-bold uppercase">
+                  Active Tier: {vendor?.subscriptionPlan || 'Atelier'} ({commissionPercentStr})
+                </span>
+              </div>
+              <p className="text-xs text-gray-300 mt-1 font-medium">
+                {potentialSavings.savingsText}
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 flex items-center gap-2">
+            <div className="text-right hidden sm:block">
+              <span className="text-[10px] uppercase font-bold text-gray-400 block">Commission Rates</span>
+              <span className="text-xs font-mono font-bold text-luxury-gold">Atelier 15% • Couture 10% • Maison 5%</span>
+            </div>
+          </div>
         </motion.div>
       )}
 

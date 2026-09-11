@@ -467,9 +467,9 @@ export const SubscriptionView: React.FC<SubscriptionViewProps> = ({
                                                                     onChange={e => handleChangeVendorTier(v, e.target.value as any)}
                                                                     className="bg-black/60 text-luxury-gold border border-white/20 rounded px-2 py-1 text-[11px] font-bold outline-none cursor-pointer"
                                                                 >
-                                                                    <option value="Atelier" className="bg-black text-white">Atelier</option>
-                                                                    <option value="Couture" className="bg-black text-white">Couture</option>
-                                                                    <option value="Maison" className="bg-black text-white">Maison</option>
+                                                                    <option value="Atelier" className="bg-black text-white">Atelier (15% Commission)</option>
+                                                                    <option value="Couture" className="bg-black text-white">Couture (10% Commission)</option>
+                                                                    <option value="Maison" className="bg-black text-white">Maison (5% Commission)</option>
                                                                 </select>
                                                             </td>
                                                             <td className="p-3">

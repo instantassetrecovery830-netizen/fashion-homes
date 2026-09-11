@@ -219,9 +219,9 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                                                     onChange={e => handleUpdateVendorSubscription(vendor, e.target.value)}
                                                     className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-800 outline-none cursor-pointer focus:border-black"
                                                 >
-                                                    <option value="Atelier">Atelier</option>
-                                                    <option value="Couture">Couture</option>
-                                                    <option value="Maison">Maison</option>
+                                                    <option value="Atelier">Atelier (15% Fee)</option>
+                                                    <option value="Couture">Couture (10% Fee)</option>
+                                                    <option value="Maison">Maison (5% Fee)</option>
                                                 </select>
                                                 
                                                 <button
