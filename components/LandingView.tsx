@@ -1,9 +1,139 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check, ThumbsUp, ChevronLeft, ChevronRight, Play, Pause, LayoutGrid, Image as ImageIcon } from 'lucide-react';
+import { 
+  ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check, ThumbsUp, 
+  ChevronLeft, ChevronRight, Play, Pause, LayoutGrid, Image as ImageIcon,
+  Eye, X, Shirt, ShoppingBag, Maximize2, Sparkle, Layers, Compass
+} from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService.ts';
 import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types.ts';
 import { useCurrency } from '../context/CurrencyContext.tsx';
+
+const SHOWCASE_ITEMS = [
+  // OUTFITS
+  {
+    id: 'outfit-1',
+    title: 'Ankara Avant-Garde Evening Gown',
+    category: 'OUTFIT',
+    subcategory: 'Couture Dresses',
+    designer: 'Ahluwalia Maison',
+    price: 680,
+    image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?q=80&w=1200',
+    tag: 'Haute Couture'
+  },
+  {
+    id: 'outfit-2',
+    title: 'Sculpted Kente & Silk Blazer Set',
+    category: 'OUTFIT',
+    subcategory: 'Tailored Suits',
+    designer: 'Lagos Craft Atelier',
+    price: 520,
+    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200',
+    tag: 'New Collection'
+  },
+  {
+    id: 'outfit-3',
+    title: 'Hand-Embroidered Velvet Agbada',
+    category: 'OUTFIT',
+    subcategory: 'Traditional Ceremonial',
+    designer: 'Kente Royal Vault',
+    price: 750,
+    image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1200',
+    tag: 'Runway Exclusive'
+  },
+  {
+    id: 'outfit-4',
+    title: 'Draped Indigo Ceremonial Caftan',
+    category: 'OUTFIT',
+    subcategory: 'Resort Wear',
+    designer: 'Mali Textile House',
+    price: 490,
+    image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1200',
+    tag: 'Hand-Dyed'
+  },
+  {
+    id: 'outfit-5',
+    title: 'Pan-African Modern Streetwear Suit',
+    category: 'OUTFIT',
+    subcategory: 'Contemporary Streetwear',
+    designer: 'Nairobi Threads',
+    price: 340,
+    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=1200',
+    tag: 'Urban Edition'
+  },
+  {
+    id: 'outfit-6',
+    title: 'Pleated Geometric Silk Maxi Dress',
+    category: 'OUTFIT',
+    subcategory: 'Couture Dresses',
+    designer: 'Accra Atelier',
+    price: 580,
+    image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=1200',
+    tag: 'Editorial Pick'
+  },
+
+  // ACCESSORIES
+  {
+    id: 'acc-1',
+    title: 'Beaded Handcrafted Leather Tote',
+    category: 'ACCESSORIES',
+    subcategory: 'Handbags & Leather',
+    designer: 'Oshun Leathercraft',
+    price: 310,
+    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=1200',
+    tag: 'Artisanal Handwoven'
+  },
+  {
+    id: 'acc-2',
+    title: 'Hammered Brass Royal Cuff Set',
+    category: 'JEWELRY',
+    subcategory: 'Fine Jewelry',
+    designer: 'Benin Bronze Guild',
+    price: 220,
+    image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?q=80&w=1200',
+    tag: 'Hand-Hammered Gold'
+  },
+  {
+    id: 'acc-3',
+    title: 'Handwoven Raffia & Gold Frame Clutch',
+    category: 'BAGS',
+    subcategory: 'Handbags & Leather',
+    designer: 'Cape Town Craft Co.',
+    price: 280,
+    image: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?q=80&w=1200',
+    tag: 'Sustainable Luxury'
+  },
+  {
+    id: 'acc-4',
+    title: 'Royal Gold Filigree Pendant & Drops',
+    category: 'JEWELRY',
+    subcategory: 'Fine Jewelry',
+    designer: 'Ashanti Jewels',
+    price: 390,
+    image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?q=80&w=1200',
+    tag: '18k Gold Plate'
+  },
+  {
+    id: 'acc-5',
+    title: 'Embroidered Artisanal Mule Heels',
+    category: 'FOOTWEAR',
+    subcategory: 'Footwear & Sandals',
+    designer: 'Dakar Soles',
+    price: 360,
+    image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=1200',
+    tag: 'Hand-Stitched Leather'
+  },
+  {
+    id: 'acc-6',
+    title: 'Hand-Dyed Gele Silk Crown Headwrap',
+    category: 'HEADWEAR',
+    subcategory: 'Headwear & Scarves',
+    designer: 'Lagos Headwear Vault',
+    price: 180,
+    image: 'https://images.unsplash.com/photo-1589156280159-27698a70f29e?q=80&w=1200',
+    tag: 'Pure Mulberry Silk'
+  }
+];
 
 interface LandingViewProps {
   onNavigate: (view: ViewState) => void;
@@ -34,6 +164,10 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const [trend, setTrend] = useState<TrendAnalysis | null>(null);
   const [loadingTrend, setLoadingTrend] = useState(false);
   const [scrollY, setScrollY] = useState(0);
+
+  // Showcase state
+  const [showcaseFilter, setShowcaseFilter] = useState<'ALL' | 'OUTFIT' | 'ACCESSORIES' | 'JEWELRY' | 'BAGS' | 'FOOTWEAR'>('ALL');
+  const [inspectModalItem, setInspectModalItem] = useState<{ title: string; image: string; designer: string; category: string; subcategory?: string; price: number; tag: string } | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -526,6 +660,181 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </div>
       </section>
 
+      {/* OUTFITS & ACCESSORIES EDITORIAL SHOWCASE SECTION */}
+      <section className="py-16 md:py-24 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-6">
+          {/* Section Header */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+            <div>
+              <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-luxury-gold mb-2 flex items-center gap-1.5">
+                <Sparkles size={14} /> Curated Lookbook & Atelier Craft
+              </span>
+              <h2 className="text-3xl md:text-5xl font-serif italic text-luxury-black">
+                Outfits & Artisanal Accessories
+              </h2>
+              <p className="text-xs md:text-sm text-gray-500 max-w-xl mt-2">
+                Discover floor-sweeping Ankara gowns, tailored Kente blazers, hand-beaded leather bags, 18k gold cuffed jewelry, and silk headwraps from leading Pan-African ateliers.
+              </p>
+            </div>
+
+            {/* Category Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { id: 'ALL', label: 'All Lookbook', icon: Layers },
+                { id: 'OUTFIT', label: 'Outfits', icon: Shirt },
+                { id: 'ACCESSORIES', label: 'Accessories', icon: ShoppingBag },
+                { id: 'JEWELRY', label: 'Fine Jewelry', icon: Sparkle },
+                { id: 'BAGS', label: 'Bags & Leather', icon: ShoppingBag },
+                { id: 'FOOTWEAR', label: 'Footwear', icon: Compass }
+              ].map(tab => {
+                const Icon = tab.icon;
+                const isActive = showcaseFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setShowcaseFilter(tab.id as any)}
+                    className={`px-3.5 py-2 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
+                      isActive 
+                        ? 'bg-luxury-black text-white shadow-md scale-105' 
+                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
+                    }`}
+                  >
+                    <Icon size={13} /> {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Outfits & Accessories Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {SHOWCASE_ITEMS
+              .filter(item => {
+                if (showcaseFilter === 'ALL') return true;
+                if (showcaseFilter === 'OUTFIT') return item.category === 'OUTFIT';
+                if (showcaseFilter === 'ACCESSORIES') return item.category !== 'OUTFIT';
+                return item.category === showcaseFilter;
+              })
+              .map(item => (
+                <div 
+                  key={item.id} 
+                  className="group bg-gray-50 rounded-xs overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-500 flex flex-col justify-between"
+                >
+                  <div className="relative aspect-[3/4] overflow-hidden bg-gray-200">
+                    <img 
+                      src={item.image} 
+                      alt={item.title} 
+                      className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out" 
+                    />
+                    
+                    {/* Badge */}
+                    <div className="absolute top-3 left-3 bg-luxury-black/90 backdrop-blur-md text-white text-[9px] font-bold px-2.5 py-1 uppercase tracking-widest rounded-xs border border-white/20">
+                      {item.tag}
+                    </div>
+
+                    {/* Quick Hover Actions */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2 p-4">
+                      <button
+                        onClick={() => setInspectModalItem(item)}
+                        className="px-3.5 py-2 bg-white text-black text-[10px] font-bold uppercase tracking-wider rounded-xs flex items-center gap-1.5 shadow-lg hover:bg-luxury-gold hover:text-white transition-colors"
+                        title="Inspect Detail"
+                      >
+                        <Eye size={14} /> Inspect Detail
+                      </button>
+                      <button
+                        onClick={() => onNavigate('MARKETPLACE')}
+                        className="px-3.5 py-2 bg-luxury-black text-white text-[10px] font-bold uppercase tracking-wider rounded-xs flex items-center gap-1.5 shadow-lg hover:bg-luxury-gold transition-colors"
+                      >
+                        <ShoppingBag size={14} /> Shop Look
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-white border-t border-gray-100">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-luxury-gold">
+                        {item.designer}
+                      </span>
+                      <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider">
+                        {item.subcategory}
+                      </span>
+                    </div>
+                    <h3 className="font-serif italic text-sm text-luxury-black font-semibold truncate mb-2">
+                      {item.title}
+                    </h3>
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+                      <span className="text-xs font-bold text-luxury-black">
+                        {formatPrice(item.price)}
+                      </span>
+                      <button 
+                        onClick={() => onNavigate('MARKETPLACE')}
+                        className="text-[10px] font-bold uppercase tracking-wider text-gray-500 hover:text-black flex items-center gap-1 group/btn"
+                      >
+                        View Atelier <ArrowRight size={12} className="group-hover/btn:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+
+          {/* DUAL HERO CATEGORY BANNER (Outfits vs Accessories) */}
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div 
+              onClick={() => onNavigate('MARKETPLACE')}
+              className="relative h-[320px] md:h-[400px] rounded-xs overflow-hidden group cursor-pointer border border-gray-200 shadow-sm hover:shadow-2xl transition-all"
+            >
+              <img 
+                src="https://images.unsplash.com/photo-1566174053879-31528523f8ae?q=80&w=1200" 
+                alt="Haute Outfits Collection" 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              <div className="absolute bottom-8 left-8 right-8 text-white space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-luxury-gold flex items-center gap-1">
+                  <Shirt size={14} /> Haute Outfits & Gowns
+                </span>
+                <h3 className="text-2xl md:text-3xl font-serif italic">Statement Couture Outfits</h3>
+                <p className="text-xs text-gray-300 font-light max-w-md">
+                  Floor-sweeping Ankara evening gowns, structured Kente blazers, and hand-embroidered velvet Agbadas.
+                </p>
+                <div className="pt-2">
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-black text-[10px] font-bold uppercase tracking-widest group-hover:bg-luxury-gold group-hover:text-white transition-colors">
+                    Explore Outfits Collection <ArrowRight size={14} />
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              onClick={() => onNavigate('MARKETPLACE')}
+              className="relative h-[320px] md:h-[400px] rounded-xs overflow-hidden group cursor-pointer border border-gray-200 shadow-sm hover:shadow-2xl transition-all"
+            >
+              <img 
+                src="https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=1200" 
+                alt="Artisanal Accessories Collection" 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              <div className="absolute bottom-8 left-8 right-8 text-white space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-luxury-gold flex items-center gap-1">
+                  <ShoppingBag size={14} /> Artisanal Accessories
+                </span>
+                <h3 className="text-2xl md:text-3xl font-serif italic">Handcrafted Bags & Fine Jewelry</h3>
+                <p className="text-xs text-gray-300 font-light max-w-md">
+                  Beaded leather totes, 18k gold filigree cuffs, handwoven raffia clutches, and pure silk crown headwraps.
+                </p>
+                <div className="pt-2">
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-black text-[10px] font-bold uppercase tracking-widest group-hover:bg-luxury-gold group-hover:text-white transition-colors">
+                    Explore Accessories Collection <ArrowRight size={14} />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Featured Collections Section (If Admin Configured) */}
       {cmsContent?.featuredCollections && cmsContent.featuredCollections.length > 0 && (
         <section className="py-16 bg-white border-b border-gray-100">
@@ -675,6 +984,61 @@ export const LandingView: React.FC<LandingViewProps> = ({
             </div>
           </div>
         </section>
+      )}
+
+      {/* OUTFIT / ACCESSORY DETAIL LIGHTBOX MODAL */}
+      {inspectModalItem && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-fade-in backdrop-blur-xs">
+          <div className="bg-white rounded-sm max-w-2xl w-full overflow-hidden shadow-2xl space-y-0 relative border border-gray-100">
+            <button 
+              onClick={() => setInspectModalItem(null)} 
+              className="absolute top-4 right-4 z-10 p-2 bg-black/70 hover:bg-black text-white rounded-full transition-colors"
+            >
+              <X size={18} />
+            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2">
+              <div className="h-72 md:h-96 bg-gray-100 overflow-hidden relative">
+                <img src={inspectModalItem.image} alt={inspectModalItem.title} className="w-full h-full object-cover" />
+                <span className="absolute bottom-3 left-3 bg-black/80 text-white text-[9px] font-bold px-2.5 py-1 uppercase tracking-wider">
+                  {inspectModalItem.tag}
+                </span>
+              </div>
+              <div className="p-6 flex flex-col justify-between space-y-4">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-luxury-gold block">
+                    {inspectModalItem.designer}
+                  </span>
+                  <h3 className="font-serif italic text-xl font-bold text-luxury-black">
+                    {inspectModalItem.title}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Category: <strong>{inspectModalItem.subcategory}</strong> ({inspectModalItem.category})
+                  </p>
+                  <p className="text-xl font-bold text-luxury-black pt-2">
+                    {formatPrice(inspectModalItem.price)}
+                  </p>
+                </div>
+                <div className="space-y-2 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={() => {
+                      setInspectModalItem(null);
+                      onNavigate('MARKETPLACE');
+                    }}
+                    className="w-full py-3 bg-luxury-black text-white text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ShoppingBag size={14} /> Shop in Marketplace
+                  </button>
+                  <button
+                    onClick={() => setInspectModalItem(null)}
+                    className="w-full py-2 bg-gray-100 text-gray-700 text-xs font-bold uppercase tracking-wider hover:bg-gray-200 transition-colors"
+                  >
+                    Close Inspection
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

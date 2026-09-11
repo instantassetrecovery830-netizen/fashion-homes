@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { BadgeCheck, FileText, CreditCard, Menu, Loader, Check, X, ShieldCheck, Sparkles, Lock, Settings, DollarSign, ToggleLeft, ToggleRight, Save, RefreshCw, Search } from 'lucide-react';
+import { BadgeCheck, FileText, CreditCard, Menu, Loader, Check, X, ShieldCheck, Sparkles, Lock, Settings, DollarSign, ToggleLeft, ToggleRight, Save, RefreshCw, Search, ArrowRight, Zap, Award, Percent, Calendar, CheckCircle2, ChevronRight } from 'lucide-react';
 import { Vendor, UserRole, LandingPageContent, PricingPlan } from '../../types.ts';
 import { useCurrency } from '../../context/CurrencyContext.tsx';
 // @ts-ignore
@@ -22,24 +21,33 @@ const DEFAULT_PLANS = [
         id: 'ATELIER',
         name: 'Atelier',
         price: 0,
-        features: ['Up to 20 monthly uploads', 'Standard analytics', 'Basic storefront', '15% commission'],
-        color: 'bg-gray-100',
+        commission: '15%',
+        commissionValue: 0.15,
+        features: ['Up to 20 monthly uploads', 'Standard analytics dashboard', 'Basic digital storefront', '15% platform commission', 'Email customer support'],
+        color: 'border-gray-200 bg-gray-50/50',
+        badgeColor: 'bg-gray-200 text-gray-800',
         isFree: true
     },
     {
         id: 'COUTURE',
         name: 'Couture',
         price: 99,
-        features: ['Unlimited uploads', 'Advanced analytics', 'Custom domain support', '10% commission', 'Priority support'],
-        color: 'bg-luxury-gold',
+        commission: '10%',
+        commissionValue: 0.10,
+        features: ['Unlimited monthly uploads', 'Advanced sales analytics & reports', 'Custom domain support', '10% platform commission', 'Priority support & fast payouts', 'Featured in "New Arrivals" feed'],
+        color: 'border-luxury-gold bg-amber-50/20 ring-1 ring-luxury-gold/30',
+        badgeColor: 'bg-luxury-gold text-white',
         isFree: false
     },
     {
         id: 'MAISON',
         name: 'Maison',
         price: 299,
-        features: ['White-glove logistics', 'Priority placement', '5% commission', 'Dedicated account manager', 'Early access to drops'],
-        color: 'bg-luxury-black',
+        commission: '5%',
+        commissionValue: 0.05,
+        features: ['White-glove logistics & fulfillment', 'Top-tier placement in "The Drop"', '5% platform commission', 'Dedicated account manager', 'Early access to drops & pop-ups', 'Custom brand store styling'],
+        color: 'border-luxury-black bg-black/5 ring-1 ring-black/20',
+        badgeColor: 'bg-black text-white',
         isFree: false
     }
 ];
@@ -59,7 +67,125 @@ export const SubscriptionView: React.FC<SubscriptionViewProps> = ({
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSavingAdmin, setIsSavingAdmin] = useState(false);
     const [adminMsg, setAdminMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [vendorMsg, setVendorMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [vendorSearch, setVendorSearch] = useState('');
+    const [autoRenew, setAutoRenew] = useState(true);
+    const [estMonthlySales, setEstMonthlySales] = useState<number>(10000);
+
+    // Read global free mode setting
+    const globalFreeMode = useMemo(() => {
+        return cmsContent?.subscriptionSettings?.isFreeMode ?? cmsContent?.pricing?.isFreeMode ?? false;
+    }, [cmsContent]);
+
+    // Active plans computed from CMS or Defaults
+    const activePlans = useMemo(() => {
+        const cmsPlans = cmsContent?.subscriptionSettings?.plans || cmsContent?.pricing?.plans;
+        if (cmsPlans && cmsPlans.length > 0) {
+            return cmsPlans.map(p => {
+                const numPrice = p.numericPrice !== undefined ? p.numericPrice : (parseFloat((p.price || '0').replace(/[^0-9.]/g, '')) || 0);
+                const idUpper = p.id?.toUpperCase() || p.name.toUpperCase();
+                const defaultMatch = DEFAULT_PLANS.find(dp => dp.id === idUpper || dp.name.toUpperCase() === p.name.toUpperCase());
+                return {
+                    id: p.id?.toUpperCase() || p.name.toUpperCase(),
+                    name: p.name,
+                    price: globalFreeMode ? 0 : (p.isFree ? 0 : numPrice),
+                    originalPrice: numPrice,
+                    commission: defaultMatch ? defaultMatch.commission : (idUpper.includes('MAISON') ? '5%' : idUpper.includes('COUTURE') ? '10%' : '15%'),
+                    commissionValue: defaultMatch ? defaultMatch.commissionValue : (idUpper.includes('MAISON') ? 0.05 : idUpper.includes('COUTURE') ? 0.10 : 0.15),
+                    features: p.features || [],
+                    isFree: globalFreeMode || p.isFree || numPrice === 0,
+                    period: p.period || '/ month',
+                    color: defaultMatch ? defaultMatch.color : 'border-gray-200 bg-white',
+                    badgeColor: defaultMatch ? defaultMatch.badgeColor : 'bg-luxury-gold text-white'
+                };
+            });
+        }
+        return DEFAULT_PLANS.map(p => ({
+            ...p,
+            price: globalFreeMode ? 0 : p.price,
+            originalPrice: p.price,
+            isFree: globalFreeMode || p.price === 0,
+            period: '/ month'
+        }));
+    }, [cmsContent, globalFreeMode]);
+
+    // Current active vendor plan object
+    const currentPlanName = storefrontForm?.subscriptionPlan || 'Atelier';
+    const currentPlanObj = useMemo(() => {
+        const found = activePlans.find(p => p.name.toLowerCase() === currentPlanName.toLowerCase() || p.id.toLowerCase() === currentPlanName.toLowerCase());
+        return found || activePlans[0];
+    }, [activePlans, currentPlanName]);
+
+    // Admin state for editing plans
+    const [adminFreeMode, setAdminFreeMode] = useState<boolean>(globalFreeMode);
+    const [adminPlans, setAdminPlans] = useState<Array<{ id: string; name: string; price: number; isFree: boolean; features: string[] }>>([
+        { id: 'ATELIER', name: 'Atelier', price: 0, isFree: true, features: ['Up to 20 monthly uploads', 'Standard analytics', 'Basic storefront', '15% commission'] },
+        { id: 'COUTURE', name: 'Couture', price: 99, isFree: false, features: ['Unlimited uploads', 'Advanced analytics', '10% commission', 'Priority support'] },
+        { id: 'MAISON', name: 'Maison', price: 299, isFree: false, features: ['White-glove logistics', 'Priority placement', '5% commission', 'Dedicated account manager'] }
+    ]);
+
+    // Sync admin state when cmsContent updates
+    useEffect(() => {
+        if (cmsContent) {
+            setAdminFreeMode(cmsContent.subscriptionSettings?.isFreeMode ?? cmsContent.pricing?.isFreeMode ?? false);
+            const cmsPlans = cmsContent.subscriptionSettings?.plans || cmsContent.pricing?.plans;
+            if (cmsPlans && cmsPlans.length > 0) {
+                setAdminPlans(cmsPlans.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    price: p.numericPrice !== undefined ? p.numericPrice : (parseFloat((p.price || '0').replace(/[^0-9.]/g, '')) || 0),
+                    isFree: p.isFree || false,
+                    features: p.features || []
+                })));
+            }
+        }
+    }, [cmsContent]);
+
+    const [selectedPlan, setSelectedPlan] = useState<typeof activePlans[0] | null>(currentPlanObj);
+
+    // Save Admin settings to Firestore via onUpdateCMSContent
+    const handleSaveAdminSettings = async () => {
+        if (!onUpdateCMSContent) return;
+        setIsSavingAdmin(true);
+        setAdminMsg(null);
+        try {
+            const updatedPricingPlans: PricingPlan[] = adminPlans.map(p => ({
+                id: p.id,
+                name: p.name,
+                price: p.isFree || adminFreeMode ? '$0' : `$${p.price}`,
+                numericPrice: p.price,
+                period: '/ month',
+                description: p.isFree ? 'Free tier access' : 'Full atelier privilege',
+                features: p.features,
+                cta: p.isFree || adminFreeMode ? 'Activate Free' : 'Subscribe',
+                highlight: p.id === 'COUTURE',
+                isFree: p.isFree
+            }));
+
+            if (!cmsContent) return;
+
+            const updatedContent: LandingPageContent = {
+                ...cmsContent,
+                pricing: {
+                  ...(cmsContent.pricing || { title: 'Unlock Privilege', subtitle: 'Atelier Membership', description: 'Select your tier', plans: [] }),
+                  isFreeMode: adminFreeMode,
+                  plans: updatedPricingPlans
+                },
+                subscriptionSettings: {
+                    isFreeMode: adminFreeMode,
+                    plans: updatedPricingPlans
+                }
+            };
+
+            await onUpdateCMSContent(updatedContent);
+            setAdminMsg({ type: 'success', text: '🎉 Subscription prices and free mode settings updated successfully!' });
+        } catch (e: any) {
+            console.error("Error saving subscription settings:", e);
+            setAdminMsg({ type: 'error', text: 'Failed to update settings: ' + e.message });
+        } finally {
+            setIsSavingAdmin(false);
+        }
+    };
 
     const handleGrantAllAccess = async () => {
         if (!setVendors || vendors.length === 0) return;
@@ -109,109 +235,7 @@ export const SubscriptionView: React.FC<SubscriptionViewProps> = ({
         }
     };
 
-    // Read global free mode setting
-    const globalFreeMode = useMemo(() => {
-        return cmsContent?.subscriptionSettings?.isFreeMode ?? cmsContent?.pricing?.isFreeMode ?? false;
-    }, [cmsContent]);
-
-    // Active plans computed from CMS or Defaults
-    const activePlans = useMemo(() => {
-        const cmsPlans = cmsContent?.subscriptionSettings?.plans || cmsContent?.pricing?.plans;
-        if (cmsPlans && cmsPlans.length > 0) {
-            return cmsPlans.map(p => {
-                const numPrice = p.numericPrice !== undefined ? p.numericPrice : (parseFloat((p.price || '0').replace(/[^0-9.]/g, '')) || 0);
-                return {
-                    id: p.id?.toUpperCase() || p.name.toUpperCase(),
-                    name: p.name,
-                    price: globalFreeMode ? 0 : (p.isFree ? 0 : numPrice),
-                    originalPrice: numPrice,
-                    features: p.features || [],
-                    isFree: globalFreeMode || p.isFree || numPrice === 0,
-                    period: p.period || '/ month'
-                };
-            });
-        }
-        return DEFAULT_PLANS.map(p => ({
-            ...p,
-            price: globalFreeMode ? 0 : p.price,
-            originalPrice: p.price,
-            isFree: globalFreeMode || p.price === 0,
-            period: '/ month'
-        }));
-    }, [cmsContent, globalFreeMode]);
-
-    // Admin state for editing plans
-    const [adminFreeMode, setAdminFreeMode] = useState<boolean>(globalFreeMode);
-    const [adminPlans, setAdminPlans] = useState<Array<{ id: string; name: string; price: number; isFree: boolean; features: string[] }>>([
-        { id: 'ATELIER', name: 'Atelier', price: 0, isFree: true, features: ['Up to 20 monthly uploads', 'Standard analytics', 'Basic storefront'] },
-        { id: 'COUTURE', name: 'Couture', price: 99, isFree: false, features: ['Unlimited uploads', 'Advanced analytics', '10% commission', 'Priority support'] },
-        { id: 'MAISON', name: 'Maison', price: 299, isFree: false, features: ['White-glove logistics', 'Priority placement', '5% commission', 'Dedicated account manager'] }
-    ]);
-
-    // Sync admin state when cmsContent updates
-    useEffect(() => {
-        if (cmsContent) {
-            setAdminFreeMode(cmsContent.subscriptionSettings?.isFreeMode ?? cmsContent.pricing?.isFreeMode ?? false);
-            const cmsPlans = cmsContent.subscriptionSettings?.plans || cmsContent.pricing?.plans;
-            if (cmsPlans && cmsPlans.length > 0) {
-                setAdminPlans(cmsPlans.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    price: p.numericPrice !== undefined ? p.numericPrice : (parseFloat((p.price || '0').replace(/[^0-9.]/g, '')) || 0),
-                    isFree: p.isFree || false,
-                    features: p.features || []
-                })));
-            }
-        }
-    }, [cmsContent]);
-
-    const [selectedPlan, setSelectedPlan] = useState<typeof activePlans[0] | null>(null);
-
-    // Save Admin settings to Firestore via onUpdateCMSContent
-    const handleSaveAdminSettings = async () => {
-        if (!onUpdateCMSContent) return;
-        setIsSavingAdmin(true);
-        setAdminMsg(null);
-        try {
-            const updatedPricingPlans: PricingPlan[] = adminPlans.map(p => ({
-                id: p.id,
-                name: p.name,
-                price: p.isFree || adminFreeMode ? '$0' : `$${p.price}`,
-                numericPrice: p.price,
-                period: '/ month',
-                description: p.isFree ? 'Free tier access' : 'Full atelier privilege',
-                features: p.features,
-                cta: p.isFree || adminFreeMode ? 'Activate Free' : 'Subscribe',
-                highlight: p.id === 'COUTURE',
-                isFree: p.isFree
-            }));
-
-            if (!cmsContent) return;
-
-            const updatedContent: LandingPageContent = {
-                ...cmsContent,
-                pricing: {
-                  ...(cmsContent.pricing || { title: 'Unlock Privilege', subtitle: 'Atelier Membership', description: 'Select your tier', plans: [] }),
-                  isFreeMode: adminFreeMode,
-                  plans: updatedPricingPlans
-                },
-                subscriptionSettings: {
-                    isFreeMode: adminFreeMode,
-                    plans: updatedPricingPlans
-                }
-            };
-
-            await onUpdateCMSContent(updatedContent);
-            setAdminMsg({ type: 'success', text: '🎉 Subscription prices and free mode settings updated successfully!' });
-        } catch (e: any) {
-            console.error("Error saving subscription settings:", e);
-            setAdminMsg({ type: 'error', text: 'Failed to update settings: ' + e.message });
-        } finally {
-            setIsSavingAdmin(false);
-        }
-    };
-
-    // Paystack Public Key (Placeholder)
+    // Paystack Public Key
     const PAYSTACK_PUBLIC_KEY = "pk_test_placeholder_123456789";
 
     const paystackConfig = useMemo(() => ({
@@ -223,35 +247,38 @@ export const SubscriptionView: React.FC<SubscriptionViewProps> = ({
     // @ts-ignore
     const initializePayment = usePaystackPayment(paystackConfig);
 
+    const handleDirectPlanSelect = async (targetPlan: typeof activePlans[0]) => {
+        if (!storefrontForm || !onUpdateVendor) return;
+        setIsProcessing(true);
+        setVendorMsg(null);
+        try {
+            const updatedVendor: Vendor = {
+                ...storefrontForm,
+                subscriptionPlan: targetPlan.name as any,
+                subscriptionStatus: 'ACTIVE'
+            };
+            await onUpdateVendor(updatedVendor);
+            setVendorMsg({ type: 'success', text: `🎉 Successfully updated subscription plan to ${targetPlan.name}!` });
+            setSelectedPlan(targetPlan);
+        } catch (e: any) {
+            setVendorMsg({ type: 'error', text: 'Failed to update subscription plan: ' + e.message });
+        } finally {
+            setIsProcessing(false);
+            setIsUpgradeModalOpen(false);
+        }
+    };
+
     const handleUpgrade = useCallback(async () => {
         if (!selectedPlan || !storefrontForm) return;
 
         if (selectedPlan.price === 0 || globalFreeMode) {
-            // Free plan or global free mode active
-            if (onUpdateVendor) {
-                await onUpdateVendor({
-                    ...storefrontForm,
-                    subscriptionPlan: selectedPlan.id as any,
-                    subscriptionStatus: 'ACTIVE'
-                });
-            }
-            setIsUpgradeModalOpen(false);
-            alert(`🎉 Membership Activated! Your Atelier is now subscribed to the ${selectedPlan.name} plan at $0 / Free.`);
+            await handleDirectPlanSelect(selectedPlan);
             return;
         }
 
         setIsProcessing(true);
-        const onSuccess = async (reference?: any) => {
-            if (onUpdateVendor) {
-                await onUpdateVendor({
-                    ...storefrontForm,
-                    subscriptionPlan: selectedPlan.id as any,
-                    subscriptionStatus: 'ACTIVE'
-                });
-            }
-            setIsUpgradeModalOpen(false);
-            setIsProcessing(false);
-            alert(`🎉 Membership Activated! You have successfully subscribed to the ${selectedPlan.name} plan. All vendor features, product uploads, and analytics are now fully unlocked.`);
+        const onSuccess = async () => {
+            await handleDirectPlanSelect(selectedPlan);
         };
         
         const onClose = () => {
@@ -262,29 +289,54 @@ export const SubscriptionView: React.FC<SubscriptionViewProps> = ({
             // @ts-ignore
             initializePayment(onSuccess, onClose);
         } catch (e) {
-            // Fallback for preview/testing environment when Paystack SDK key is placeholder
-            console.warn("Paystack SDK popup unavailable in sandbox mode, activating directly:", e);
+            // Sandbox fallback
+            console.warn("Paystack SDK popup preview mode fallback:", e);
             setTimeout(() => {
-                onSuccess({ reference: 'SUB_' + Date.now() });
-            }, 800);
+                onSuccess();
+            }, 600);
         }
-    }, [selectedPlan, storefrontForm, onUpdateVendor, initializePayment, globalFreeMode]);
+    }, [selectedPlan, storefrontForm, globalFreeMode, handleDirectPlanSelect, initializePayment]);
 
     return (
-        <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-7xl">
-            <div className="flex items-center justify-between">
+        <div className="space-y-8 animate-fade-in pb-20 md:pb-8 max-w-7xl mx-auto">
+            {/* Header Title */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 md:p-8 rounded-sm shadow-xs border border-gray-100">
                 <div>
-                    <h2 className="text-3xl font-serif italic">Membership & Plan</h2>
-                    {globalFreeMode && (
-                        <p className="text-xs text-emerald-600 font-bold uppercase tracking-widest mt-1 flex items-center gap-1">
-                            <Sparkles size={12} /> Global Free Subscriptions Enabled by Admin
-                        </p>
-                    )}
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-2xl md:text-3xl font-serif italic">Subscription Plan & Management</h2>
+                        {globalFreeMode && (
+                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full flex items-center gap-1">
+                                <Sparkles size={12} /> Global Free Mode
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                        Manage your active vendor subscription tier, tier privileges, platform commission fees, and automated billing options.
+                    </p>
                 </div>
-                <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
+
+                {storefrontForm && (
+                    <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-sm border border-gray-200">
+                        <div className="text-right">
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Active Plan Tier</span>
+                            <span className="text-base font-serif italic text-luxury-black font-bold">{currentPlanObj.name}</span>
+                        </div>
+                        <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                            <CheckCircle2 size={12} /> {storefrontForm.subscriptionStatus || 'Active'}
+                        </span>
+                    </div>
+                )}
+
+                <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm self-start">
                     <Menu size={20} />
                 </button>
             </div>
+
+            {vendorMsg && (
+                <div className={`p-4 rounded-sm text-xs font-bold transition-all ${vendorMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                    {vendorMsg.text}
+                </div>
+            )}
 
             {/* ADMIN CONTROL PANEL */}
             {userRole === UserRole.ADMIN && (
@@ -354,7 +406,7 @@ export const SubscriptionView: React.FC<SubscriptionViewProps> = ({
                                                 updated[idx].name = e.target.value;
                                                 setAdminPlans(updated);
                                             }}
-                                            className="bg-transparent text-sm font-bold border-b border-white/20 focus:border-luxury-gold outline-none w-2/3"
+                                            className="bg-transparent text-sm font-bold border-b border-white/20 focus:border-luxury-gold outline-none w-2/3 text-white"
                                         />
                                         <span className="text-[10px] text-luxury-gold font-mono uppercase">{plan.id}</span>
                                     </div>
@@ -507,43 +559,217 @@ export const SubscriptionView: React.FC<SubscriptionViewProps> = ({
                 </div>
             )}
 
-            {/* Vendor Current Plan & Details */}
+            {/* VENDOR SUBSCRIPTION PLAN COMPARISON GRID (INTERACTIVE SELECTION & SWITCHING) */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-serif italic text-luxury-black">Select or Upgrade Subscription Tier</h3>
+                        <p className="text-xs text-gray-500">Choose the tier that best matches your atelier volume and commission needs.</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {activePlans.map((plan) => {
+                        const isCurrent = currentPlanObj.name.toLowerCase() === plan.name.toLowerCase() || currentPlanObj.id.toLowerCase() === plan.id.toLowerCase();
+                        return (
+                            <div 
+                                key={plan.id}
+                                className={`bg-white rounded-sm p-6 border shadow-xs transition-all flex flex-col justify-between relative ${isCurrent ? 'border-luxury-gold ring-2 ring-luxury-gold/40 shadow-md bg-amber-50/10' : 'border-gray-200 hover:border-gray-400'}`}
+                            >
+                                {isCurrent && (
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-luxury-gold text-white text-[9px] font-bold uppercase tracking-widest px-3 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                                        <BadgeCheck size={12} /> Current Active Tier
+                                    </div>
+                                )}
+
+                                <div>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h4 className="text-xl font-serif italic font-bold text-luxury-black">{plan.name}</h4>
+                                            <p className="text-[11px] text-gray-500 uppercase tracking-widest mt-0.5 font-bold">
+                                                Platform Split: <span className="text-luxury-gold font-mono">{plan.commission}</span>
+                                            </p>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest ${plan.badgeColor}`}>
+                                            {plan.id}
+                                        </span>
+                                    </div>
+
+                                    <div className="my-6 border-y border-gray-100 py-4 flex items-baseline justify-between">
+                                        <div>
+                                            <span className="text-3xl font-bold text-luxury-black font-serif">
+                                                {plan.isFree || globalFreeMode ? '$0' : formatPrice(plan.price)}
+                                            </span>
+                                            <span className="text-[11px] text-gray-400 uppercase tracking-widest ml-1">{plan.period}</span>
+                                        </div>
+                                        {globalFreeMode && (
+                                            <span className="text-[10px] text-emerald-600 font-bold uppercase">100% Free Mode</span>
+                                        )}
+                                    </div>
+
+                                    <ul className="space-y-2.5 mb-6 text-xs text-gray-600">
+                                        {plan.features.map((feat, idx) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                                <Check size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                                                <span>{feat}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-100">
+                                    {isCurrent ? (
+                                        <button 
+                                            disabled 
+                                            className="w-full py-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xs text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 cursor-default"
+                                        >
+                                            <CheckCircle2 size={14} /> Active Plan
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleDirectPlanSelect(plan)}
+                                            disabled={isProcessing}
+                                            className="w-full py-3 bg-luxury-black text-white hover:bg-luxury-gold transition-colors rounded-xs text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 shadow-xs disabled:opacity-50"
+                                        >
+                                            {isProcessing ? <Loader className="animate-spin" size={14} /> : <>Switch to {plan.name} Plan <ChevronRight size={14} /></>}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* TIER COMMISSION SAVINGS CALCULATOR */}
+            <div className="bg-white p-6 md:p-8 rounded-sm shadow-xs border border-gray-100 space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                    <div>
+                        <h3 className="text-lg font-serif italic text-luxury-black flex items-center gap-2">
+                            <Percent size={18} className="text-luxury-gold" /> Tier Commission & Profit Savings Calculator
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                            See how upgrading your subscription tier lowers platform fees and increases your take-home payouts.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded border border-gray-200">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Est. Monthly Sales ($):</label>
+                        <input
+                            type="number"
+                            step="1000"
+                            min="1000"
+                            value={estMonthlySales}
+                            onChange={(e) => setEstMonthlySales(Math.max(0, Number(e.target.value)))}
+                            className="w-28 bg-white border border-gray-300 rounded px-3 py-1 text-sm font-bold text-luxury-black outline-none focus:border-luxury-gold"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {activePlans.map((p) => {
+                        const feeAmount = estMonthlySales * p.commissionValue;
+                        const planCost = globalFreeMode ? 0 : p.price;
+                        const netTakeHome = estMonthlySales - feeAmount - planCost;
+                        const baselineTakeHome = estMonthlySales - (estMonthlySales * 0.15); // Atelier baseline
+                        const extraSaved = netTakeHome - baselineTakeHome;
+
+                        return (
+                            <div key={p.id} className="p-4 bg-gray-50 rounded border border-gray-200 space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-serif italic font-bold text-sm">{p.name} ({p.commission} Fee)</span>
+                                    <span className="text-[10px] font-mono font-bold text-gray-500">${planCost}/mo plan</span>
+                                </div>
+                                <div className="space-y-1 text-xs">
+                                    <div className="flex justify-between text-gray-500">
+                                        <span>Platform Fee ({p.commission}):</span>
+                                        <span className="font-mono text-red-600">-${feeAmount.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-500">
+                                        <span>Subscription Fee:</span>
+                                        <span className="font-mono text-gray-600">-${planCost.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold text-luxury-black pt-2 border-t border-gray-200">
+                                        <span>Net Payout Take-Home:</span>
+                                        <span className="font-mono text-emerald-700">${netTakeHome.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                                {extraSaved > 0 && (
+                                    <div className="bg-emerald-100 text-emerald-800 text-[10px] font-bold p-2 rounded text-center uppercase tracking-wide">
+                                        🎉 Saves +${extraSaved.toLocaleString()}/mo vs Atelier Tier!
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* VENDOR CURRENT BILLING & PAYMENT MANAGEMENT */}
             {storefrontForm && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm md:col-span-2">
-                        <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
-                            <BadgeCheck size={14} /> Current Status
+                    <div className="bg-white p-6 md:p-8 border border-gray-100 rounded-sm shadow-xs md:col-span-2 space-y-6">
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                            <BadgeCheck size={14} /> Subscription Status & Renewal Management
                         </h3>
-                        <div className="flex items-center justify-between p-6 bg-gray-50 rounded-sm mb-6">
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 bg-gray-50 rounded-sm border border-gray-200">
                             <div>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Current Plan</p>
-                                <p className="text-2xl font-serif italic">{storefrontForm.subscriptionPlan || 'Atelier'}</p>
+                                <p className="text-xs text-gray-500 uppercase tracking-wide">Current Active Plan</p>
+                                <p className="text-2xl font-serif italic text-luxury-black">{currentPlanObj.name}</p>
+                                <p className="text-xs text-gray-400 mt-1">Platform split: <strong className="text-luxury-black font-mono">{currentPlanObj.commission}</strong></p>
                             </div>
-                            <div className="text-right">
-                                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${storefrontForm.subscriptionStatus === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                                    {storefrontForm.subscriptionStatus || 'Inactive'}
+
+                            <div className="text-left sm:text-right space-y-2">
+                                <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${storefrontForm.subscriptionStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                    {storefrontForm.subscriptionStatus || 'Active'}
                                 </span>
-                                <p className="text-[10px] text-gray-400 mt-2">{globalFreeMode ? 'Free Access Active' : 'Renews automatically'}</p>
+                                <div className="text-[11px] text-gray-500 flex items-center gap-1 sm:justify-end">
+                                    <Calendar size={12} /> Next Renewal: <strong className="text-luxury-black">Oct 15, 2026</strong>
+                                </div>
                             </div>
                         </div>
-                        
-                        <div className="space-y-4">
-                            <h4 className="text-sm font-bold uppercase tracking-wide">Billing History</h4>
-                            <div className="border border-gray-100 rounded-sm overflow-hidden">
-                                {[1, 2].map(i => (
-                                    <div key={i} className="flex justify-between items-center p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+
+                        {/* Auto Renewal Toggle */}
+                        <div className="p-4 bg-gray-50 rounded border border-gray-200 flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-bold text-luxury-black uppercase tracking-wide">Auto-Renew Subscription</p>
+                                <p className="text-[11px] text-gray-500">Automatically renew your plan each month to maintain tier privileges.</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setAutoRenew(!autoRenew);
+                                    setVendorMsg({ type: 'success', text: `Auto-renewal ${!autoRenew ? 'enabled' : 'disabled'} for your subscription.` });
+                                }}
+                                className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 ${autoRenew ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                            >
+                                {autoRenew ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                                {autoRenew ? 'Auto-Renew: ON' : 'Auto-Renew: OFF'}
+                            </button>
+                        </div>
+
+                        {/* Invoice & Tax Receipts */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wide text-gray-700">Billing History & Tax Statements</h4>
+                            <div className="border border-gray-200 rounded-sm overflow-hidden divide-y divide-gray-100">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="flex justify-between items-center p-4 hover:bg-gray-50 transition-colors text-xs">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
+                                            <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600">
                                                 <FileText size={14} />
                                             </div>
                                             <div>
-                                                <p className="text-xs font-bold">Invoice #{2024000 + i}</p>
-                                                <p className="text-[10px] text-gray-400">Oct {10 - i}, 2024</p>
+                                                <p className="font-bold text-luxury-black">Statement & Invoice #{2026000 + i}</p>
+                                                <p className="text-[10px] text-gray-400">Sep {15 - i * 4}, 2026 • {currentPlanObj.name} Tier</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4">
-                                            <span className="text-sm font-medium">{globalFreeMode ? '$0.00 (Free)' : '$165.00'}</span>
-                                            <button className="text-[10px] uppercase font-bold text-luxury-gold hover:underline">Download</button>
+                                            <span className="font-medium text-gray-700">{globalFreeMode ? '$0.00 (Free)' : `$${currentPlanObj.price}.00`}</span>
+                                            <button 
+                                                onClick={() => alert(`Downloading Invoice #${2026000 + i} PDF / CSV...`)}
+                                                className="text-[10px] uppercase font-bold text-luxury-gold hover:underline"
+                                            >
+                                                Download
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
@@ -551,123 +777,39 @@ export const SubscriptionView: React.FC<SubscriptionViewProps> = ({
                         </div>
                     </div>
 
-                    <div className="bg-white p-8 border border-gray-100 rounded-sm shadow-sm">
-                        <h3 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2 text-gray-400">
+                    {/* Payment Method Card */}
+                    <div className="bg-white p-6 md:p-8 border border-gray-100 rounded-sm shadow-xs space-y-6">
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
                             <CreditCard size={14} /> Payment Method
                         </h3>
-                        <div className="flex items-center gap-3 p-4 border border-gray-200 rounded-sm mb-4">
-                            <div className="w-10 h-6 bg-blue-900 rounded-sm flex items-center justify-center text-[8px] text-white font-bold">VISA</div> 
-                            <div>
-                                <p className="text-xs font-bold">•••• 4242</p>
-                                <p className="text-[10px] text-gray-400">Expires 12/28</p>
+
+                        <div className="p-4 border border-gray-200 rounded-sm space-y-3 bg-gray-50">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-6 bg-luxury-black rounded-xs flex items-center justify-center text-[9px] text-white font-bold tracking-wider">
+                                        VISA
+                                    </div> 
+                                    <div>
+                                        <p className="text-xs font-bold text-luxury-black">•••• 4242</p>
+                                        <p className="text-[10px] text-gray-400">Expires 12/28</p>
+                                    </div>
+                                </div>
+                                <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold uppercase px-2 py-0.5 rounded">Primary</span>
                             </div>
                         </div>
-                        <button className="w-full border border-black text-black py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors">
+
+                        <button 
+                            onClick={() => alert("Billing portal connection active. You can manage or update payment cards securely.")}
+                            className="w-full border border-black text-black py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors rounded-xs"
+                        >
                             Update Payment Details
                         </button>
-                    </div>
-                </div>
-            )}
 
-            <div className="bg-luxury-black text-white p-8 md:p-12 rounded-sm shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-luxury-gold/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
-                    <div>
-                        <h3 className="text-2xl font-serif italic mb-2">
-                            {globalFreeMode ? "Activate Free Atelier Membership" : "Upgrade Your Atelier"}
-                        </h3>
-                        <p className="text-gray-400 text-sm max-w-lg">
-                            {globalFreeMode 
-                                ? "All vendor subscription tiers are currently 100% free! Select a tier to activate product uploads and store customization."
-                                : "Unlock white-glove logistics, priority placement in 'The Drop', and reduced commission rates."
-                            }
-                        </p>
-                    </div>
-                    <button 
-                        onClick={() => setIsUpgradeModalOpen(true)}
-                        className="bg-luxury-gold text-white px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-white hover:text-black transition-colors shrink-0 shadow-lg"
-                    >
-                        {globalFreeMode ? "View Free Plans" : "View Plans"}
-                    </button>
-                </div>
-            </div>
-
-            {/* Upgrade / Plan Selection Modal */}
-            {isUpgradeModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsUpgradeModalOpen(false)} />
-                    <div className="relative bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-sm shadow-2xl animate-scale-in text-black">
-                        <div className="p-8 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
-                            <div>
-                                <h2 className="text-2xl font-serif italic">Select Your Plan</h2>
-                                <p className="text-xs text-gray-400 uppercase tracking-widest mt-1">
-                                    {globalFreeMode ? "Free Vendor Access Mode Active" : "Elevate your digital storefront"}
-                                </p>
-                            </div>
-                            <button onClick={() => setIsUpgradeModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {activePlans.map(plan => (
-                                <div 
-                                    key={plan.id}
-                                    onClick={() => setSelectedPlan(plan)}
-                                    className={`relative p-6 border transition-all cursor-pointer flex flex-col ${selectedPlan?.id === plan.id ? 'border-luxury-gold ring-1 ring-luxury-gold shadow-lg' : 'border-gray-100 hover:border-gray-300'}`}
-                                >
-                                    {plan.id === 'COUTURE' && (
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-luxury-gold text-white text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
-                                            Most Popular
-                                        </div>
-                                    )}
-                                    <h3 className="text-lg font-serif italic mb-1">{plan.name}</h3>
-                                    <div className="flex items-baseline gap-1 mb-6">
-                                        <span className="text-2xl font-bold">
-                                            {plan.isFree || globalFreeMode ? 'FREE ($0)' : formatPrice(plan.price)}
-                                        </span>
-                                        <span className="text-[10px] text-gray-400 uppercase tracking-widest">{plan.period}</span>
-                                    </div>
-                                    <ul className="space-y-3 mb-8 flex-1">
-                                        {plan.features.map((feature, idx) => (
-                                            <li key={idx} className="flex items-start gap-2 text-xs text-gray-600">
-                                                <Check size={14} className="text-green-500 shrink-0 mt-0.5" />
-                                                <span>{feature}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    <div className={`w-full py-3 text-[10px] font-bold uppercase tracking-widest text-center transition-colors ${selectedPlan?.id === plan.id ? 'bg-black text-white' : 'bg-gray-50 text-gray-400 group-hover:bg-gray-100'}`}>
-                                        {selectedPlan?.id === plan.id ? 'Selected' : 'Select Plan'}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="p-8 bg-gray-50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm">
-                                    <ShieldCheck className="text-luxury-gold" size={24} />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-widest">
-                                        {globalFreeMode || selectedPlan?.isFree ? '1-Click Free Activation' : 'Secure Checkout'}
-                                    </p>
-                                    <p className="text-[10px] text-gray-400">
-                                        {globalFreeMode || selectedPlan?.isFree ? 'No credit card required for free activation' : 'Payments processed securely by Paystack'}
-                                    </p>
-                                </div>
-                            </div>
-                            <button 
-                                onClick={handleUpgrade}
-                                disabled={!selectedPlan || isProcessing}
-                                className="w-full md:w-auto bg-luxury-black text-white px-12 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {isProcessing ? (
-                                    <>Processing <Loader className="animate-spin" size={14} /></>
-                                ) : (
-                                    <>{selectedPlan?.isFree || globalFreeMode ? 'Activate Free Membership' : 'Confirm & Pay'} <Lock size={14} /></>
-                                )}
-                            </button>
+                        <div className="pt-4 border-t border-gray-100 text-center">
+                            <p className="text-[11px] text-gray-400">Need help with your plan or commission split?</p>
+                            <a href="mailto:support@myfitstore.com" className="text-xs font-bold text-luxury-gold hover:underline block mt-1">
+                                Contact Concierge Support
+                            </a>
                         </div>
                     </div>
                 </div>

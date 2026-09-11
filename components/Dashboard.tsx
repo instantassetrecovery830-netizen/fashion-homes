@@ -584,16 +584,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
         );
 
       case 'KYC': {
-        const currentVendor = vendors.find(v => v.email === currentUser?.email);
-        if (!currentVendor) return null;
+        const currentVendor = vendors.find(v => v.email === currentUser?.email) || storefrontForm || ({
+            id: currentUser?.email ? `vendor_${currentUser.email.replace(/[^a-zA-Z0-9]/g, '_')}` : 'vendor_default',
+            name: currentUser?.name || 'My Atelier',
+            brandName: currentUser?.name || 'My Atelier',
+            email: currentUser?.email || 'vendor@myfitstore.com',
+            subscriptionPlan: 'Atelier',
+            subscriptionStatus: 'ACTIVE',
+            approved: true
+        } as unknown as Vendor);
+
         return (
           <KycView 
             vendor={currentVendor}
             onUpdateVendor={async (v) => {
                 if (setVendors) {
-                    await setVendors(vendors.map(vendor => vendor.id === v.id ? v : vendor));
+                    const exists = vendors.some(vendor => vendor.id === v.id || vendor.email === v.email);
+                    if (exists) {
+                        await setVendors(vendors.map(vendor => (vendor.id === v.id || vendor.email === v.email) ? v : vendor));
+                    } else {
+                        await setVendors([...vendors, v]);
+                    }
                 }
             }}
+            userRole={role}
+            setIsSidebarOpen={setIsSidebarOpen}
           />
         );
       }
@@ -636,17 +651,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
         );
 
       case 'SUBSCRIPTION': {
-        const activeVendorForm = storefrontForm || (role === UserRole.ADMIN ? ({
-            id: 'admin_store',
-            name: 'Platform Admin Atelier',
-            brandName: 'Platform Admin',
-            email: currentUser?.email || 'admin@myfitstore.com',
-            subscriptionPlan: 'MAISON',
+        const currentVendor = vendors.find(v => v.email === currentUser?.email);
+        const activeVendorForm = storefrontForm || currentVendor || ({
+            id: currentUser?.email ? `vendor_${currentUser.email.replace(/[^a-zA-Z0-9]/g, '_')}` : 'vendor_default',
+            name: currentUser?.name || 'My Atelier',
+            brandName: currentUser?.name || 'My Atelier',
+            email: currentUser?.email || 'vendor@myfitstore.com',
+            subscriptionPlan: 'Atelier',
             subscriptionStatus: 'ACTIVE',
             approved: true
-        } as unknown as Vendor) : null);
+        } as unknown as Vendor);
 
-        if (!activeVendorForm) return <div className="p-8"><Loader className="animate-spin text-luxury-gold" /></div>;
         return (
           <SubscriptionView 
             storefrontForm={activeVendorForm}

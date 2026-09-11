@@ -101,7 +101,19 @@ export interface KycDocuments {
   idFront?: string;
   idBack?: string;
   proofOfAddress?: string;
+  businessRegistrationDoc?: string;
+  taxCertificateDoc?: string;
+  businessName?: string;
+  registrationNumber?: string;
+  taxId?: string;
+  businessAddress?: string;
+  phone?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
   submittedAt?: string;
+  reviewedAt?: string;
+  adminNote?: string;
 }
 
 export interface ShippingAddress {
