@@ -135,5 +135,10 @@ service cloud.firestore {
     match /user_logs/{logId} {
       allow read, write: if true;
     }
+
+    // Shared Wishlists
+    match /shared_wishlists/{wishlistId} {
+      allow read, write: if true;
+    }
   }
 }
