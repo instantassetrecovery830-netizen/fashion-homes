@@ -149,6 +149,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 3, code: 'VIPACCESS', discount: '15%', status: 'EXPIRED', uses: 128 }
   ]);
 
+  const [adminSelectedVendor, setAdminSelectedVendor] = useState<Vendor | null>(null);
+
   // Refs for file inputs
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -584,7 +586,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         );
 
       case 'KYC': {
-        const currentVendor = vendors.find(v => v.email === currentUser?.email) || storefrontForm || ({
+        const defaultVendor = vendors.find(v => v.email === currentUser?.email) || storefrontForm || ({
             id: currentUser?.email ? `vendor_${currentUser.email.replace(/[^a-zA-Z0-9]/g, '_')}` : 'vendor_default',
             name: currentUser?.name || 'My Atelier',
             brandName: currentUser?.name || 'My Atelier',
@@ -594,9 +596,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
             approved: true
         } as unknown as Vendor);
 
+        const activeVendorForKyc = (role === UserRole.ADMIN && adminSelectedVendor) ? adminSelectedVendor : (role === UserRole.ADMIN && vendors.length > 0 ? vendors[0] : defaultVendor);
+
         return (
           <KycView 
-            vendor={currentVendor}
+            vendor={activeVendorForKyc}
+            allVendors={role === UserRole.ADMIN ? vendors : []}
+            onSelectVendorForKyc={(v) => setAdminSelectedVendor(v)}
             onUpdateVendor={async (v) => {
                 if (setVendors) {
                     const exists = vendors.some(vendor => vendor.id === v.id || vendor.email === v.email);
@@ -604,6 +610,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         await setVendors(vendors.map(vendor => (vendor.id === v.id || vendor.email === v.email) ? v : vendor));
                     } else {
                         await setVendors([...vendors, v]);
+                    }
+                    if (adminSelectedVendor && adminSelectedVendor.id === v.id) {
+                      setAdminSelectedVendor(v);
                     }
                 }
             }}

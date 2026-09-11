@@ -193,8 +193,8 @@ const App: React.FC = () => {
       ]);
       
       if (dbContent) setCmsContent(dbContent);
-      if (dbVendors && dbVendors.length > 0) setVendors(dbVendors);
-      if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
+      if (dbVendors) setVendors(dbVendors);
+      if (dbProducts) setProducts(dbProducts);
 
       // Fetch user-specific data (Notifications, Orders, Follows, Votes)
       const currentUserId = auth.currentUser?.uid;

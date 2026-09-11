@@ -7,9 +7,11 @@ interface KycViewProps {
   onUpdateVendor: (vendor: Vendor) => Promise<void>;
   userRole?: UserRole;
   setIsSidebarOpen?: (open: boolean) => void;
+  allVendors?: Vendor[];
+  onSelectVendorForKyc?: (vendor: Vendor) => void;
 }
 
-export const KycView: React.FC<KycViewProps> = ({ vendor, onUpdateVendor, userRole, setIsSidebarOpen }) => {
+export const KycView: React.FC<KycViewProps> = ({ vendor, onUpdateVendor, userRole, setIsSidebarOpen, allVendors = [], onSelectVendorForKyc }) => {
   const [kycForm, setKycForm] = useState<KycDocuments>(vendor.kycDocuments || {
     businessName: vendor.brandName || vendor.name || '',
     bankName: vendor.bankDetails?.bankName || '',
@@ -87,14 +89,15 @@ export const KycView: React.FC<KycViewProps> = ({ vendor, onUpdateVendor, userRo
         ...vendor,
         verificationStatus: newStatus,
         approvalStatus: newStatus === 'VERIFIED' ? 'APPROVED' : 'REJECTED',
+        subscriptionStatus: newStatus === 'VERIFIED' ? 'ACTIVE' : vendor.subscriptionStatus,
         kycDocuments: {
           ...vendor.kycDocuments,
           reviewedAt: new Date().toISOString(),
-          adminNote: adminNoteInput
+          adminNote: adminNoteInput || (newStatus === 'VERIFIED' ? 'Directly verified by Platform Admin (Manual Override)' : 'Rejected by Platform Admin')
         }
       };
       await onUpdateVendor(updatedVendor);
-      setMsg({ type: 'success', text: `Updated verification status to ${newStatus}.` });
+      setMsg({ type: 'success', text: `🎉 Vendor ${vendor.name || vendor.brandName} verification status updated to ${newStatus} with store access granted!` });
     } catch (e: any) {
       setMsg({ type: 'error', text: 'Failed to update status: ' + e.message });
     } finally {
@@ -108,6 +111,31 @@ export const KycView: React.FC<KycViewProps> = ({ vendor, onUpdateVendor, userRo
 
   return (
     <div className="space-y-8 animate-fade-in pb-16 max-w-7xl mx-auto">
+      {/* Admin Vendor Selector */}
+      {userRole === UserRole.ADMIN && allVendors.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+            <ShieldCheck size={18} className="text-amber-600" /> Admin Inspection: Select Vendor Atelier
+          </div>
+          <select
+            value={vendor.id}
+            onChange={(e) => {
+              const selected = allVendors.find(v => v.id === e.target.value);
+              if (selected && onSelectVendorForKyc) {
+                onSelectVendorForKyc(selected);
+              }
+            }}
+            className="bg-white border border-amber-300 rounded px-3 py-2 text-xs font-bold text-gray-900 outline-none focus:border-black cursor-pointer shadow-xs"
+          >
+            {allVendors.map(v => (
+              <option key={v.id} value={v.id}>
+                {v.name} ({v.email || 'No email'}) — Status: {v.verificationStatus || 'NOT SUBMITTED'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="bg-white p-6 md:p-8 rounded-sm shadow-xs border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -168,32 +196,42 @@ export const KycView: React.FC<KycViewProps> = ({ vendor, onUpdateVendor, userRo
       {/* ADMIN VERIFICATION OVERRIDE (FOR ADMIN USERS) */}
       {userRole === UserRole.ADMIN && (
         <div className="bg-gradient-to-r from-luxury-black via-gray-900 to-black text-white p-6 rounded-sm border border-luxury-gold/40 space-y-4">
-          <div className="flex items-center gap-2 text-luxury-gold font-bold text-xs uppercase tracking-widest border-b border-white/10 pb-3">
-            <ShieldCheck size={18} /> Admin Verification Decision Panel
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2 text-luxury-gold font-bold text-xs uppercase tracking-widest">
+              <ShieldCheck size={18} /> Admin Direct KYC Decision & Override
+            </div>
+            <span className="text-[10px] text-gray-300 font-normal italic">
+              Inspecting: <strong className="text-luxury-gold font-bold">{vendor.name || vendor.brandName}</strong> ({vendor.email})
+            </span>
           </div>
+
+          <div className="bg-luxury-gold/10 border border-luxury-gold/20 p-3 rounded-xs text-[11px] text-gray-300">
+            💡 <strong>Admin Power Override:</strong> As platform admin, you can personally verify and grant store approval to this vendor even if they have not applied or submitted KYC documents yet.
+          </div>
+
           <div className="space-y-3">
-            <label className="text-xs text-gray-300 font-bold block">Admin Review Note / Reason:</label>
+            <label className="text-xs text-gray-300 font-bold block">Admin Review Note / Decision Audit Log:</label>
             <textarea
               rows={2}
               value={adminNoteInput}
               onChange={e => setAdminNoteInput(e.target.value)}
-              placeholder="e.g. Approved verified business registration. OR: ID photo blurry, please re-upload."
+              placeholder="e.g. Manually verified business credentials and approved store access."
               className="w-full bg-white/10 border border-white/20 rounded-xs p-2 text-xs text-white placeholder-gray-400 outline-none focus:border-luxury-gold"
             />
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => handleAdminVerify('VERIFIED')}
                 disabled={isSaving}
-                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold uppercase tracking-wider rounded-xs flex items-center gap-2"
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold uppercase tracking-wider rounded-xs flex items-center gap-2 shadow-sm transition-colors"
               >
-                <Check size={14} /> Approve & Mark Verified
+                <Check size={14} /> Directly Verify & Approve KYC
               </button>
               <button
                 onClick={() => handleAdminVerify('REJECTED')}
                 disabled={isSaving}
-                className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-wider rounded-xs flex items-center gap-2"
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-wider rounded-xs flex items-center gap-2 shadow-sm transition-colors"
               >
-                <X size={14} /> Reject & Request Resubmission
+                <X size={14} /> Decline / Revoke Verification
               </button>
             </div>
           </div>

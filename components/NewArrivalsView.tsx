@@ -96,7 +96,20 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
 
       {/* Grid */}
       <div className="max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-20">
+        {newArrivals.length === 0 ? (
+          <div className="py-20 text-center text-gray-400 font-serif italic">
+            <p className="text-xl mb-4">No new season arrivals posted yet.</p>
+            {userRole !== UserRole.BUYER && (
+              <button
+                onClick={() => isLoggedIn ? onNavigate('NEW_ARRIVALS_MANAGE') : (onAuthRequest ? onAuthRequest('LOGIN', UserRole.VENDOR) : onNavigate('AUTH'))}
+                className="inline-block bg-black text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-luxury-gold transition-colors not-italic"
+              >
+                Be the first to list a piece
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-20">
           {newArrivals.map((product) => (
             <div 
               key={product.id} 
@@ -174,6 +187,7 @@ export const NewArrivalsView: React.FC<NewArrivalsViewProps> = ({
             </div>
           ))}
         </div>
+        )}
       </div>
     </div>
   );
