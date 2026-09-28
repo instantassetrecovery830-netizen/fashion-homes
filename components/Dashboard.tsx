@@ -8,6 +8,7 @@ import { FinanceView } from './DashboardTabs/FinanceView';
 import { MarketingView } from './DashboardTabs/MarketingView';
 import { MessagesView } from './DashboardTabs/MessagesView';
 import { StoreDesignView } from './DashboardTabs/StoreDesignView';
+import { LandingPageView } from './DashboardTabs/LandingPageView';
 import { FollowingView } from './DashboardTabs/FollowingView';
 import { NewArrivalsFeed } from './DashboardTabs/NewArrivalsFeed';
 import { ProfileView } from './DashboardTabs/ProfileView';
@@ -31,7 +32,7 @@ import {
 import { 
   Package, Users, DollarSign, Activity, Settings, LayoutDashboard, Shirt, ShoppingBag, 
   Plus, Trash2, ArrowUpRight,
-  Palette, FileText,
+  Palette, FileText, Layout,
   MapPin, Mail, Globe, Instagram, Twitter, Heart, Truck, CheckCircle, AlertCircle, 
   UserX, Camera, MessageCircle, Ban, Diamond, Check, Edit2, X, ShieldCheck, BadgeCheck,
   Lock, MessageSquare, Flag, Store, Grid, ChevronDown, Loader, Star, Save, Menu, Wallet, ArrowLeft, Inbox,
@@ -490,7 +491,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'ORDERS', label: 'Orders', icon: ShoppingBag, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
       { id: 'ANALYTICS', label: 'Analytics', icon: TrendingUp, roles: [UserRole.VENDOR] },
       { id: 'PRODUCTS', label: 'Products', icon: Shirt, roles: [UserRole.ADMIN, UserRole.VENDOR] },
-      { id: 'STOREFRONT', label: 'Design Store', icon: Palette, roles: [UserRole.VENDOR] },
+      { id: 'STOREFRONT', label: 'Storefront', icon: Palette, roles: [UserRole.VENDOR] },
       { id: 'FINANCE', label: 'Finance', icon: Wallet, roles: [UserRole.VENDOR] },
       { id: 'MARKETING', label: 'Marketing', icon: Tag, roles: [UserRole.VENDOR] },
       { id: 'SUBSCRIPTION', label: 'Subscription', icon: CreditCard, roles: [UserRole.ADMIN, UserRole.VENDOR] },
@@ -503,6 +504,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'MESSAGES', label: 'Contact Forms', icon: Inbox, roles: [UserRole.ADMIN] },
       { id: 'WAITLIST', label: 'Waitlist', icon: Mail, roles: [UserRole.ADMIN, UserRole.VENDOR] },
       { id: 'STORE_DESIGN', label: 'Design Store', icon: Palette, roles: [UserRole.ADMIN] },
+      { id: 'LANDING_PAGE', label: 'Landing Page', icon: Layout, roles: [UserRole.ADMIN] },
       { id: 'FOLLOWING', label: 'Following', icon: Heart, roles: [UserRole.BUYER, UserRole.VENDOR] },
       { id: 'PROFILE', label: 'Settings', icon: Settings, roles: [UserRole.ADMIN, UserRole.VENDOR, UserRole.BUYER] },
     ];
@@ -814,7 +816,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
               setCmsForm={setCmsForm}
               handleCMSUpdate={handleCMSUpdate}
               setIsSidebarOpen={setIsSidebarOpen}
-              products={products}
+              vendors={vendors}
+              onNavigate={onNavigate}
+              onDesignerClick={onDesignerClick}
+            />
+          );
+
+      case 'LANDING_PAGE':
+          return (
+            <LandingPageView 
+              cmsForm={cmsForm}
+              setCmsForm={setCmsForm}
+              handleCMSUpdate={handleCMSUpdate}
+              setIsSidebarOpen={setIsSidebarOpen}
+              products={products || []}
               onNavigate={onNavigate}
             />
           );

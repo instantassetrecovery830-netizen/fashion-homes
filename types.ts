@@ -410,6 +410,38 @@ export interface ThemeSettings {
   borderRadius: 'none' | 'sm' | 'md' | 'lg' | 'full';
 }
 
+export interface StoreDesignSettings {
+  announcement?: {
+    enabled: boolean;
+    text: string;
+    link?: string;
+    bgColor?: string;
+    textColor?: string;
+    badgeText?: string;
+  };
+  layout?: {
+    gridColumns?: 2 | 3 | 4;
+    cardStyle?: 'editorial' | 'minimal' | 'luxury';
+    showPriceCurrency?: boolean;
+    showAtelierBadges?: boolean;
+    defaultSort?: string;
+  };
+  featuredCategories?: Array<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    imageUrl: string;
+    link?: string;
+  }>;
+  branding?: {
+    tagline?: string;
+    supportEmail?: string;
+    conciergeHours?: string;
+    newsletterTitle?: string;
+    copyrightText?: string;
+  };
+}
+
 export interface DropPageContent {
   id?: string;
   title: string;
@@ -424,6 +456,7 @@ export interface DropPageContent {
 
 export interface LandingPageContent {
   theme?: ThemeSettings;
+  storeDesign?: StoreDesignSettings;
   hero: {
     videoUrl: string;
     posterUrl: string;
