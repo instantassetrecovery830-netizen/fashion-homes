@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { 
     Menu, Palette, ChevronDown, Video, Type, Sparkles, Image as ImageIcon, 
     FileText, DollarSign, Plus, Trash2, ExternalLink, Calendar, RefreshCw, 
-    Check, AlertCircle, Eye, Clock, Layers, Upload, X
+    Check, CheckCircle2, AlertCircle, Eye, Clock, Layers, Upload, X
 } from 'lucide-react';
 import { Product, DropPageContent } from '../../types.ts';
 
@@ -17,8 +17,8 @@ const processImageFile = (file: File): Promise<string> => {
         reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
-                const MAX_WIDTH = 1920;
-                const MAX_HEIGHT = 1080;
+                const MAX_WIDTH = 1200;
+                const MAX_HEIGHT = 800;
                 let width = img.width;
                 let height = img.height;
 
@@ -38,7 +38,7 @@ const processImageFile = (file: File): Promise<string> => {
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
                     ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.85));
+                    resolve(canvas.toDataURL('image/jpeg', 0.72));
                 } else {
                     resolve(reader.result as string);
                 }
@@ -68,18 +68,33 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
     products,
     onNavigate
 }) => {
-    const [expandedSection, setExpandedSection] = useState<string | null>('theme');
+    const [expandedSection, setExpandedSection] = useState<string | null>('hero');
     const [selectedDropIndex, setSelectedDropIndex] = useState(0);
     const [isSavingDrop, setIsSavingDrop] = useState(false);
+    const [isSavingAll, setIsSavingAll] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [dropNotification, setDropNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [newImageUrl, setNewImageUrl] = useState('');
     const [isUploadingDropImages, setIsUploadingDropImages] = useState(false);
     const [isDragOverDrop, setIsDragOverDrop] = useState(false);
     const [showDropUrlFallback, setShowDropUrlFallback] = useState(false);
 
+    // Hero Poster Direct URL state
+    const [heroPosterUrlInput, setHeroPosterUrlInput] = useState('');
+
+    // Editorial Trends States
+    const [newEditorialUrl, setNewEditorialUrl] = useState('');
+    const [isUploadingEditorial, setIsUploadingEditorial] = useState(false);
+
+    // Additional Campaign Slides States
+    const [newCampaignSlideUrl, setNewCampaignSlideUrl] = useState('');
+    const [isUploadingCampaignSlide, setIsUploadingCampaignSlide] = useState(false);
+
     const dropFileInputRef = useRef<HTMLInputElement>(null);
     const heroPosterInputRef = useRef<HTMLInputElement>(null);
     const campaignInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+    const editorialFileInputRef = useRef<HTMLInputElement>(null);
+    const extraCampaignFileInputRef = useRef<HTMLInputElement>(null);
 
     // Multi-Drop list computed property
     const activeDrops: DropPageContent[] = useMemo(() => {
@@ -399,22 +414,189 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
         });
     };
 
+    const onSaveAll = async () => {
+        setIsSavingAll(true);
+        setSaveStatus(null);
+        try {
+            await handleCMSUpdate(cmsForm);
+            setSaveStatus({
+                type: 'success',
+                message: 'All landing page changes, text, and images have been saved and published live!'
+            });
+        } catch (err: any) {
+            console.error('Error saving CMS:', err);
+            setSaveStatus({
+                type: 'error',
+                message: err?.message || 'Failed to save landing page changes. Please check connection and try again.'
+            });
+        } finally {
+            setIsSavingAll(false);
+            setTimeout(() => setSaveStatus(null), 6000);
+        }
+    };
+
+    const handleEditorialUpload = async (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        setIsUploadingEditorial(true);
+        try {
+            const fileArr = Array.from(files);
+            const urls: string[] = [];
+            for (const file of fileArr) {
+                try {
+                    const u = await processImageFile(file);
+                    urls.push(u);
+                } catch (err) {
+                    console.warn("Editorial upload notice:", err);
+                }
+            }
+            if (urls.length > 0) {
+                const current = cmsForm?.editorialImages || [];
+                setCmsForm({
+                    ...cmsForm,
+                    editorialImages: [...current, ...urls]
+                });
+            }
+        } finally {
+            setIsUploadingEditorial(false);
+        }
+    };
+
+    const handleAddEditorialUrl = () => {
+        if (!newEditorialUrl.trim()) return;
+        const current = cmsForm?.editorialImages || [];
+        setCmsForm({
+            ...cmsForm,
+            editorialImages: [...current, newEditorialUrl.trim()]
+        });
+        setNewEditorialUrl('');
+    };
+
+    const handleRemoveEditorialImage = (index: number) => {
+        const current = cmsForm?.editorialImages || [];
+        setCmsForm({
+            ...cmsForm,
+            editorialImages: current.filter((_: any, i: number) => i !== index)
+        });
+    };
+
+    const handleExtraCampaignUpload = async (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        setIsUploadingCampaignSlide(true);
+        try {
+            const fileArr = Array.from(files);
+            const urls: string[] = [];
+            for (const file of fileArr) {
+                try {
+                    const u = await processImageFile(file);
+                    urls.push(u);
+                } catch (err) {
+                    console.warn("Campaign slide upload notice:", err);
+                }
+            }
+            if (urls.length > 0) {
+                const current = cmsForm?.campaign?.images || [];
+                setCmsForm({
+                    ...cmsForm,
+                    campaign: {
+                        ...(cmsForm.campaign || {}),
+                        images: [...current, ...urls]
+                    }
+                });
+            }
+        } finally {
+            setIsUploadingCampaignSlide(false);
+        }
+    };
+
+    const handleAddCampaignSlide = () => {
+        if (!newCampaignSlideUrl.trim()) return;
+        const current = cmsForm?.campaign?.images || [];
+        setCmsForm({
+            ...cmsForm,
+            campaign: {
+                ...(cmsForm.campaign || {}),
+                images: [...current, newCampaignSlideUrl.trim()]
+            }
+        });
+        setNewCampaignSlideUrl('');
+    };
+
+    const handleRemoveCampaignSlide = (index: number) => {
+        const current = cmsForm?.campaign?.images || [];
+        setCmsForm({
+            ...cmsForm,
+            campaign: {
+                ...(cmsForm.campaign || {}),
+                images: current.filter((_: any, i: number) => i !== index)
+            }
+        });
+    };
+
     return (
         <div className="space-y-8 animate-fade-in pb-20 md:pb-0 max-w-7xl">
-            <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-serif italic">Store Design</h2>
-                <div className="flex gap-4">
+            {/* Header with Save & Live Preview */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 border border-gray-100 rounded-sm shadow-sm">
+                <div>
+                    <h2 className="text-2xl sm:text-3xl font-serif italic text-luxury-black">Landing Page CMS & Store Design</h2>
+                    <p className="text-xs text-gray-500 mt-1">Live visual editor for hero banners, editorial trends, drops, and marketing copy.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                    {onNavigate && (
+                        <button 
+                            type="button"
+                            onClick={() => onNavigate('LANDING')}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-800 text-xs font-bold uppercase tracking-wider hover:bg-gray-200 transition-colors rounded-xs"
+                            title="Open storefront to verify changes live"
+                        >
+                            <Eye size={14} /> Preview Storefront
+                        </button>
+                    )}
                     <button 
-                        onClick={handleCMSUpdate}
-                        className="bg-black text-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors hidden md:block"
+                        type="button"
+                        onClick={onSaveAll}
+                        disabled={isSavingAll}
+                        className="inline-flex items-center gap-2 bg-luxury-black text-white px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold hover:text-black transition-all shadow-md disabled:opacity-50 rounded-xs"
                     >
-                        Save All Changes
+                        {isSavingAll ? (
+                            <>
+                                <RefreshCw size={14} className="animate-spin text-luxury-gold" />
+                                <span>Publishing...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Check size={14} />
+                                <span>Save All Changes</span>
+                            </>
+                        )}
                     </button>
                     <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 border border-gray-200 rounded-sm">
                         <Menu size={20} />
                     </button>
                 </div>
             </div>
+
+            {/* Save Status Notification Banner */}
+            {saveStatus && (
+                <div className={`p-4 rounded-sm border flex items-center justify-between animate-fade-in ${saveStatus.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-red-50 border-red-200 text-red-900'}`}>
+                    <div className="flex items-center gap-3">
+                        {saveStatus.type === 'success' ? (
+                            <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                        ) : (
+                            <AlertCircle size={18} className="text-red-600 shrink-0" />
+                        )}
+                        <span className="text-xs font-medium">{saveStatus.message}</span>
+                    </div>
+                    {saveStatus.type === 'success' && onNavigate && (
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('LANDING')}
+                            className="text-xs font-bold uppercase tracking-wider underline hover:text-emerald-700"
+                        >
+                            View Live Now →
+                        </button>
+                    )}
+                </div>
+            )}
             
             {cmsForm && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -532,20 +714,30 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                             className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                         />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Hero Description</label>
+                                        <textarea 
+                                            value={cmsForm.hero?.description || ''}
+                                            onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), description: e.target.value}})}
+                                            placeholder="Discover bespoke ready-to-wear, curated designer collections, and avant-garde couture from Africa's premier ateliers."
+                                            className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white min-h-[70px]"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Video URL</label>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Video URL (MP4)</label>
                                             <input 
                                                 value={cmsForm.hero?.videoUrl || ''}
                                                 onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), videoUrl: e.target.value}})}
+                                                placeholder="https://..."
                                                 className="w-full border border-gray-200 p-3 text-xs focus:border-black outline-none font-mono text-gray-500 transition-colors bg-gray-50 focus:bg-white"
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Poster Image</label>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Poster / Fallback Image</label>
                                             <div className="space-y-2">
                                                 {cmsForm.hero?.posterUrl ? (
-                                                    <div className="relative group rounded-sm overflow-hidden border border-gray-200 aspect-video bg-gray-100 max-w-xs">
+                                                    <div className="relative group rounded-sm overflow-hidden border border-gray-200 aspect-video bg-gray-100">
                                                         <img 
                                                             src={cmsForm.hero.posterUrl} 
                                                             alt="Hero Poster Preview" 
@@ -555,7 +747,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                             <button 
                                                                 type="button"
                                                                 onClick={() => heroPosterInputRef.current?.click()}
-                                                                className="px-3 py-1.5 bg-white text-black text-[10px] font-bold uppercase tracking-wider rounded-xs flex items-center gap-1 hover:bg-luxury-gold hover:text-white transition-colors"
+                                                                className="px-3 py-1.5 bg-white text-black text-[10px] font-bold uppercase tracking-wider rounded-xs flex items-center gap-1 hover:bg-luxury-gold hover:text-black transition-colors"
                                                             >
                                                                 <Upload size={12} /> Replace
                                                             </button>
@@ -570,15 +762,38 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <button 
-                                                        type="button"
-                                                        onClick={() => heroPosterInputRef.current?.click()}
-                                                        className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-black rounded-sm text-gray-500 hover:text-black transition-colors flex flex-col items-center justify-center gap-1 bg-gray-50 hover:bg-white"
-                                                    >
-                                                        <Upload size={18} className="text-gray-400" />
-                                                        <span className="text-xs font-bold uppercase tracking-wider">Upload Poster Image</span>
-                                                        <span className="text-[10px] text-gray-400">JPG, PNG, WEBP</span>
-                                                    </button>
+                                                    <div className="space-y-2">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => heroPosterInputRef.current?.click()}
+                                                            className="w-full py-3 border-2 border-dashed border-gray-200 hover:border-black rounded-sm text-gray-500 hover:text-black transition-colors flex flex-col items-center justify-center gap-1 bg-gray-50 hover:bg-white"
+                                                        >
+                                                            <Upload size={16} className="text-gray-400" />
+                                                            <span className="text-xs font-bold uppercase tracking-wider">Upload Poster Image</span>
+                                                            <span className="text-[10px] text-gray-400">JPG, PNG, WEBP</span>
+                                                        </button>
+                                                        <div className="flex gap-1.5">
+                                                            <input 
+                                                                type="url"
+                                                                value={heroPosterUrlInput}
+                                                                onChange={e => setHeroPosterUrlInput(e.target.value)}
+                                                                placeholder="Or paste image URL"
+                                                                className="flex-1 border border-gray-200 p-2 text-xs focus:border-black outline-none bg-white"
+                                                            />
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (heroPosterUrlInput.trim()) {
+                                                                        setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), posterUrl: heroPosterUrlInput.trim()}});
+                                                                        setHeroPosterUrlInput('');
+                                                                    }
+                                                                }}
+                                                                className="px-3 py-1.5 bg-gray-900 text-white text-[10px] font-bold uppercase tracking-wider hover:bg-luxury-gold transition-colors"
+                                                            >
+                                                                Set
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 )}
                                                 <input 
                                                     type="file" 
@@ -592,7 +807,7 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Button Text</label>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Primary Button Text</label>
                                             <input 
                                                 value={cmsForm.hero?.buttonText || ''}
                                                 onChange={e => setCmsForm({...cmsForm, hero: {...(cmsForm.hero || {}), buttonText: e.target.value}})}
@@ -618,37 +833,47 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                 onClick={() => setExpandedSection(expandedSection === 'sections' ? null : 'sections')}
                                 className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
                             >
-                                <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><Type size={14} /> Sections</span>
+                                <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><Type size={14} /> Headings & Sections</span>
                                 <ChevronDown size={16} className={`transition-transform ${expandedSection === 'sections' ? 'rotate-180' : ''}`} />
                             </button>
                             
                             {expandedSection === 'sections' && (
                                 <div className="p-6 space-y-4 border-t border-gray-100">
                                     <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Marquee Text</label>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Running Marquee Text</label>
                                         <textarea 
                                             value={cmsForm.marquee?.text || ''}
                                             onChange={e => setCmsForm({...cmsForm, marquee: { text: e.target.value }})}
                                             className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white min-h-[80px]"
                                         />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Designers Title</label>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Designers Subtitle</label>
+                                            <input 
+                                                value={cmsForm.designers?.subtitle || ''}
+                                                onChange={e => setCmsForm({...cmsForm, designers: { ...(cmsForm.designers || {}), subtitle: e.target.value }})}
+                                                placeholder="The Ateliers"
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Designers Section Title</label>
                                             <input 
                                                 value={cmsForm.designers?.title || ''}
-                                                onChange={e => setCmsForm({...cmsForm, designers: { ...cmsForm.designers, title: e.target.value }})}
+                                                onChange={e => setCmsForm({...cmsForm, designers: { ...(cmsForm.designers || {}), title: e.target.value }})}
+                                                placeholder="Shop by Designer"
                                                 className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                             />
                                         </div>
-                                        <div>
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Spotlight Title</label>
-                                            <input 
-                                                value={cmsForm.spotlight?.title || ''}
-                                                onChange={e => setCmsForm({...cmsForm, spotlight: { title: e.target.value }})}
-                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
-                                            />
-                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Spotlight / Editor's Pick Title</label>
+                                        <input 
+                                            value={cmsForm.spotlight?.title || ''}
+                                            onChange={e => setCmsForm({...cmsForm, spotlight: { title: e.target.value }})}
+                                            className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                        />
                                     </div>
                                 </div>
                             )}
@@ -1084,89 +1309,281 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                                 onClick={() => setExpandedSection(expandedSection === 'campaign' ? null : 'campaign')}
                                 className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
                             >
-                                <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><ImageIcon size={14} /> Campaign</span>
+                                <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><ImageIcon size={14} /> Campaign Showcase</span>
                                 <ChevronDown size={16} className={`transition-transform ${expandedSection === 'campaign' ? 'rotate-180' : ''}`} />
                             </button>
                             
                             {expandedSection === 'campaign' && (
                                 <div className="p-6 space-y-4 border-t border-gray-100">
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Campaign Title</label>
-                                        <input 
-                                            value={cmsForm.campaign?.title || ''}
-                                            onChange={e => setCmsForm({...cmsForm, campaign: {...(cmsForm.campaign || {}), title: e.target.value}})}
-                                            className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
-                                        />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Campaign Subtitle</label>
+                                            <input 
+                                                value={cmsForm.campaign?.subtitle || ''}
+                                                onChange={e => setCmsForm({...cmsForm, campaign: {...(cmsForm.campaign || {}), subtitle: e.target.value}})}
+                                                placeholder="The Campaign"
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Campaign Title</label>
+                                            <input 
+                                                value={cmsForm.campaign?.title || ''}
+                                                onChange={e => setCmsForm({...cmsForm, campaign: {...(cmsForm.campaign || {}), title: e.target.value}})}
+                                                placeholder="Urban Chronicles"
+                                                className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
+                                            />
+                                        </div>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Overlay Text</label>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Overlay Badge Text</label>
                                         <input 
                                             value={cmsForm.campaign?.overlayText1 || ''}
                                             onChange={e => setCmsForm({...cmsForm, campaign: {...(cmsForm.campaign || {}), overlayText1: e.target.value}})}
+                                            placeholder="Street Edition"
                                             className="w-full border border-gray-200 p-3 text-sm focus:border-black outline-none transition-colors bg-gray-50 focus:bg-white"
                                         />
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {[1, 2, 3, 4].map(num => {
-                                            // @ts-ignore
-                                            const imgVal = cmsForm.campaign?.[`image${num}`] || '';
-                                            return (
-                                                <div key={num} className="p-3 border border-gray-200 rounded-sm bg-gray-50/50 space-y-2">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-[10px] text-gray-500 uppercase font-bold">Campaign Image {num}</label>
-                                                        {imgVal && (
-                                                            <button 
-                                                                type="button"
-                                                                onClick={() => setCmsForm({
-                                                                    ...cmsForm, 
-                                                                    campaign: { ...(cmsForm.campaign || {}), [`image${num}`]: '' }
-                                                                })}
-                                                                className="text-[10px] text-red-600 hover:text-red-800 font-bold uppercase tracking-wider"
-                                                            >
-                                                                Remove
-                                                            </button>
-                                                        )}
-                                                    </div>
 
-                                                    {imgVal ? (
-                                                        <div className="relative group rounded-sm overflow-hidden border border-gray-200 aspect-video bg-gray-100">
-                                                            <img 
-                                                                src={imgVal} 
-                                                                alt={`Campaign ${num}`} 
-                                                                className="w-full h-full object-cover" 
-                                                            />
-                                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    {/* 4 Featured Campaign Images */}
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-3">Featured Campaign Photos (Up to 4)</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {[1, 2, 3, 4].map(num => {
+                                                // @ts-ignore
+                                                const imgVal = cmsForm.campaign?.[`image${num}`] || '';
+                                                return (
+                                                    <div key={num} className="p-3 border border-gray-200 rounded-sm bg-gray-50/50 space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <label className="text-[10px] text-gray-600 uppercase font-bold">Campaign Photo {num}</label>
+                                                            {imgVal && (
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => setCmsForm({
+                                                                        ...cmsForm, 
+                                                                        campaign: { ...(cmsForm.campaign || {}), [`image${num}`]: '' }
+                                                                    })}
+                                                                    className="text-[10px] text-red-600 hover:text-red-800 font-bold uppercase tracking-wider"
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        {imgVal ? (
+                                                            <div className="relative group rounded-sm overflow-hidden border border-gray-200 aspect-video bg-gray-100">
+                                                                <img 
+                                                                    src={imgVal} 
+                                                                    alt={`Campaign ${num}`} 
+                                                                    className="w-full h-full object-cover" 
+                                                                />
+                                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                                    <button 
+                                                                        type="button"
+                                                                        onClick={() => campaignInputRefs.current[num]?.click()}
+                                                                        className="px-3 py-1.5 bg-white text-black text-[10px] font-bold uppercase tracking-wider rounded-xs flex items-center gap-1 hover:bg-luxury-gold hover:text-black transition-colors"
+                                                                    >
+                                                                        <Upload size={12} /> Replace
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-2">
                                                                 <button 
                                                                     type="button"
                                                                     onClick={() => campaignInputRefs.current[num]?.click()}
-                                                                    className="px-3 py-1.5 bg-white text-black text-[10px] font-bold uppercase tracking-wider rounded-xs flex items-center gap-1 hover:bg-luxury-gold hover:text-white transition-colors"
+                                                                    className="w-full py-3 border-2 border-dashed border-gray-200 hover:border-black rounded-sm text-gray-500 hover:text-black transition-colors flex flex-col items-center justify-center gap-1 bg-white"
                                                                 >
-                                                                    <Upload size={12} /> Replace
+                                                                    <Upload size={16} className="text-gray-400" />
+                                                                    <span className="text-[10px] font-bold uppercase tracking-wider">Upload Photo {num}</span>
                                                                 </button>
+                                                                <div className="flex gap-1">
+                                                                    <input 
+                                                                        type="url"
+                                                                        placeholder="Or paste image URL"
+                                                                        onKeyDown={e => {
+                                                                            if (e.key === 'Enter') {
+                                                                                const val = (e.target as HTMLInputElement).value.trim();
+                                                                                if (val) {
+                                                                                    setCmsForm({
+                                                                                        ...cmsForm,
+                                                                                        campaign: { ...(cmsForm.campaign || {}), [`image${num}`]: val }
+                                                                                    });
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        onBlur={e => {
+                                                                            const val = e.target.value.trim();
+                                                                            if (val) {
+                                                                                setCmsForm({
+                                                                                    ...cmsForm,
+                                                                                    campaign: { ...(cmsForm.campaign || {}), [`image${num}`]: val }
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                        className="flex-1 border border-gray-200 p-1.5 text-xs focus:border-black outline-none bg-white"
+                                                                    />
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ) : (
+                                                        )}
+
+                                                        <input 
+                                                            type="file"
+                                                            ref={el => { campaignInputRefs.current[num] = el; }}
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            onChange={e => handleCampaignImageUpload(e.target.files?.[0], num)}
+                                                        />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Additional Campaign Slideshow Images */}
+                                    <div className="pt-4 border-t border-gray-100">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div>
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-luxury-black">Additional Slideshow Photos</h4>
+                                                <p className="text-[10px] text-gray-500">Add more photos to the animated campaign banner on the landing page.</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => extraCampaignFileInputRef.current?.click()}
+                                                disabled={isUploadingCampaignSlide}
+                                                className="px-3 py-1.5 bg-black text-white text-[10px] font-bold uppercase tracking-wider hover:bg-luxury-gold hover:text-black transition-colors rounded-xs flex items-center gap-1.5 disabled:opacity-50"
+                                            >
+                                                <Upload size={12} /> Upload Slides
+                                            </button>
+                                        </div>
+
+                                        <input 
+                                            type="file"
+                                            ref={extraCampaignFileInputRef}
+                                            accept="image/*"
+                                            multiple
+                                            className="hidden"
+                                            onChange={e => handleExtraCampaignUpload(e.target.files)}
+                                        />
+
+                                        <div className="flex gap-2 mb-3">
+                                            <input 
+                                                type="url"
+                                                value={newCampaignSlideUrl}
+                                                onChange={e => setNewCampaignSlideUrl(e.target.value)}
+                                                placeholder="Or paste slide image URL (https://...)"
+                                                className="flex-1 border border-gray-200 p-2 text-xs focus:border-black outline-none bg-white"
+                                            />
+                                            <button 
+                                                type="button"
+                                                onClick={handleAddCampaignSlide}
+                                                className="px-4 py-2 bg-gray-800 text-white text-xs font-bold uppercase tracking-wider hover:bg-luxury-gold hover:text-black transition-colors"
+                                            >
+                                                Add Slide
+                                            </button>
+                                        </div>
+
+                                        {Array.isArray(cmsForm.campaign?.images) && cmsForm.campaign.images.length > 0 && (
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                                {cmsForm.campaign.images.map((slideUrl: string, idx: number) => (
+                                                    <div key={idx} className="relative group aspect-video rounded-xs overflow-hidden border border-gray-200 bg-gray-100">
+                                                        <img src={slideUrl} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
                                                         <button 
                                                             type="button"
-                                                            onClick={() => campaignInputRefs.current[num]?.click()}
-                                                            className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-black rounded-sm text-gray-500 hover:text-black transition-colors flex flex-col items-center justify-center gap-1 bg-white"
+                                                            onClick={() => handleRemoveCampaignSlide(idx)}
+                                                            className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                                                            title="Remove slide"
                                                         >
-                                                            <Upload size={16} className="text-gray-400" />
-                                                            <span className="text-[11px] font-bold uppercase tracking-wider">Upload Image {num}</span>
+                                                            <Trash2 size={10} />
                                                         </button>
-                                                    )}
-
-                                                    <input 
-                                                        type="file"
-                                                        ref={el => { campaignInputRefs.current[num] = el; }}
-                                                        accept="image/*"
-                                                        className="hidden"
-                                                        onChange={e => handleCampaignImageUpload(e.target.files?.[0], num)}
-                                                    />
-                                                </div>
-                                            );
-                                        })}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Editorial Fashion Trend Showcase */}
+                        <div className="bg-white border border-gray-100 rounded-sm overflow-hidden shadow-sm">
+                            <button 
+                                onClick={() => setExpandedSection(expandedSection === 'editorial' ? null : 'editorial')}
+                                className="w-full px-6 py-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors"
+                            >
+                                <span className="font-bold text-xs uppercase tracking-widest flex items-center gap-2"><Layers size={14} /> Editorial Trends Grid</span>
+                                <ChevronDown size={16} className={`transition-transform ${expandedSection === 'editorial' ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {expandedSection === 'editorial' && (
+                                <div className="p-6 space-y-4 border-t border-gray-100">
+                                    <div>
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-luxury-black">Landing Page Editorial Showcase</h4>
+                                        <p className="text-[11px] text-gray-500 mt-0.5">These high-resolution photos populate the stylish 2-column fashion lookbook grid on the storefront.</p>
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <input 
+                                            type="url"
+                                            value={newEditorialUrl}
+                                            onChange={e => setNewEditorialUrl(e.target.value)}
+                                            placeholder="Paste editorial image URL (https://...)"
+                                            className="flex-1 border border-gray-200 p-2 text-xs focus:border-black outline-none bg-white"
+                                        />
+                                        <div className="flex gap-2">
+                                            <button 
+                                                type="button"
+                                                onClick={handleAddEditorialUrl}
+                                                className="px-4 py-2 bg-gray-800 text-white text-xs font-bold uppercase tracking-wider hover:bg-luxury-gold hover:text-black transition-colors whitespace-nowrap"
+                                            >
+                                                Add URL
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={() => editorialFileInputRef.current?.click()}
+                                                disabled={isUploadingEditorial}
+                                                className="px-4 py-2 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-luxury-gold hover:text-black transition-colors whitespace-nowrap flex items-center gap-1.5 disabled:opacity-50"
+                                            >
+                                                <Upload size={12} />
+                                                <span>{isUploadingEditorial ? 'Uploading...' : 'Upload Photos'}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <input 
+                                        type="file"
+                                        ref={editorialFileInputRef}
+                                        accept="image/*"
+                                        multiple
+                                        className="hidden"
+                                        onChange={e => handleEditorialUpload(e.target.files)}
+                                    />
+
+                                    {Array.isArray(cmsForm.editorialImages) && cmsForm.editorialImages.length > 0 ? (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+                                            {cmsForm.editorialImages.map((imgUrl: string, idx: number) => (
+                                                <div key={idx} className="relative group aspect-3/4 rounded-xs overflow-hidden border border-gray-200 bg-gray-100 shadow-xs">
+                                                    <img src={imgUrl} alt={`Editorial ${idx + 1}`} className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleRemoveEditorialImage(idx)}
+                                                            className="px-3 py-1.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-xs flex items-center gap-1 hover:bg-red-700 transition-colors shadow-md"
+                                                        >
+                                                            <Trash2 size={12} /> Remove
+                                                        </button>
+                                                    </div>
+                                                    <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded-xs font-mono">
+                                                        #{idx + 1}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="p-6 border-2 border-dashed border-gray-200 text-center rounded-sm text-gray-400 text-xs">
+                                            No custom editorial images uploaded yet. The landing page is displaying curated default fashion looks.
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1402,13 +1819,40 @@ export const StoreDesignView: React.FC<StoreDesignViewProps> = ({
                 </div>
             )}
             
-            <div className="md:hidden mt-6">
-                <button 
-                    onClick={handleCMSUpdate}
-                    className="w-full bg-black text-white px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold transition-colors"
-                >
-                    Save Changes
-                </button>
+            <div className="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-sm shadow-xs">
+                <div className="text-xs text-gray-500">
+                    {saveStatus?.type === 'success' ? (
+                        <span className="text-green-600 font-bold flex items-center gap-1.5">
+                            <CheckCircle2 size={14} /> Changes successfully published to storefront!
+                        </span>
+                    ) : saveStatus?.type === 'error' ? (
+                        <span className="text-red-600 font-bold flex items-center gap-1.5">
+                            <AlertCircle size={14} /> Error saving changes. Please retry.
+                        </span>
+                    ) : (
+                        <span>Edits made here update the storefront immediately upon saving.</span>
+                    )}
+                </div>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <button 
+                        type="button"
+                        onClick={onSaveAll}
+                        disabled={isSavingAll}
+                        className="flex-1 sm:flex-initial bg-black text-white px-8 py-3.5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-luxury-gold hover:text-black transition-colors rounded-xs flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                    >
+                        {isSavingAll ? (
+                            <>
+                                <RefreshCw size={14} className="animate-spin" />
+                                <span>Publishing...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Check size={14} />
+                                <span>Save All Changes</span>
+                            </>
+                        )}
+                    </button>
+                </div>
             </div>
         </div>
     );

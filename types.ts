@@ -124,6 +124,24 @@ export interface ShippingAddress {
   country: string;
 }
 
+export interface PayoutRecord {
+  id: string;
+  vendorId?: string;
+  date: string;
+  amount: number;
+  grossAmount?: number;
+  commissionFee?: number;
+  commissionRate?: number;
+  commissionPercentStr?: string;
+  method: string;
+  accountEnding: string;
+  status: 'Completed' | 'Processing' | 'Pending';
+  referenceNumber: string;
+  type?: 'STRIPE_CONNECT' | 'DIRECT_BANK';
+  disbursedAt?: string;
+  notes?: string;
+}
+
 export interface Vendor {
   id: string;
   name: string;
@@ -134,6 +152,17 @@ export interface Vendor {
   subscriptionStatus: SubscriptionStatus;
   location?: string;
   coverImage?: string;
+  heroBanner?: string;
+  heroHeadline?: string;
+  heroTagline?: string;
+  heroOverlayOpacity?: number;
+  brandStory?: string;
+  storyTitle?: string;
+  storySubtitle?: string;
+  storyImages?: string[];
+  artisanQuote?: string;
+  artisanQuoteAuthor?: string;
+  brandManifesto?: string;
   email?: string;
   subscriptionPlan?: 'Atelier' | 'Maison' | 'Couture' | 'BASIC';
   bankDetails?: {
@@ -141,6 +170,17 @@ export interface Vendor {
     accountName?: string;
     accountNumber?: string;
     routingNumber?: string;
+    swiftCode?: string;
+    country?: string;
+  };
+  stripeConnect?: {
+    connected: boolean;
+    stripeAccountId?: string;
+    payoutSchedule?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'MANUAL';
+    currency?: string;
+    chargesEnabled?: boolean;
+    payoutsEnabled?: boolean;
+    connectedEmail?: string;
   };
   website?: string;
   instagram?: string;
@@ -149,7 +189,8 @@ export interface Vendor {
   tiktok?: string;
   paymentMethods?: PaymentMethod[];
   kycDocuments?: KycDocuments;
-  visualTheme?: 'MINIMALIST' | 'DARK' | 'GOLD';
+  visualTheme?: 'MINIMALIST' | 'DARK' | 'GOLD' | 'AVANT-GARDE' | 'CLASSIC' | 'HAUTE-COUTURE';
+  themeAccentColor?: string;
   gallery?: string[];
   videoUrl?: string;
   brandName?: string;
@@ -389,6 +430,7 @@ export interface LandingPageContent {
     subtitle: string;
     titleLine1: string;
     titleLine2: string;
+    description?: string;
     buttonText: string;
     secondaryButtonText?: string;
     heroImages?: string[];

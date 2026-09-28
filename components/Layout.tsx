@@ -459,7 +459,7 @@ export const Layout: React.FC<LayoutProps> = ({
             {/* Icons */}
             <div className={`flex items-center gap-3 md:gap-5 ${navTextColor}`}>
               {/* Currency Selector */}
-              <CurrencySelector />
+              <CurrencySelector isDark={isNavTransparent} />
 
               {/* Visual Search */}
               <div className="relative group hidden md:block">

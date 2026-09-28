@@ -107,6 +107,22 @@
       "title": "UserLog",
       "description": "User activity audit log",
       "type": "object"
+    },
+    "Payout": {
+      "title": "Payout",
+      "description": "Vendor payout disbursement record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "vendorId": { "type": "string" },
+        "amount": { "type": "number" },
+        "grossAmount": { "type": "number" },
+        "commissionFee": { "type": "number" },
+        "status": { "type": "string", "enum": ["Completed", "Processing", "Pending"] },
+        "method": { "type": "string" },
+        "referenceNumber": { "type": "string" }
+      },
+      "required": ["amount", "status", "method", "referenceNumber"]
     }
   },
   "firestore": {
@@ -125,6 +141,10 @@
     "/orders/{orderId}": {
       "schema": { "$ref": "#/entities/Order" },
       "description": "Customer purchase orders"
+    },
+    "/payouts/{payoutId}": {
+      "schema": { "$ref": "#/entities/Payout" },
+      "description": "Vendor payouts and withdrawals"
     },
     "/notifications/{notificationId}": {
       "schema": { "$ref": "#/entities/AppNotification" },

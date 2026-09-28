@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
   ArrowRight, Sparkles, Loader, Diamond, UserPlus, Check, ThumbsUp, 
   ChevronLeft, ChevronRight, Play, Pause, LayoutGrid, Image as ImageIcon,
-  Eye, X, Shirt, ShoppingBag, Maximize2, Sparkle, Layers, Compass
+  Eye, X, Shirt, ShoppingBag, Maximize2, Sparkle, Layers, Compass, Palette
 } from 'lucide-react';
 import { generateSeasonalTrend } from '../services/geminiService.ts';
 import { TrendAnalysis, ViewState, UserRole, Vendor, Product, LandingPageContent } from '../types.ts';
@@ -198,29 +198,38 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const activeVendors = useMemo(() => vendors.filter(v => v.subscriptionStatus === 'ACTIVE' && v.verificationStatus === 'VERIFIED'), [vendors]);
   const spotlightProducts = useMemo(() => products.filter(p => !p.isNewSeason).slice(0, 3), [products]); // Display first 3 real products (excluding new arrivals)
 
-  // Safe access to CMS content
-  const hero = useMemo(() => cmsContent?.hero || {
-    videoUrl: "https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4",
-    posterUrl: "https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop",
-    subtitle: "The New Vanguard",
-    titleLine1: "DIGITAL",
-    titleLine2: "AVANT-GARDE",
-    buttonText: "Shop Collection"
+  // Safe access to CMS content with resilient non-empty fallbacks
+  const hero = useMemo(() => {
+    const raw = cmsContent?.hero;
+    return {
+      videoUrl: (raw?.videoUrl && raw.videoUrl.trim()) || "https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4",
+      posterUrl: (raw?.posterUrl && raw.posterUrl.trim()) || "https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop",
+      subtitle: (raw?.subtitle && raw.subtitle.trim()) || "The New Vanguard",
+      titleLine1: (raw?.titleLine1 && raw.titleLine1.trim()) || "DIGITAL",
+      titleLine2: (raw?.titleLine2 && raw.titleLine2.trim()) || "AVANT-GARDE",
+      description: (raw?.description && raw.description.trim()) || "Discover bespoke ready-to-wear, curated designer collections, and avant-garde couture from Africa's premier ateliers.",
+      buttonText: (raw?.buttonText && raw.buttonText.trim()) || "Shop Collection",
+      secondaryButtonText: (raw?.secondaryButtonText && raw.secondaryButtonText.trim()) || "Membership"
+    };
   }, [cmsContent]);
   
   const marqueeItems = useMemo(() => {
-    const marqueeText = cmsContent?.marquee?.text || "Lagos • Accra • Nairobi • Cape Town • Heritage Reimagined • Pan-African Aesthetics";
+    const marqueeText = (cmsContent?.marquee?.text && cmsContent.marquee.text.trim()) || "Lagos • Accra • Nairobi • Cape Town • Heritage Reimagined • Pan-African Aesthetics";
     return marqueeText.split("•").map(s => s.trim()).filter(Boolean);
   }, [cmsContent]);
 
-  const campaign = useMemo(() => cmsContent?.campaign || {
-    subtitle: "The Campaign",
-    title: "Urban Chronicles",
-    image1: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887&auto=format&fit=crop",
-    image2: "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888&auto=format&fit=crop",
-    image3: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop",
-    image4: "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886&auto=format&fit=crop",
-    overlayText1: "Street Edition"
+  const campaign = useMemo(() => {
+    const raw = cmsContent?.campaign;
+    return {
+      subtitle: (raw?.subtitle && raw.subtitle.trim()) || "The Campaign",
+      title: (raw?.title && raw.title.trim()) || "Urban Chronicles",
+      image1: (raw?.image1 && raw.image1.trim()) || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887&auto=format&fit=crop",
+      image2: (raw?.image2 && raw.image2.trim()) || "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888&auto=format&fit=crop",
+      image3: (raw?.image3 && raw.image3.trim()) || "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop",
+      image4: (raw?.image4 && raw.image4.trim()) || "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886&auto=format&fit=crop",
+      overlayText1: (raw?.overlayText1 && raw.overlayText1.trim()) || "Street Edition",
+      images: raw?.images
+    };
   }, [cmsContent]);
 
   // Landing Page Campaign Slideshow State
@@ -249,21 +258,34 @@ export const LandingView: React.FC<LandingViewProps> = ({
     return () => clearInterval(interval);
   }, [isCampaignSlideshowPlaying, campaignSlides]);
 
-  const designersSection = useMemo(() => cmsContent?.designers || { subtitle: "The Ateliers", title: "Shop by Designer" }, [cmsContent]);
-  const spotlightSection = useMemo(() => cmsContent?.spotlight || { title: "Editor's Picks" }, [cmsContent]);
+  const designersSection = useMemo(() => {
+    const raw = cmsContent?.designers;
+    return {
+      subtitle: (raw?.subtitle && raw.subtitle.trim()) || "The Ateliers",
+      title: (raw?.title && raw.title.trim()) || "Shop by Designer"
+    };
+  }, [cmsContent]);
+
+  const spotlightSection = useMemo(() => {
+    const raw = cmsContent?.spotlight;
+    return {
+      title: (raw?.title && raw.title.trim()) || "Editor's Picks"
+    };
+  }, [cmsContent]);
 
   return (
     <div className="w-full">
       {/* Hero Section */}
       <section className="relative min-h-[100dvh] w-full overflow-hidden flex items-center justify-center bg-luxury-black">
-        <div className="absolute inset-0 bg-black/40 z-10" />
+        {/* Enhanced high-contrast overlay gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/90 z-10" />
         <video
           autoPlay
           muted
           loop
           playsInline
           poster={hero.posterUrl}
-          className="absolute inset-0 w-full h-full object-cover animate-fade-in opacity-90"
+          className="absolute inset-0 w-full h-full object-cover animate-fade-in opacity-80"
         >
           <source src={hero.videoUrl} type="video/mp4" />
           <img 
@@ -274,19 +296,25 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </video>
         
         <div className="relative z-20 text-center text-white px-6 py-20 md:py-32 animate-slide-up w-full max-w-4xl mx-auto flex flex-col items-center">
-          <h2 className="text-[10px] md:text-base tracking-[0.3em] uppercase mb-4 opacity-90 text-luxury-gold">{hero.subtitle}</h2>
-          <h1 className="text-4xl sm:text-6xl md:text-8xl font-serif font-medium mb-8 md:mb-10 leading-tight drop-shadow-2xl">
+          <h2 className="text-xs sm:text-sm md:text-base tracking-[0.35em] uppercase mb-4 text-[#F3D37A] font-bold drop-shadow-md">
+            {hero.subtitle}
+          </h2>
+          <h1 className="text-4xl sm:text-6xl md:text-8xl font-serif font-medium mb-6 md:mb-8 leading-tight drop-shadow-2xl text-white">
             {hero.titleLine1} <br /> 
-            <span className="italic font-light">{hero.titleLine2}</span>
+            <span className="italic font-light text-white/95">{hero.titleLine2}</span>
           </h1>
+
+          <p className="text-xs sm:text-sm md:text-base text-gray-200 font-sans max-w-xl mx-auto mb-8 md:mb-10 drop-shadow-md leading-relaxed font-normal">
+            {hero.description || "Discover bespoke ready-to-wear, curated designer collections, and avant-garde couture from Africa's premier ateliers."}
+          </p>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-md md:max-w-none">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-md md:max-w-none">
             <button 
               onClick={() => onNavigate('MARKETPLACE')}
-              className="group relative inline-flex items-center justify-center gap-3 px-8 py-3 md:py-4 bg-white text-black text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase hover:bg-luxury-gold hover:text-white transition-all duration-300 w-full sm:w-auto sm:min-w-[200px] shadow-xl hover:shadow-2xl hover:-translate-y-1"
+              className="group relative inline-flex items-center justify-center gap-3 px-8 py-3.5 md:py-4 bg-white text-black text-xs font-black tracking-[0.2em] uppercase hover:bg-luxury-gold hover:text-black transition-all duration-300 w-full sm:w-auto sm:min-w-[200px] shadow-2xl hover:shadow-gold/20 hover:-translate-y-0.5 rounded-xs"
             >
               {hero.buttonText}
-              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
             </button>
             
             {!isLoggedIn && (
@@ -299,9 +327,9 @@ export const LandingView: React.FC<LandingViewProps> = ({
                     onNavigate('AUTH');
                   }
                 }}
-                className="group relative inline-flex items-center justify-center gap-2 px-8 py-3 md:py-4 bg-luxury-gold text-white text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase hover:bg-white hover:text-black transition-all duration-300 w-full sm:w-auto sm:min-w-[200px] shadow-xl hover:shadow-2xl hover:-translate-y-1"
+                className="group relative inline-flex items-center justify-center gap-2.5 px-8 py-3.5 md:py-4 bg-luxury-gold text-black text-xs font-black tracking-[0.2em] uppercase hover:bg-white hover:text-black transition-all duration-300 w-full sm:w-auto sm:min-w-[200px] shadow-2xl hover:-translate-y-0.5 rounded-xs"
               >
-                <UserPlus size={14} /> Get Started
+                <UserPlus size={15} className="text-black" /> Get Started
               </button>
             )}
             
@@ -309,15 +337,15 @@ export const LandingView: React.FC<LandingViewProps> = ({
               onClick={() => {
                 document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="group relative inline-flex items-center justify-center gap-2 px-8 py-3 md:py-4 bg-black/40 backdrop-blur-md border border-white/30 text-white text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 w-full sm:w-auto sm:min-w-[200px]"
+              className="group relative inline-flex items-center justify-center gap-2.5 px-8 py-3.5 md:py-4 bg-black/70 backdrop-blur-md border-2 border-white/80 text-white text-xs font-bold tracking-[0.2em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 w-full sm:w-auto sm:min-w-[200px] shadow-xl rounded-xs"
             >
-              <Diamond size={12} /> {hero.secondaryButtonText || 'Membership'}
+              <Diamond size={13} className="text-white group-hover:text-black" /> {hero.secondaryButtonText || 'Membership'}
             </button>
 
             {isLoggedIn && (
                <button 
                 onClick={handleDashboardClick}
-                className="group relative inline-flex items-center justify-center gap-3 px-8 py-3 md:py-4 border border-white text-white text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase hover:bg-white hover:text-black transition-all duration-300 backdrop-blur-sm w-full sm:w-auto sm:min-w-[200px]"
+                className="group relative inline-flex items-center justify-center gap-3 px-8 py-3.5 md:py-4 border-2 border-white bg-black/60 text-white text-xs font-bold tracking-[0.2em] uppercase hover:bg-white hover:text-black transition-all duration-300 backdrop-blur-md w-full sm:w-auto sm:min-w-[200px] shadow-xl rounded-xs"
               >
                 Dashboard
               </button>
@@ -371,14 +399,14 @@ export const LandingView: React.FC<LandingViewProps> = ({
                       )}
                   </div>
                 </div>
-                <h3 className="font-bold text-xs uppercase tracking-wide mb-1 text-gray-400">{product.designer}</h3>
+                <h3 className="font-bold text-xs uppercase tracking-wide mb-1 text-gray-700">{product.designer}</h3>
                 <p className="font-serif text-sm md:text-base italic text-luxury-black mb-1 truncate">{product.name}</p>
-                <p className="text-xs font-medium text-luxury-black">{formatPrice(product.price)}</p>
+                <p className="text-xs font-semibold text-luxury-black">{formatPrice(product.price)}</p>
               </div>
             ))}
             {products.filter(p => p.isNewSeason).length === 0 && (
-                <div className="col-span-full py-12 text-center text-gray-400 border border-dashed border-gray-200 rounded-sm">
-                    <p>New season collections are arriving soon.</p>
+                <div className="col-span-full py-12 text-center text-gray-500 border border-dashed border-gray-300 rounded-sm">
+                    <p className="font-medium text-sm">New season collections are arriving soon.</p>
                 </div>
             )}
           </div>
@@ -386,7 +414,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
       </section>
 
       {/* Infinite Marquee with Parallax */}
-      <div className="bg-luxury-gold text-white py-3 md:py-4 overflow-hidden whitespace-nowrap border-y border-white/10 relative z-30">
+      <div className="bg-luxury-black text-white py-3.5 md:py-4.5 overflow-hidden whitespace-nowrap border-y border-luxury-gold/30 relative z-30 shadow-md">
         {/* Parallax Wrapper */}
         <div style={{ transform: `translateX(${scrollY * -0.15}px)`, willChange: 'transform' }}>
           {/* Animation Wrapper: 30s duration, linear timing */}
@@ -395,8 +423,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
                <React.Fragment key={i}>
                   {marqueeItems.map((item, idx) => (
                      <React.Fragment key={idx}>
-                        <span className={`text-[10px] md:text-xs mx-4 md:mx-8 ${idx % 2 === 0 ? 'font-bold uppercase tracking-[0.3em]' : 'font-serif italic'}`}>{item}</span>
-                        <span className="mx-4 md:mx-8 text-black/50">•</span>
+                        <span className={`text-[10px] md:text-xs mx-4 md:mx-8 ${idx % 2 === 0 ? 'font-bold uppercase tracking-[0.3em] text-[#F3D37A]' : 'font-serif italic text-luxury-cream'}`}>{item}</span>
+                        <span className="mx-4 md:mx-8 text-luxury-gold font-bold">•</span>
                      </React.Fragment>
                   ))}
                </React.Fragment>
@@ -415,13 +443,13 @@ export const LandingView: React.FC<LandingViewProps> = ({
       <section className="py-16 md:py-24 bg-luxury-cream border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12 md:mb-16">
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-luxury-taupe mb-4 block">{designersSection.subtitle}</span>
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-gray-600 mb-4 block">{designersSection.subtitle}</span>
             <h2 className="text-3xl md:text-5xl font-serif italic text-luxury-black">{designersSection.title}</h2>
           </div>
           
           <div className="flex flex-wrap justify-center gap-8 md:gap-20">
             {activeVendors.length === 0 ? (
-               <div className="w-full text-center text-gray-400">
+               <div className="w-full text-center text-gray-500 font-medium">
                   <p>Our curated ateliers are being updated.</p>
                </div>
             ) : (
@@ -443,7 +471,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                   <h3 className="text-xs md:text-sm font-bold uppercase tracking-widest border-b border-transparent group-hover:border-luxury-black pb-1 transition-all duration-300 text-luxury-charcoal text-center">
                     {vendor.name}
                   </h3>
-                  <p className="text-[9px] md:text-[10px] text-luxury-taupe mt-1 md:mt-2 font-serif italic">{vendor.location}</p>
+                  <p className="text-[9px] md:text-[10px] text-gray-600 mt-1 md:mt-2 font-serif italic">{vendor.location}</p>
                 </div>
               ))
             )}
@@ -474,22 +502,24 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 <div className="h-48 flex items-center justify-center border border-white/10">
                   <Loader className="animate-spin text-luxury-gold" />
                 </div>
-              ) : trend ? (
+              ) : (
                 <div className="space-y-6 md:space-y-8 animate-fade-in">
-                  <h2 className="text-3xl md:text-6xl font-serif leading-none">{trend.title}</h2>
-                  <p className="text-gray-400 text-sm md:text-lg font-light leading-relaxed">
-                    {trend.description}
+                  <h2 className="text-3xl md:text-6xl font-serif leading-none text-white">
+                    {trend?.title || "Neo-Heritage Silhouettes"}
+                  </h2>
+                  <p className="text-gray-300 text-sm md:text-lg font-light leading-relaxed">
+                    {trend?.description || "Sculptural tailoring intersecting with artisanal Pan-African weaves. Structured shoulders, fluid draped sashes, and golden bronze metallic accents define this season's couture movement."}
                   </p>
                   <div className="space-y-2">
-                    <p className="text-[10px] md:text-xs uppercase tracking-wider text-gray-500">Palette</p>
+                    <p className="text-[10px] md:text-xs uppercase tracking-wider text-gray-400 font-bold">Palette</p>
                     <div className="flex gap-4">
-                      {trend.colorPalette.map((color, idx) => (
-                        <div key={idx} className="w-8 h-8 md:w-12 md:h-12 rounded-full border border-white/10" style={{ backgroundColor: color }} />
+                      {(trend?.colorPalette || ["#0A0A0A", "#C5A059", "#8B8580", "#4A0404", "#FDFCF8"]).map((color, idx) => (
+                        <div key={idx} className="w-8 h-8 md:w-12 md:h-12 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: color }} />
                       ))}
                     </div>
                   </div>
                 </div>
-              ) : null}
+              )}
             </div>
 
             <div className="relative hidden md:block">
@@ -633,8 +663,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 >
                    <img src={campaign.image1 || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Outfit 1" />
                    <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-                   <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 text-white opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                      <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest">{campaign.overlayText1}</p>
+                   <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 text-white transition-opacity duration-300">
+                      <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest bg-black/70 backdrop-blur-xs px-3 py-1.5 rounded-xs border border-white/20 inline-block shadow-md">{campaign.overlayText1}</p>
                    </div>
                 </div>
                 <div 
@@ -908,11 +938,11 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 )}
               </div>
               <h3 className="font-bold text-xs md:text-sm uppercase tracking-wide mb-1 text-luxury-charcoal">{product.designer}</h3>
-              <p className="font-serif text-base md:text-lg italic text-luxury-taupe mb-2">{product.name}</p>
-              <p className="text-xs md:text-sm font-medium text-luxury-black">{formatPrice(product.price)}</p>
+              <p className="font-serif text-base md:text-lg italic text-luxury-black font-semibold mb-2">{product.name}</p>
+              <p className="text-xs md:text-sm font-bold text-luxury-black">{formatPrice(product.price)}</p>
             </div>
           )) : (
-            <div className="col-span-3 text-center text-gray-400 py-12">
+            <div className="col-span-3 text-center text-gray-500 py-12 font-medium">
               <p>No products featured at the moment.</p>
             </div>
           )}
@@ -924,8 +954,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
         <section id="pricing-section" className="py-24 bg-luxury-cream">
           <div className="max-w-7xl mx-auto px-6 mb-20 text-center">
             <span className="text-xs font-bold uppercase tracking-[0.3em] text-luxury-gold mb-4 block">{cmsContent.pricing.subtitle}</span>
-            <h2 className="text-4xl md:text-6xl font-serif italic mb-6">{cmsContent.pricing.title}</h2>
-            <p className="max-w-2xl mx-auto text-gray-500 font-light text-lg">
+            <h2 className="text-4xl md:text-6xl font-serif italic text-luxury-black mb-6">{cmsContent.pricing.title}</h2>
+            <p className="max-w-2xl mx-auto text-gray-700 font-light text-lg">
               {cmsContent.pricing.description}
             </p>
           </div>
@@ -1038,6 +1068,23 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {/* Admin Floating CMS Quick Access Toolbar */}
+      {userRole === UserRole.ADMIN && (
+        <div className="fixed bottom-6 right-6 z-50 bg-black/90 text-white backdrop-blur-md border border-luxury-gold/50 px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-fade-in hover:border-luxury-gold transition-all">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#F3D37A]">Admin Mode</span>
+          </div>
+          <span className="text-gray-500 text-xs">|</span>
+          <button
+            onClick={() => onNavigate('ADMIN_PANEL')}
+            className="text-xs font-bold uppercase tracking-wider hover:text-[#F3D37A] transition-colors flex items-center gap-1.5"
+            title="Open Store Design & Landing Page Editor"
+          >
+            <Palette size={14} className="text-[#F3D37A]" /> Edit Landing Page CMS
+          </button>
         </div>
       )}
     </div>

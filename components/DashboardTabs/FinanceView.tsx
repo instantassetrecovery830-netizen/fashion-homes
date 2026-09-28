@@ -1,16 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Wallet, Clock, TrendingUp, Activity, Download, CheckCircle, Menu, ArrowUpRight, 
   CreditCard, DollarSign, Percent, ShieldCheck, Filter, Search, ArrowDownRight, 
   Building, RefreshCw, AlertCircle, FileText, Check, ChevronRight, HelpCircle,
-  FileCheck, Calendar, Zap
+  FileCheck, Calendar, Zap, ExternalLink, Printer, CheckCircle2, Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { Order, User, Vendor } from '../../types';
+import { Order, User, Vendor, PayoutRecord } from '../../types.ts';
 import { useCurrency } from '../../context/CurrencyContext.tsx';
 import { getCommissionRate, getCommissionPercent, getPotentialSavingsMessage } from '../../utils/commission.ts';
 import { generateTaxStatementData, downloadTaxStatementCSV, TaxStatementData } from '../../utils/taxStatement.ts';
+import { fetchVendorPayouts, createPayoutInDb } from '../../services/dataService.ts';
 
 interface FinanceViewProps {
   totalRevenue: number;
@@ -18,16 +19,6 @@ interface FinanceViewProps {
   setIsSidebarOpen: (open: boolean) => void;
   currentUser?: User | Vendor | null;
   vendor?: Vendor | null;
-}
-
-interface PayoutRecord {
-  id: string;
-  date: string;
-  amount: number;
-  method: string;
-  accountEnding: string;
-  status: 'Completed' | 'Processing' | 'Pending';
-  referenceNumber: string;
 }
 
 export const FinanceView: React.FC<FinanceViewProps> = ({ 
@@ -42,16 +33,32 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   // Date Range Filter State
   const [dateRange, setDateRange] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_90_DAYS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'LEDGER' | 'PAYOUTS' | 'PORTAL' | 'BANK_SETTINGS'>('PORTAL');
+  const [activeTab, setActiveTab] = useState<'PORTAL' | 'STRIPE_CONNECT' | 'LEDGER' | 'PAYOUTS' | 'BANK_SETTINGS'>('PORTAL');
 
-  // Modals
+  // Modals & Forms
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
+  const [isStripeModalOpen, setIsStripeModalOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [lastPayoutReceipt, setLastPayoutReceipt] = useState<PayoutRecord | null>(null);
+
   const [selectedTaxPeriod, setSelectedTaxPeriod] = useState<string>('FY_2026');
   const [payoutAmountInput, setPayoutAmountInput] = useState('');
-  const [payoutMethod, setPayoutMethod] = useState<'BANK_TRANSFER' | 'STRIPE' | 'PAYSTACK'>('BANK_TRANSFER');
+  const [payoutMethod, setPayoutMethod] = useState<'STRIPE_CONNECT' | 'DIRECT_BANK'>('STRIPE_CONNECT');
   const [payoutSuccessMsg, setPayoutSuccessMsg] = useState<string | null>(null);
+  const [isSubmittingPayout, setIsSubmittingPayout] = useState(false);
+
+  // Stripe Connect State
+  const [stripeAccount, setStripeAccount] = useState({
+    connected: vendor?.stripeConnect?.connected ?? true,
+    stripeAccountId: vendor?.stripeConnect?.stripeAccountId || 'acct_1Ox9842MaisonAtelier',
+    payoutSchedule: vendor?.stripeConnect?.payoutSchedule || 'WEEKLY',
+    chargesEnabled: true,
+    payoutsEnabled: true,
+    instantPayoutEligible: true,
+    connectedEmail: vendor?.stripeConnect?.connectedEmail || vendor?.email || 'finance@atelier-couture.com'
+  });
 
   // Bank Info State
   const [bankInfo, setBankInfo] = useState({
@@ -59,40 +66,78 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     accountName: vendor?.bankDetails?.accountName || vendor?.name || 'Maison Atelier Inc.',
     accountNumber: vendor?.bankDetails?.accountNumber || '••••••••4242',
     routingNumber: vendor?.bankDetails?.routingNumber || '021000021',
-    swiftCode: 'CHASUS33',
-    country: 'United States'
+    swiftCode: vendor?.bankDetails?.swiftCode || 'CHASUS33',
+    country: vendor?.bankDetails?.country || 'United States'
   });
 
-  // Payout History State
-  const [payoutHistory, setPayoutHistory] = useState<PayoutRecord[]>([
+  // Initial Seed Records for initial fallback
+  const initialPayouts: PayoutRecord[] = useMemo(() => [
     {
       id: 'PO-98421',
+      vendorId: vendor?.id,
       date: '2026-08-15',
       amount: 2400.00,
-      method: 'Bank Wire (USD)',
+      grossAmount: 2823.53,
+      commissionFee: 423.53,
+      commissionRate: 0.15,
+      method: 'Stripe Connect Instant Payout',
       accountEnding: '••••4242',
       status: 'Completed',
-      referenceNumber: 'REF-8842190'
+      referenceNumber: 'REF-8842190',
+      type: 'STRIPE_CONNECT',
+      disbursedAt: '2026-08-15T14:32:00Z'
     },
     {
       id: 'PO-98305',
+      vendorId: vendor?.id,
       date: '2026-07-30',
       amount: 1850.50,
-      method: 'Bank Wire (USD)',
+      grossAmount: 2177.06,
+      commissionFee: 326.56,
+      commissionRate: 0.15,
+      method: 'Direct Bank Wire (J.P. Morgan)',
       accountEnding: '••••4242',
       status: 'Completed',
-      referenceNumber: 'REF-7639102'
+      referenceNumber: 'REF-7639102',
+      type: 'DIRECT_BANK',
+      disbursedAt: '2026-07-30T10:15:00Z'
     },
     {
       id: 'PO-98112',
+      vendorId: vendor?.id,
       date: '2026-07-01',
       amount: 3200.00,
-      method: 'Bank Wire (USD)',
+      grossAmount: 3764.71,
+      commissionFee: 564.71,
+      commissionRate: 0.15,
+      method: 'Stripe Connect Instant Payout',
       accountEnding: '••••4242',
       status: 'Completed',
-      referenceNumber: 'REF-6520194'
+      referenceNumber: 'REF-6520194',
+      type: 'STRIPE_CONNECT',
+      disbursedAt: '2026-07-01T16:45:00Z'
     }
-  ]);
+  ], [vendor?.id]);
+
+  // Payout History State
+  const [payoutHistory, setPayoutHistory] = useState<PayoutRecord[]>(initialPayouts);
+
+  // Load Payouts from Firestore
+  useEffect(() => {
+    let isMounted = true;
+    const loadPayouts = async () => {
+      try {
+        const records = await fetchVendorPayouts(vendor?.id);
+        if (isMounted && records && records.length > 0) {
+          setPayoutHistory(records);
+        }
+      } catch (err) {
+        console.warn("Could not load remote payouts:", err);
+      }
+    };
+    loadPayouts();
+    return () => { isMounted = false; };
+  }, [vendor?.id]);
 
   // Commission Rate calculation based on vendor active subscription plan (Atelier 15%, Couture 10%, Maison 5%)
   const commissionRate = useMemo(() => {
@@ -107,7 +152,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   const filteredOrders = useMemo(() => {
     let list = [...myOrders];
 
-    const now = new Date('2026-09-02'); // Current simulated platform date
+    const now = new Date('2026-09-02');
     if (dateRange === 'THIS_MONTH') {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       list = list.filter(o => new Date(o.date) >= startOfMonth);
@@ -136,7 +181,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     return list;
   }, [myOrders, dateRange, searchQuery]);
 
-  // Financial Calculations
+  // Financial Calculations: Automated Platform Commission & Net Payout
   const grossSales = useMemo(() => {
     return filteredOrders.reduce((sum, order) => sum + order.total, 0);
   }, [filteredOrders]);
@@ -149,6 +194,15 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     return grossSales - totalCommissionDeducted;
   }, [grossSales, totalCommissionDeducted]);
 
+  // Lifetime Calculations
+  const totalLifetimeGross = useMemo(() => {
+    return myOrders.reduce((sum, o) => sum + o.total, 0);
+  }, [myOrders]);
+
+  const totalLifetimeNet = useMemo(() => {
+    return totalLifetimeGross * (1 - commissionRate);
+  }, [totalLifetimeGross, commissionRate]);
+
   // Payout Adjustments
   const totalPayoutsRequested = useMemo(() => {
     return payoutHistory
@@ -156,19 +210,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       .reduce((sum, p) => sum + p.amount, 0);
   }, [payoutHistory]);
 
-  const totalLifetimeNet = useMemo(() => {
-    const lifetimeGross = myOrders.reduce((sum, o) => sum + o.total, 0);
-    return lifetimeGross * (1 - commissionRate);
-  }, [myOrders, commissionRate]);
-
-  // Pending vs Available Clearance logic
+  // Pending Clearance (Orders currently in Processing status)
   const pendingClearance = useMemo(() => {
-    // Orders in Processing status or within last 3 days
     return filteredOrders
       .filter(o => o.status === 'Processing')
       .reduce((sum, o) => sum + (o.total * (1 - commissionRate)), 0);
   }, [filteredOrders, commissionRate]);
 
+  // Available Cleared Net Funds ready for payout
   const availableBalance = useMemo(() => {
     const totalClearedNet = totalLifetimeNet - pendingClearance;
     const balance = totalClearedNet - totalPayoutsRequested;
@@ -183,8 +232,6 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   // Chart Data preparation
   const monthlyChartData = useMemo(() => {
     const monthlyMap: Record<string, { gross: number; commission: number; net: number }> = {};
-    
-    // Sort orders chronologically
     const sorted = [...myOrders].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     sorted.forEach(order => {
@@ -221,10 +268,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       'Items Count',
       'Items Description',
       'Order Status',
-      'Gross Amount (USD)',
-      'Commission Rate (%)',
-      'Commission Fee (USD)',
-      'Net Vendor Earnings (USD)',
+      'Gross Total (USD)',
+      'Platform Fee Rate (%)',
+      'Commission Fee Deducted (USD)',
+      'Net Vendor Payout (USD)',
       'Clearance Status'
     ];
 
@@ -255,13 +302,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `MyFitStore_Revenue_Statement_${dateRange}_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute('download', `MyFitStore_Vendor_Ledger_${dateRange}_${new Date().toISOString().slice(0,10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Generate Current Tax Statement Data
+  // Tax Statement Generation
   const taxStatementData = useMemo(() => {
     return generateTaxStatementData(myOrders, vendor, selectedTaxPeriod.replace('_', ' '));
   }, [myOrders, vendor, selectedTaxPeriod]);
@@ -270,8 +317,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     downloadTaxStatementCSV(taxStatementData);
   };
 
-  // Submit Payout Request Handler
-  const handleRequestPayout = (e: React.FormEvent) => {
+  // Submit Automated Payout Request
+  const handleRequestPayout = async (e: React.FormEvent) => {
     e.preventDefault();
     const amountNum = parseFloat(payoutAmountInput);
     if (isNaN(amountNum) || amountNum <= 0) {
@@ -284,39 +331,68 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       return;
     }
 
-    const newRecord: PayoutRecord = {
-      id: `PO-${Math.floor(10000 + Math.random() * 90000)}`,
-      date: new Date().toISOString().slice(0, 10),
-      amount: amountNum,
-      method: payoutMethod === 'BANK_TRANSFER' ? `Bank Wire (${bankInfo.bankName})` : payoutMethod,
-      accountEnding: bankInfo.accountNumber.slice(-4) || '4242',
-      status: 'Processing',
-      referenceNumber: `REF-${Math.floor(1000000 + Math.random() * 9000000)}`
-    };
+    setIsSubmittingPayout(true);
 
-    setPayoutHistory([newRecord, ...payoutHistory]);
-    setPayoutSuccessMsg(`Payout request of ${formatPrice(amountNum)} submitted successfully. Reference: ${newRecord.referenceNumber}`);
-    setPayoutAmountInput('');
-    setIsPayoutModalOpen(false);
+    try {
+      const isStripe = payoutMethod === 'STRIPE_CONNECT';
+      const refNumber = `REF-${Math.floor(1000000 + Math.random() * 9000000)}`;
+      const payoutId = `PO-${Math.floor(10000 + Math.random() * 90000)}`;
 
-    setTimeout(() => {
-      setPayoutSuccessMsg(null);
-    }, 6000);
+      const newRecord: PayoutRecord = {
+        id: payoutId,
+        vendorId: vendor?.id || 'current_vendor',
+        date: new Date().toISOString().slice(0, 10),
+        amount: amountNum,
+        grossAmount: amountNum / (1 - commissionRate),
+        commissionFee: (amountNum / (1 - commissionRate)) * commissionRate,
+        commissionRate: commissionRate,
+        commissionPercentStr: commissionPercentStr,
+        method: isStripe 
+          ? `Stripe Connect Instant (${stripeAccount.stripeAccountId})` 
+          : `Direct Bank Wire (${bankInfo.bankName})`,
+        accountEnding: isStripe ? 'Stripe Debit Card / Bank' : (bankInfo.accountNumber.slice(-4) || '4242'),
+        status: isStripe ? 'Processing' : 'Pending',
+        referenceNumber: refNumber,
+        type: isStripe ? 'STRIPE_CONNECT' : 'DIRECT_BANK',
+        disbursedAt: new Date().toISOString(),
+        notes: `Disbursement calculated minus ${commissionPercentStr} platform commission. 0% withdrawal processing fee.`
+      };
+
+      // Persist to Firestore
+      await createPayoutInDb(newRecord);
+
+      // Update local state
+      setPayoutHistory([newRecord, ...payoutHistory]);
+      setLastPayoutReceipt(newRecord);
+      setPayoutSuccessMsg(`Payout of ${formatPrice(amountNum)} initiated via ${isStripe ? 'Stripe Connect' : 'Direct Bank Wire'}. Reference: ${refNumber}`);
+      setPayoutAmountInput('');
+      setIsPayoutModalOpen(false);
+      setIsReceiptModalOpen(true);
+
+      setTimeout(() => {
+        setPayoutSuccessMsg(null);
+      }, 7000);
+    } catch (error) {
+      console.error("Payout error:", error);
+      alert("Failed to submit payout. Please try again.");
+    } finally {
+      setIsSubmittingPayout(false);
+    }
   };
 
   return (
     <div className="space-y-8 animate-fade-in pb-20 md:pb-0">
-      {/* Top Header & Quick Actions */}
+      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-6">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-3xl font-serif italic text-black">Payout & Earnings</h2>
+            <h2 className="text-3xl font-serif italic text-black">Payouts & Financial Portal</h2>
             <span className="bg-luxury-gold/10 text-luxury-gold px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-luxury-gold/20 flex items-center gap-1">
-              <ShieldCheck size={12} /> Tier: {vendor?.subscriptionPlan || 'STANDARD'} ({commissionPercentStr} Fee)
+              <ShieldCheck size={12} /> Tier: {vendor?.subscriptionPlan || 'Atelier'} ({commissionPercentStr} Platform Commission)
             </span>
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Real-time financial dashboard with gross revenue, platform deductions, clearance schedules, and automated payouts.
+            Automated vendor payouts calculated minus platform fee, integrated with Stripe Connect and Direct Bank Wire.
           </p>
         </div>
 
@@ -325,7 +401,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value as any)}
-            className="bg-white border border-gray-200 text-xs font-semibold px-3 py-2.5 rounded-sm focus:outline-none focus:border-black transition-colors"
+            className="bg-white border border-gray-200 text-xs font-semibold px-3 py-2.5 rounded-xs focus:outline-none focus:border-black transition-colors"
           >
             <option value="ALL">All Time</option>
             <option value="THIS_MONTH">This Month</option>
@@ -333,10 +409,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <option value="LAST_90_DAYS">Last 90 Days</option>
           </select>
 
-          {/* Download Tax & Commission Breakdown Statement Button */}
+          {/* Tax Statement Button */}
           <button
             onClick={() => setIsTaxModalOpen(true)}
-            className="bg-gray-100 text-black border border-gray-200 px-4 py-2.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-black hover:text-white transition-colors shadow-sm"
+            className="bg-gray-100 text-black border border-gray-200 px-4 py-2.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-black hover:text-white transition-colors shadow-sm rounded-xs"
             title="Download official tax & commission breakdown statements"
           >
             <FileCheck size={15} className="text-luxury-gold" /> <span className="hidden sm:inline">Tax Statement</span>
@@ -345,10 +421,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           {/* Export CSV Statement Button */}
           <button 
             onClick={handleDownloadCSV}
-            className="bg-luxury-black text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-luxury-gold transition-colors shadow-sm"
-            title="Download full itemized CSV revenue statement"
+            className="bg-black text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-luxury-gold hover:text-black transition-colors shadow-sm rounded-xs"
+            title="Download full itemized CSV revenue ledger"
           >
-            <Download size={15} /> <span className="hidden sm:inline">Export Statement</span> (CSV)
+            <Download size={15} /> <span className="hidden sm:inline">Export Ledger</span> (CSV)
           </button>
 
           <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2.5 border border-gray-200 rounded-sm">
@@ -365,49 +441,44 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-sm text-xs font-medium flex items-center justify-between"
         >
           <div className="flex items-center gap-2">
-            <CheckCircle size={16} className="text-emerald-600" />
+            <CheckCircle2 size={16} className="text-emerald-600" />
             <span>{payoutSuccessMsg}</span>
           </div>
           <button onClick={() => setPayoutSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900 font-bold">×</button>
         </motion.div>
       )}
 
-      {/* Tiered Commission Savings Callout */}
-      {potentialSavings && (
-        <motion.div
-          initial={{ opacity: 0, y: -5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-luxury-black via-gray-900 to-black text-white p-4 rounded-sm border border-luxury-gold/30 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md"
-        >
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-luxury-gold/20 text-luxury-gold rounded shrink-0 mt-0.5">
-              <Percent size={18} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase font-bold tracking-widest text-luxury-gold">Tiered Commission Split Insight</span>
-                <span className="text-[9px] bg-luxury-gold/20 text-luxury-gold border border-luxury-gold/30 px-2 py-0.5 rounded font-bold uppercase">
-                  Active Tier: {vendor?.subscriptionPlan || 'Atelier'} ({commissionPercentStr})
-                </span>
-              </div>
-              <p className="text-xs text-gray-300 mt-1 font-medium">
-                {potentialSavings.savingsText}
-              </p>
-            </div>
+      {/* Tiered Commission Split Formula Banner */}
+      <div className="bg-gradient-to-r from-black via-zinc-900 to-black text-white p-5 rounded-sm border border-luxury-gold/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 bg-luxury-gold/20 text-luxury-gold rounded shrink-0 mt-0.5">
+            <Percent size={20} />
           </div>
-          <div className="shrink-0 flex items-center gap-2">
-            <div className="text-right hidden sm:block">
-              <span className="text-[10px] uppercase font-bold text-gray-400 block">Commission Rates</span>
-              <span className="text-xs font-mono font-bold text-luxury-gold">Atelier 15% • Couture 10% • Maison 5%</span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold tracking-widest text-luxury-gold">Automated Payout Engine</span>
+              <span className="text-[9px] bg-luxury-gold/20 text-luxury-gold border border-luxury-gold/30 px-2 py-0.5 rounded font-bold uppercase">
+                Active Plan: {vendor?.subscriptionPlan || 'Atelier'} ({commissionPercentStr} Commission)
+              </span>
             </div>
+            <p className="text-xs text-gray-300 mt-1 font-mono">
+              Net Vendor Earnings = Gross Sales - Platform Fee ({commissionPercentStr}) • All withdrawals have 0% disbursal surcharge
+            </p>
           </div>
-        </motion.div>
-      )}
+        </div>
+
+        {potentialSavings && (
+          <div className="text-right shrink-0">
+            <span className="text-[10px] uppercase font-bold text-luxury-gold block">Upgrade & Save</span>
+            <span className="text-xs text-gray-300 font-medium">{potentialSavings.savingsText}</span>
+          </div>
+        )}
+      </div>
 
       {/* Financial Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Available Balance / Wallet Card */}
-        <div className="bg-luxury-black text-white p-6 rounded-sm shadow-xl relative overflow-hidden flex flex-col justify-between">
+        {/* Available Cleared Balance */}
+        <div className="bg-black text-white p-6 rounded-sm shadow-xl relative overflow-hidden flex flex-col justify-between border border-luxury-gold/30">
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold flex items-center gap-1">
@@ -416,14 +487,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold uppercase">Ready</span>
             </div>
             <h3 className="text-3xl font-serif mb-1 font-semibold text-white">{formatPrice(availableBalance)}</h3>
-            <p className="text-[10px] text-gray-400">Cleared net funds ready for withdrawal</p>
+            <p className="text-[10px] text-gray-400">Net cleared funds ready for instant disbursal</p>
           </div>
 
           <div className="relative z-10 mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
             <button 
               onClick={() => setIsPayoutModalOpen(true)}
               disabled={availableBalance <= 0}
-              className={`w-full py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all text-center flex items-center justify-center gap-1.5 ${
+              className={`w-full py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all text-center flex items-center justify-center gap-1.5 rounded-xs ${
                 availableBalance > 0 
                   ? 'bg-luxury-gold text-black hover:bg-white' 
                   : 'bg-white/10 text-gray-400 cursor-not-allowed'
@@ -456,7 +527,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           </div>
         </div>
 
-        {/* Platform Commission Deductions */}
+        {/* Platform Commission Deducted */}
         <div className="bg-white p-6 border border-gray-100 rounded-sm shadow-sm flex flex-col justify-between hover:border-gray-200 transition-colors">
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -469,22 +540,22 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <p className="text-[10px] text-gray-400 mt-1">Platform fee rate: <strong className="text-black font-semibold">{commissionPercentStr}</strong></p>
           </div>
           <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-[11px] text-gray-500">
-            <span>Atelier Tier</span>
-            <span className="text-purple-600 font-bold text-[10px] uppercase">{vendor?.subscriptionPlan || 'STANDARD'}</span>
+            <span>Tier Rate</span>
+            <span className="text-purple-600 font-bold text-[10px] uppercase">{vendor?.subscriptionPlan || 'Atelier'}</span>
           </div>
         </div>
 
-        {/* Net Earnings */}
+        {/* Net Vendor Earnings */}
         <div className="bg-white p-6 border border-gray-100 rounded-sm shadow-sm flex flex-col justify-between hover:border-gray-200 transition-colors">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Net Earnings</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Net Take-Home Earnings</span>
               <div className="p-2 bg-emerald-50 text-emerald-600 rounded-full">
                 <TrendingUp size={16} />
               </div>
             </div>
             <h3 className="text-2xl font-serif font-medium text-emerald-700">{formatPrice(netEarnings)}</h3>
-            <p className="text-[10px] text-gray-400 mt-1">Gross sales minus {commissionPercentStr} commission</p>
+            <p className="text-[10px] text-gray-400 mt-1">Calculated net after {commissionPercentStr} commission</p>
           </div>
           <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between text-[11px] text-gray-500">
             <span>Pending Clearance:</span>
@@ -493,14 +564,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
       </div>
 
-      {/* Recharts Monthly Sales vs Net Earnings Breakdown */}
+      {/* Monthly Sales vs Net Earnings Breakdown Chart */}
       <div className="bg-white border border-gray-100 rounded-sm p-6 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-widest text-black flex items-center gap-2">
-              <Activity size={16} className="text-luxury-gold" /> Monthly Revenue & Net Payout Trend
+              <Activity size={16} className="text-luxury-gold" /> Gross Sales vs. Net Vendor Payout Trend
             </h3>
-            <p className="text-xs text-gray-400 mt-0.5">Comparison of gross order revenue vs. net vendor earnings after commission</p>
+            <p className="text-xs text-gray-400 mt-0.5">Automated calculation of monthly gross revenue minus platform commission</p>
           </div>
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1.5">
@@ -509,7 +580,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 bg-luxury-gold rounded-xs block"></span>
-              <span className="text-gray-600">Net Vendor Earnings</span>
+              <span className="text-gray-600">Net Take-Home</span>
             </div>
           </div>
         </div>
@@ -543,8 +614,23 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 : 'border-transparent text-gray-400 hover:text-black'
             }`}
           >
-            <Wallet size={14} className="text-luxury-gold" /> Wallet Portal & Withdrawal
+            <Wallet size={14} className="text-luxury-gold" /> Payout Portal & Disbursal
           </button>
+
+          <button
+            onClick={() => setActiveTab('STRIPE_CONNECT')}
+            className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'STRIPE_CONNECT'
+                ? 'border-black text-black bg-white'
+                : 'border-transparent text-gray-400 hover:text-black'
+            }`}
+          >
+            <CreditCard size={14} className="text-luxury-gold" /> Stripe Connect Hub
+            {stripeAccount.connected && (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 ml-1"></span>
+            )}
+          </button>
+
           <button
             onClick={() => setActiveTab('LEDGER')}
             className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
@@ -555,6 +641,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           >
             <FileText size={14} /> Revenue Ledger ({filteredOrders.length})
           </button>
+
           <button
             onClick={() => setActiveTab('PAYOUTS')}
             className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
@@ -565,6 +652,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           >
             <Clock size={14} /> Payout History ({payoutHistory.length})
           </button>
+
           <button
             onClick={() => setActiveTab('BANK_SETTINGS')}
             className={`px-6 py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
@@ -573,21 +661,20 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 : 'border-transparent text-gray-400 hover:text-black'
             }`}
           >
-            <Building size={14} /> Bank & Payment Setup
+            <Building size={14} /> Direct Bank Payout Setup
           </button>
         </div>
 
-        {/* Tab 0: Dedicated Wallet Withdrawal Portal */}
+        {/* Tab 0: Payout Portal & Quick Disbursal */}
         {activeTab === 'PORTAL' && (
           <div className="p-6 md:p-8 space-y-8 bg-gray-50/40">
-            {/* Wallet Portal Summary Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Wallet Main Card */}
-              <div className="lg:col-span-2 bg-gradient-to-br from-black via-gray-900 to-luxury-black text-white p-6 rounded-sm shadow-xl border border-luxury-gold/30 relative overflow-hidden flex flex-col justify-between">
+              <div className="lg:col-span-2 bg-gradient-to-br from-black via-zinc-900 to-black text-white p-6 md:p-8 rounded-sm shadow-xl border border-luxury-gold/30 relative overflow-hidden flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs uppercase tracking-widest text-luxury-gold font-bold flex items-center gap-1.5">
-                      <Wallet size={16} /> Vendor Wallet & Disbursal Portal
+                      <Wallet size={16} /> Verified Disbursal Account
                     </span>
                     <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
                       Account Status: Verified
@@ -598,13 +685,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     <div>
                       <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">Available for Withdrawal</span>
                       <div className="text-3xl font-serif font-bold text-white">{formatPrice(availableBalance)}</div>
-                      <span className="text-[10px] text-emerald-400 mt-1 block">Cleared & ready for transfer</span>
+                      <span className="text-[10px] text-emerald-400 mt-1 block">Net cleared funds</span>
                     </div>
 
                     <div>
                       <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">Pending Clearance</span>
                       <div className="text-2xl font-serif font-bold text-amber-300">{formatPrice(pendingClearance)}</div>
-                      <span className="text-[10px] text-gray-400 mt-1 block">Under 24h security hold</span>
+                      <span className="text-[10px] text-gray-400 mt-1 block">Under processing hold</span>
                     </div>
 
                     <div>
@@ -615,27 +702,25 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   </div>
                 </div>
 
-                {/* Direct Withdrawal Actions */}
+                {/* Disbursal Destination Info */}
                 <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 text-xs text-gray-300">
-                    <Building size={16} className="text-luxury-gold shrink-0" />
+                  <div className="flex items-center gap-3 text-xs text-gray-300">
+                    <div className="p-2 bg-luxury-gold/10 text-luxury-gold rounded">
+                      <CreditCard size={18} />
+                    </div>
                     <div>
-                      <span className="block text-[10px] text-gray-400 uppercase font-bold">Disbursement Destination</span>
-                      <span className="font-semibold text-white">{bankInfo.bankName} ({bankInfo.accountNumber.slice(-8)})</span>
+                      <span className="block text-[10px] text-gray-400 uppercase font-bold">Primary Transfer Route</span>
+                      <span className="font-semibold text-white">
+                        {stripeAccount.connected ? `Stripe Connect (${stripeAccount.stripeAccountId})` : `${bankInfo.bankName} (${bankInfo.accountNumber.slice(-4)})`}
+                      </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
-                      onClick={() => setIsBankModalOpen(true)}
-                      className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold uppercase tracking-wider rounded-xs transition-colors"
-                    >
-                      Update Bank
-                    </button>
-                    <button
                       onClick={() => setIsPayoutModalOpen(true)}
                       disabled={availableBalance <= 0}
-                      className={`px-6 py-2.5 text-xs font-bold uppercase tracking-widest rounded-xs flex items-center justify-center gap-2 transition-all shadow-lg ${
+                      className={`w-full sm:w-auto px-6 py-2.5 text-xs font-bold uppercase tracking-widest rounded-xs flex items-center justify-center gap-2 transition-all shadow-lg ${
                         availableBalance > 0
                           ? 'bg-luxury-gold text-black hover:bg-white'
                           : 'bg-white/10 text-gray-500 cursor-not-allowed'
@@ -647,17 +732,17 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 </div>
               </div>
 
-              {/* Quick Withdrawal Portal Widget */}
+              {/* Quick Withdrawal Presets */}
               <div className="bg-white p-6 border border-gray-200 rounded-sm shadow-sm space-y-4 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                     <h4 className="text-xs font-bold uppercase tracking-widest text-black flex items-center gap-1.5">
-                      <Zap size={15} className="text-luxury-gold" /> Instant Withdrawal Quick Select
+                      <Zap size={15} className="text-luxury-gold" /> Instant Withdrawal Presets
                     </h4>
                   </div>
 
                   <p className="text-xs text-gray-500 mt-2">
-                    Select a quick withdrawal amount or enter custom sum to initiate direct wire disbursal:
+                    Select a quick amount to initiate instant transfer to your connected account:
                   </p>
 
                   <div className="grid grid-cols-2 gap-2 mt-4">
@@ -706,254 +791,248 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
                 <div className="pt-3 border-t border-gray-100 text-[11px] text-gray-500 space-y-1">
                   <div className="flex justify-between">
-                    <span>Minimum Withdrawal:</span>
-                    <strong className="text-black font-mono">$50.00 USD</strong>
-                  </div>
-                  <div className="flex justify-between">
                     <span>Disbursal Fee:</span>
-                    <strong className="text-emerald-600 font-bold uppercase">0% (Waived)</strong>
+                    <strong className="text-emerald-600 font-bold uppercase">0% (Platform Absorbed)</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tier Clearance Time:</span>
-                    <strong className="text-black font-semibold">
-                      {vendor?.subscriptionPlan === 'Maison' ? 'Instant (< 1 hr)' : vendor?.subscriptionPlan === 'Couture' ? '24 Hours' : '48 Hours'}
-                    </strong>
+                    <span>Stripe Instant ETA:</span>
+                    <strong className="text-black font-semibold">Under 30 Minutes</strong>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Official Tax & Commission Breakdown Statements Portal */}
-            <div className="bg-white border border-gray-200 rounded-sm p-6 shadow-sm space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+            {/* Statement Summary Callout */}
+            <div className="bg-white border border-gray-200 rounded-sm p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-black flex items-center gap-2">
+                  <FileCheck size={16} className="text-luxury-gold" /> Need an itemized tax or commission summary?
+                </h4>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Generate official quarterly and annual VAT/platform fee statements for your atelier records.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsTaxModalOpen(true)}
+                className="bg-black text-white hover:bg-luxury-gold hover:text-black px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors shrink-0 rounded-xs"
+              >
+                Open Tax Generator
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 1: Stripe Connect Hub */}
+        {activeTab === 'STRIPE_CONNECT' && (
+          <div className="p-8 max-w-4xl space-y-8">
+            <div className="border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-[#635BFF]/10 text-[#635BFF] rounded">
+                  <CreditCard size={20} />
+                </div>
                 <div>
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-black flex items-center gap-2">
-                    <FileCheck size={18} className="text-luxury-gold" /> Downloadable Tax & Commission Statements
+                  <h3 className="text-lg font-serif italic font-bold text-black flex items-center gap-2">
+                    Stripe Connect Express Hub
                   </h3>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Official platform tax withholding, VAT summaries, and itemized commission breakdown reports for tax compliance.
+                  <p className="text-xs text-gray-500">
+                    Direct automated payouts to your bank account or debit card via Stripe Connect.
                   </p>
                 </div>
+              </div>
+            </div>
 
-                <button
-                  onClick={() => setIsTaxModalOpen(true)}
-                  className="bg-black text-white hover:bg-luxury-gold hover:text-black px-5 py-2.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors shadow-sm self-start sm:self-auto"
-                >
-                  <FileCheck size={15} /> Open Tax Statement Generator
-                </button>
+            {/* Connection Status Box */}
+            <div className="bg-gray-50 border border-gray-200 rounded-sm p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Stripe Express Status</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <strong className="text-sm font-mono text-black">{stripeAccount.stripeAccountId}</strong>
+                    <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded font-bold uppercase">Active</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => alert(`Stripe Express Dashboard session initiated for ${stripeAccount.stripeAccountId}.`)}
+                    className="px-4 py-2 bg-white border border-gray-300 text-black hover:border-black text-xs font-bold uppercase tracking-wider rounded-xs transition-colors flex items-center gap-1.5"
+                  >
+                    <ExternalLink size={13} /> Stripe Dashboard
+                  </button>
+                </div>
               </div>
 
-              {/* Statement Download Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Statement Card 1: FY 2026 Full Year */}
-                <div className="border border-gray-200 p-4 rounded-sm hover:border-black transition-colors bg-gray-50/50 flex flex-col justify-between space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase font-bold">
-                      <span>Annual Statement</span>
-                      <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[9px]">Verified</span>
-                    </div>
-                    <h5 className="font-bold text-sm text-black mt-1">FY 2026 Full Year Report</h5>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Comprehensive gross sales, VAT output, and {commissionPercentStr} platform fee ledger.</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedTaxPeriod('FY_2026');
-                      const data = generateTaxStatementData(myOrders, vendor, 'FY 2026 Full Year');
-                      downloadTaxStatementCSV(data);
-                    }}
-                    className="w-full py-2 bg-white border border-gray-300 text-xs font-bold uppercase tracking-wider text-black hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <Download size={13} /> Download Statement
-                  </button>
+              {/* Status Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 bg-white border border-gray-200 rounded-xs">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Instant Payouts</span>
+                  <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                    <CheckCircle2 size={13} /> Eligible (0% Surcharge)
+                  </span>
+                  <p className="text-[10px] text-gray-400 mt-1">Direct debit card and RTP transfers</p>
                 </div>
 
-                {/* Statement Card 2: FY 2026 Q2 */}
-                <div className="border border-gray-200 p-4 rounded-sm hover:border-black transition-colors bg-gray-50/50 flex flex-col justify-between space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase font-bold">
-                      <span>Quarterly Statement</span>
-                      <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[9px]">Q2 2026</span>
-                    </div>
-                    <h5 className="font-bold text-sm text-black mt-1">Q2 2026 Tax & Fee Report</h5>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Quarterly breakdown statement covering April – June 2026.</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedTaxPeriod('Q2_2026');
-                      const data = generateTaxStatementData(myOrders, vendor, 'Q2 2026');
-                      downloadTaxStatementCSV(data);
-                    }}
-                    className="w-full py-2 bg-white border border-gray-300 text-xs font-bold uppercase tracking-wider text-black hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <Download size={13} /> Download Statement
-                  </button>
+                <div className="p-4 bg-white border border-gray-200 rounded-xs">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Automated Schedule</span>
+                  <span className="text-xs font-bold text-black uppercase font-mono">
+                    {stripeAccount.payoutSchedule}
+                  </span>
+                  <p className="text-[10px] text-gray-400 mt-1">Funds sweep automatically</p>
                 </div>
 
-                {/* Statement Card 3: FY 2026 Q1 */}
-                <div className="border border-gray-200 p-4 rounded-sm hover:border-black transition-colors bg-gray-50/50 flex flex-col justify-between space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase font-bold">
-                      <span>Quarterly Statement</span>
-                      <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[9px]">Q1 2026</span>
-                    </div>
-                    <h5 className="font-bold text-sm text-black mt-1">Q1 2026 Tax & Fee Report</h5>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Quarterly breakdown statement covering January – March 2026.</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedTaxPeriod('Q1_2026');
-                      const data = generateTaxStatementData(myOrders, vendor, 'Q1 2026');
-                      downloadTaxStatementCSV(data);
-                    }}
-                    className="w-full py-2 bg-white border border-gray-300 text-xs font-bold uppercase tracking-wider text-black hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <Download size={13} /> Download Statement
-                  </button>
+                <div className="p-4 bg-white border border-gray-200 rounded-xs">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Settlement Currency</span>
+                  <span className="text-xs font-bold text-black font-mono">USD ($)</span>
+                  <p className="text-[10px] text-gray-400 mt-1">Auto-converted for international banks</p>
                 </div>
+              </div>
 
-                {/* Statement Card 4: All Time Cumulative */}
-                <div className="border border-gray-200 p-4 rounded-sm hover:border-black transition-colors bg-gray-50/50 flex flex-col justify-between space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase font-bold">
-                      <span>Cumulative Audit</span>
-                      <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-[9px]">All Time</span>
-                    </div>
-                    <h5 className="font-bold text-sm text-black mt-1">Cumulative All-Time Statement</h5>
-                    <p className="text-[11px] text-gray-500 mt-0.5">All historic orders, cumulative commission fees, and total disbursements.</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedTaxPeriod('ALL_TIME');
-                      const data = generateTaxStatementData(myOrders, vendor, 'All Time Cumulative');
-                      downloadTaxStatementCSV(data);
-                    }}
-                    className="w-full py-2 bg-white border border-gray-300 text-xs font-bold uppercase tracking-wider text-black hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <Download size={13} /> Download Statement
-                  </button>
+              {/* Disbursal Schedule Selector */}
+              <div className="pt-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block mb-2">
+                  Configure Automated Disbursal Frequency
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {['DAILY', 'WEEKLY', 'MONTHLY', 'MANUAL'].map((freq) => (
+                    <button
+                      key={freq}
+                      onClick={() => setStripeAccount({ ...stripeAccount, payoutSchedule: freq as any })}
+                      className={`p-2.5 border text-xs font-bold uppercase tracking-wider rounded-xs transition-all ${
+                        stripeAccount.payoutSchedule === freq
+                          ? 'border-black bg-black text-white'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
+                      }`}
+                    >
+                      {freq}
+                    </button>
+                  ))}
                 </div>
+                <p className="text-[11px] text-gray-400 mt-2">
+                  Automated schedules disburse cleared funds minus platform commission on a recurring basis. You can still initiate manual withdrawals anytime.
+                </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Search Bar for Ledger */}
+        {/* Tab 2: Revenue Ledger */}
         {activeTab === 'LEDGER' && (
-          <div className="p-4 border-b border-gray-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-              <input 
-                type="text" 
-                placeholder="Search by Order ID, Customer, Item..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 text-xs rounded-sm focus:outline-none focus:border-black"
-              />
+          <div>
+            <div className="p-4 border-b border-gray-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <input 
+                  type="text" 
+                  placeholder="Search by Order ID, Customer, Item..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 text-xs rounded-sm focus:outline-none focus:border-black"
+                />
+              </div>
+              <div className="text-xs text-gray-500 font-mono">
+                Showing <strong className="text-black">{filteredOrders.length}</strong> revenue transactions
+              </div>
             </div>
-            <div className="text-xs text-gray-500 font-mono">
-              Showing <strong className="text-black">{filteredOrders.length}</strong> revenue transactions
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[750px]">
+                <thead className="bg-gray-50 text-[10px] uppercase tracking-widest text-gray-500 font-bold border-b border-gray-100">
+                  <tr>
+                    <th className="p-4">Date</th>
+                    <th className="p-4">Order ID & Customer</th>
+                    <th className="p-4">Items Summary</th>
+                    <th className="p-4 text-right">Gross Total</th>
+                    <th className="p-4 text-center">Platform Fee %</th>
+                    <th className="p-4 text-right">Commission Fee</th>
+                    <th className="p-4 text-right">Net Vendor Payout</th>
+                    <th className="p-4 text-center">Clearance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-gray-400 italic">
+                        No order transactions found for the selected filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOrders.map((order) => {
+                      const gross = order.total;
+                      const fee = gross * commissionRate;
+                      const net = gross - fee;
+                      const isCleared = order.status !== 'Processing';
+
+                      return (
+                        <tr key={order.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="p-4 text-gray-500 whitespace-nowrap font-mono">
+                            {new Date(order.date).toLocaleDateString()}
+                          </td>
+                          <td className="p-4">
+                            <div className="font-semibold text-black">{order.id}</div>
+                            <div className="text-[10px] text-gray-400">{order.customerName}</div>
+                          </td>
+                          <td className="p-4 max-w-xs truncate text-gray-600">
+                            {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                          </td>
+                          <td className="p-4 text-right font-medium text-black whitespace-nowrap">
+                            {formatPrice(gross)}
+                          </td>
+                          <td className="p-4 text-center whitespace-nowrap">
+                            <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                              {commissionPercentStr}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right font-mono text-purple-700 whitespace-nowrap">
+                            -{formatPrice(fee)}
+                          </td>
+                          <td className="p-4 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                            +{formatPrice(net)}
+                          </td>
+                          <td className="p-4 text-center whitespace-nowrap">
+                            {isCleared ? (
+                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full text-[10px] font-bold">
+                                <CheckCircle size={10} /> Cleared
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full text-[10px] font-bold">
+                                <Clock size={10} /> Processing
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* Tab 1: Revenue Ledger */}
-        {activeTab === 'LEDGER' && (
+        {/* Tab 3: Payout History */}
+        {activeTab === 'PAYOUTS' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs min-w-[700px]">
               <thead className="bg-gray-50 text-[10px] uppercase tracking-widest text-gray-500 font-bold border-b border-gray-100">
                 <tr>
-                  <th className="p-4">Date</th>
-                  <th className="p-4">Order ID & Customer</th>
-                  <th className="p-4">Items Summary</th>
-                  <th className="p-4 text-right">Gross Total</th>
-                  <th className="p-4 text-center">Fee Rate</th>
-                  <th className="p-4 text-right">Commission Fee</th>
-                  <th className="p-4 text-right">Net Payout</th>
-                  <th className="p-4 text-center">Clearance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="p-8 text-center text-gray-400 italic">
-                      No order transactions found for the selected filter.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredOrders.map((order) => {
-                    const gross = order.total;
-                    const fee = gross * commissionRate;
-                    const net = gross - fee;
-                    const isCleared = order.status !== 'Processing';
-
-                    return (
-                      <tr key={order.id} className="hover:bg-gray-50/60 transition-colors">
-                        <td className="p-4 text-gray-500 whitespace-nowrap font-mono">
-                          {new Date(order.date).toLocaleDateString()}
-                        </td>
-                        <td className="p-4">
-                          <div className="font-semibold text-black">{order.id}</div>
-                          <div className="text-[10px] text-gray-400">{order.customerName}</div>
-                        </td>
-                        <td className="p-4 max-w-xs truncate text-gray-600">
-                          {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
-                        </td>
-                        <td className="p-4 text-right font-medium text-black whitespace-nowrap">
-                          {formatPrice(gross)}
-                        </td>
-                        <td className="p-4 text-center whitespace-nowrap">
-                          <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                            {commissionPercentStr}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right font-mono text-purple-700 whitespace-nowrap">
-                          -{formatPrice(fee)}
-                        </td>
-                        <td className="p-4 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                          +{formatPrice(net)}
-                        </td>
-                        <td className="p-4 text-center whitespace-nowrap">
-                          {isCleared ? (
-                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full text-[10px] font-bold">
-                              <CheckCircle size={10} /> Cleared
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full text-[10px] font-bold">
-                              <Clock size={10} /> Pending
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Tab 2: Payout History */}
-        {activeTab === 'PAYOUTS' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs min-w-[650px]">
-              <thead className="bg-gray-50 text-[10px] uppercase tracking-widest text-gray-500 font-bold border-b border-gray-100">
-                <tr>
                   <th className="p-4">Payout ID</th>
                   <th className="p-4">Request Date</th>
-                  <th className="p-4">Method & Account</th>
+                  <th className="p-4">Disbursal Method</th>
                   <th className="p-4">Reference No.</th>
-                  <th className="p-4 text-right">Amount</th>
+                  <th className="p-4 text-right">Net Amount</th>
                   <th className="p-4 text-center">Status</th>
+                  <th className="p-4 text-center">Receipt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {payoutHistory.map((payout) => (
                   <tr key={payout.id} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="p-4 font-bold text-black">{payout.id}</td>
+                    <td className="p-4 font-bold text-black font-mono">{payout.id}</td>
                     <td className="p-4 text-gray-500 font-mono">{payout.date}</td>
                     <td className="p-4">
                       <div className="font-medium text-black">{payout.method}</div>
-                      <div className="text-[10px] text-gray-400">Account ending in {payout.accountEnding}</div>
+                      <div className="text-[10px] text-gray-400">Account: {payout.accountEnding}</div>
                     </td>
                     <td className="p-4 text-gray-500 font-mono">{payout.referenceNumber}</td>
                     <td className="p-4 text-right font-mono font-bold text-black">
@@ -969,6 +1048,17 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                         {payout.status}
                       </span>
                     </td>
+                    <td className="p-4 text-center">
+                      <button
+                        onClick={() => {
+                          setLastPayoutReceipt(payout);
+                          setIsReceiptModalOpen(true);
+                        }}
+                        className="text-[10px] font-bold uppercase tracking-wider text-luxury-gold hover:underline flex items-center justify-center gap-1 mx-auto"
+                      >
+                        <FileText size={12} /> View Receipt
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -976,25 +1066,25 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           </div>
         )}
 
-        {/* Tab 3: Bank & Payment Setup */}
+        {/* Tab 4: Direct Bank Settings */}
         {activeTab === 'BANK_SETTINGS' && (
           <div className="p-8 max-w-2xl space-y-6">
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div>
                 <h3 className="text-base font-bold text-black flex items-center gap-2">
-                  <Building size={18} className="text-luxury-gold" /> Payout Disbursement Account
+                  <Building size={18} className="text-luxury-gold" /> Direct Bank Wire / ACH Account
                 </h3>
-                <p className="text-xs text-gray-500 mt-0.5">Funds requested during payouts are automatically deposited to this account.</p>
+                <p className="text-xs text-gray-500 mt-0.5">Funds requested during manual wire payouts are deposited to this account.</p>
               </div>
               <button
                 onClick={() => setIsBankModalOpen(true)}
-                className="px-4 py-2 bg-black text-white text-xs font-bold uppercase tracking-wider rounded hover:bg-luxury-gold transition-colors"
+                className="px-4 py-2 bg-black text-white text-xs font-bold uppercase tracking-wider rounded-xs hover:bg-luxury-gold hover:text-black transition-colors"
               >
-                Edit Details
+                Edit Bank
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-6 rounded border border-gray-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-6 rounded-xs border border-gray-200">
               <div>
                 <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Bank Name</span>
                 <span className="text-sm font-semibold text-black">{bankInfo.bankName}</span>
@@ -1008,44 +1098,48 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 <span className="text-sm font-mono text-black">{bankInfo.accountNumber}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Routing / SWIFT</span>
-                <span className="text-sm font-mono text-black">{bankInfo.routingNumber}</span>
+                <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Routing / SWIFT Code</span>
+                <span className="text-sm font-mono text-black">{bankInfo.routingNumber} ({bankInfo.swiftCode})</span>
               </div>
             </div>
 
-            <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded text-xs flex items-start gap-3">
+            <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-xs text-xs flex items-start gap-3">
               <ShieldCheck size={18} className="text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <strong className="font-bold block">Security & Compliance Notice</strong>
-                All payout disbursement details are verified against seller KYC documentation. Changes to bank details undergo a 24-hour security hold before disbursements can be initiated.
+                <strong className="font-bold block">Security & KYC Compliance</strong>
+                Direct bank accounts are verified against your submitted KYC documentation. Updates undergo automated compliance check before disbursements can be initiated.
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Request Payout Modal */}
+      {/* Automated Request Payout Modal */}
       <AnimatePresence>
         {isPayoutModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-sm shadow-2xl max-w-md w-full p-6 space-y-6 border border-gray-100"
+              className="bg-white rounded-sm shadow-2xl max-w-md w-full p-6 md:p-8 space-y-6 border border-gray-100"
             >
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                <h3 className="text-lg font-serif italic font-bold text-black flex items-center gap-2">
-                  <ArrowUpRight size={20} className="text-luxury-gold" /> Request Payout
-                </h3>
-                <button onClick={() => setIsPayoutModalOpen(false)} className="text-gray-400 hover:text-black font-bold">×</button>
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-luxury-gold block">Automated Transfer</span>
+                  <h3 className="text-xl font-serif italic font-bold text-black flex items-center gap-2 mt-0.5">
+                    <ArrowUpRight size={20} className="text-luxury-gold" /> Initiate Vendor Payout
+                  </h3>
+                </div>
+                <button onClick={() => setIsPayoutModalOpen(false)} className="text-gray-400 hover:text-black font-bold text-xl">×</button>
               </div>
 
-              <form onSubmit={handleRequestPayout} className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded border border-gray-100 flex justify-between items-center">
+              <form onSubmit={handleRequestPayout} className="space-y-5">
+                {/* Available Balance Preview */}
+                <div className="bg-gray-50 p-4 rounded-xs border border-gray-200 flex justify-between items-center">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-gray-400 block">Available Balance</span>
-                    <span className="text-lg font-serif font-bold text-emerald-700">{formatPrice(availableBalance)}</span>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 block">Available Net Balance</span>
+                    <span className="text-xl font-serif font-bold text-emerald-700">{formatPrice(availableBalance)}</span>
                   </div>
                   <button 
                     type="button" 
@@ -1056,65 +1150,104 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   </button>
                 </div>
 
+                {/* Amount Input */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                    Payout Amount ($)
+                    Withdrawal Amount ($ USD)
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-gray-400">$</span>
                     <input 
                       type="number" 
                       step="0.01"
-                      min="1"
+                      min="10"
                       max={availableBalance}
                       placeholder="0.00"
                       value={payoutAmountInput}
                       onChange={(e) => setPayoutAmountInput(e.target.value)}
                       required
-                      className="w-full pl-8 pr-4 py-2.5 border border-gray-200 text-sm rounded-sm focus:outline-none focus:border-black font-mono"
+                      className="w-full pl-8 pr-4 py-2.5 border border-gray-200 text-sm rounded-xs focus:outline-none focus:border-black font-mono font-bold"
                     />
                   </div>
                 </div>
 
+                {/* Disbursement Method */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                    Disbursement Method
+                    Select Transfer Route
                   </label>
-                  <select 
-                    value={payoutMethod}
-                    onChange={(e) => setPayoutMethod(e.target.value as any)}
-                    className="w-full p-2.5 border border-gray-200 text-xs font-medium rounded-sm focus:outline-none focus:border-black"
-                  >
-                    <option value="BANK_TRANSFER">Direct Bank Wire ({bankInfo.bankName})</option>
-                    <option value="STRIPE">Stripe Connect Instant Payout</option>
-                    <option value="PAYSTACK">Paystack Transfer (NGN/USD)</option>
-                  </select>
+                  <div className="space-y-2">
+                    <label 
+                      onClick={() => setPayoutMethod('STRIPE_CONNECT')}
+                      className={`p-3 border rounded-xs flex items-center justify-between cursor-pointer transition-all ${
+                        payoutMethod === 'STRIPE_CONNECT' ? 'border-black bg-black text-white' : 'border-gray-200 bg-white hover:bg-gray-50 text-black'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <CreditCard size={18} className={payoutMethod === 'STRIPE_CONNECT' ? "text-luxury-gold" : "text-[#635BFF]"} />
+                        <div>
+                          <span className="text-xs font-bold block">Stripe Connect Instant Payout</span>
+                          <span className={`text-[10px] ${payoutMethod === 'STRIPE_CONNECT' ? 'text-gray-300' : 'text-gray-400'}`}>
+                            Direct debit / RTP • ~30 minutes
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">
+                        Recommended
+                      </span>
+                    </label>
+
+                    <label 
+                      onClick={() => setPayoutMethod('DIRECT_BANK')}
+                      className={`p-3 border rounded-xs flex items-center justify-between cursor-pointer transition-all ${
+                        payoutMethod === 'DIRECT_BANK' ? 'border-black bg-black text-white' : 'border-gray-200 bg-white hover:bg-gray-50 text-black'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Building size={18} className={payoutMethod === 'DIRECT_BANK' ? "text-luxury-gold" : "text-gray-500"} />
+                        <div>
+                          <span className="text-xs font-bold block">Direct Bank Wire (Fedwire / ACH)</span>
+                          <span className={`text-[10px] ${payoutMethod === 'DIRECT_BANK' ? 'text-gray-300' : 'text-gray-400'}`}>
+                            {bankInfo.bankName} • 1-2 Business Days
+                          </span>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
-                <div className="p-3 bg-gray-50 border border-gray-100 rounded text-[11px] space-y-1 text-gray-600">
+                {/* Calculation Breakdown */}
+                <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xs text-[11px] space-y-1.5 text-gray-600 font-mono">
                   <div className="flex justify-between">
-                    <span>Disbursement Fee:</span>
-                    <strong className="text-emerald-600 font-mono">FREE ($0.00)</strong>
+                    <span>Platform Commission:</span>
+                    <strong className="text-black font-semibold">Already Deducted ({commissionPercentStr})</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Estimated Processing:</span>
-                    <strong className="text-black">1-2 Business Days</strong>
+                    <span>Disbursal Transfer Fee:</span>
+                    <strong className="text-emerald-700 font-bold">$0.00 (WAIVED)</strong>
+                  </div>
+                  <div className="flex justify-between pt-1 border-t border-gray-200 text-xs text-black font-bold">
+                    <span>Net Disbursal to Atelier:</span>
+                    <span className="text-emerald-700 font-bold">
+                      {payoutAmountInput ? formatPrice(parseFloat(payoutAmountInput) || 0) : '$0.00'}
+                    </span>
                   </div>
                 </div>
 
-                <div className="pt-4 flex gap-3">
+                <div className="pt-2 flex gap-3">
                   <button
                     type="button"
                     onClick={() => setIsPayoutModalOpen(false)}
-                    className="w-1/2 py-2.5 border border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-50 transition-colors"
+                    className="w-1/2 py-2.5 border border-gray-300 text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-50 transition-colors rounded-xs"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="w-1/2 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-luxury-gold transition-colors"
+                    disabled={isSubmittingPayout || !payoutAmountInput || parseFloat(payoutAmountInput) <= 0}
+                    className="w-1/2 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-luxury-gold hover:text-black transition-colors rounded-xs shadow-md disabled:opacity-50"
                   >
-                    Confirm Payout
+                    {isSubmittingPayout ? 'Processing...' : 'Confirm Disbursal'}
                   </button>
                 </div>
               </form>
@@ -1123,10 +1256,91 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         )}
       </AnimatePresence>
 
+      {/* Official Payout Receipt Certificate Modal */}
+      <AnimatePresence>
+        {isReceiptModalOpen && lastPayoutReceipt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-sm shadow-2xl max-w-lg w-full p-6 md:p-8 space-y-6 border border-gray-100"
+            >
+              <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-600 flex items-center gap-1">
+                    <CheckCircle2 size={12} /> Disbursal Initiated
+                  </span>
+                  <h3 className="text-xl font-serif italic font-bold text-black mt-0.5">
+                    Official Disbursal Receipt
+                  </h3>
+                </div>
+                <button onClick={() => setIsReceiptModalOpen(false)} className="text-gray-400 hover:text-black font-bold text-xl">×</button>
+              </div>
+
+              {/* Receipt Content */}
+              <div className="bg-gray-50 p-6 rounded-xs border border-gray-200 space-y-4 font-mono text-xs text-gray-800">
+                <div className="flex justify-between border-b border-gray-200 pb-3">
+                  <div>
+                    <span className="text-[10px] uppercase text-gray-400 block font-sans font-bold">Transaction Ref</span>
+                    <strong className="text-black">{lastPayoutReceipt.referenceNumber}</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase text-gray-400 block font-sans font-bold">Date</span>
+                    <span>{lastPayoutReceipt.date}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Beneficiary Atelier:</span>
+                    <strong className="text-black font-sans">{vendor?.name || 'Maison Atelier'}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Disbursal Method:</span>
+                    <span className="font-semibold text-black">{lastPayoutReceipt.method}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Destination:</span>
+                    <span>{lastPayoutReceipt.accountEnding}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Platform Fee Calculation:</span>
+                    <span className="text-emerald-700 font-bold">{lastPayoutReceipt.commissionPercentStr || commissionPercentStr} Platform Commission Settled</span>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-gray-200 flex justify-between items-center text-sm font-bold">
+                  <span>Net Disbursed Sum:</span>
+                  <span className="text-emerald-700 text-base">{formatPrice(lastPayoutReceipt.amount)}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="w-1/2 py-2.5 bg-gray-100 hover:bg-gray-200 text-black text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 rounded-xs transition-colors"
+                >
+                  <Printer size={14} /> Print Receipt
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReceiptModalOpen(false)}
+                  className="w-1/2 py-2.5 bg-black hover:bg-luxury-gold hover:text-black text-white text-xs font-bold uppercase tracking-wider rounded-xs transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Edit Bank Info Modal */}
       <AnimatePresence>
         {isBankModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -1205,13 +1419,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsBankModalOpen(false)}
-                    className="w-1/2 py-2.5 border border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-50 transition-colors"
+                    className="w-1/2 py-2.5 border border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-50 transition-colors rounded-xs"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="w-1/2 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-luxury-gold transition-colors"
+                    className="w-1/2 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-luxury-gold hover:text-black transition-colors rounded-xs"
                   >
                     Save Changes
                   </button>
@@ -1225,7 +1439,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       {/* Tax & Commission Breakdown Statement Generator Modal */}
       <AnimatePresence>
         {isTaxModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1352,7 +1566,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsTaxModalOpen(false)}
-                  className="w-full sm:w-1/3 py-2.5 border border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="w-full sm:w-1/3 py-2.5 border border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-50 transition-colors rounded-xs"
                 >
                   Close
                 </button>
@@ -1362,7 +1576,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     handleDownloadTaxStatement();
                     setIsTaxModalOpen(false);
                   }}
-                  className="w-full sm:w-2/3 py-2.5 bg-black text-white hover:bg-luxury-gold hover:text-black text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 shadow-md"
+                  className="w-full sm:w-2/3 py-2.5 bg-black text-white hover:bg-luxury-gold hover:text-black text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 shadow-md rounded-xs"
                 >
                   <Download size={15} /> Download Official Statement (CSV)
                 </button>

@@ -9,11 +9,25 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        hmr: {
-            clientPort: 443,
-        }
+        hmr: false,
+        ws: false
       },
       plugins: [
+        {
+          name: 'disable-hmr-client-ws',
+          enforce: 'pre',
+          transform(code, id) {
+            if (id.includes('client.mjs') || id.includes('/@vite/client')) {
+              return {
+                code: code
+                  .replace(/transport\.connect\(createHMRHandler\(handleMessage\)\);/g, '/* HMR connection disabled */')
+                  .replace(/console\.error\(`\[vite\] failed to connect to websocket[^\`]*`\);/g, 'void 0;')
+                  .replace(/console\.error\("\[vite\]", err\)/g, 'void 0'),
+                map: null
+              };
+            }
+          }
+        },
         react(),
         VitePWA({
           registerType: 'autoUpdate',
@@ -125,8 +139,7 @@ export default defineConfig(({ mode }) => {
             ],
           },
           devOptions: {
-            enabled: true,
-            type: 'module',
+            enabled: false,
           },
         })
       ],

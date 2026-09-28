@@ -27,6 +27,7 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
     const [inspectVendor, setInspectVendor] = useState<Vendor | null>(null);
+    const [previewDoc, setPreviewDoc] = useState<{ title: string; url: string } | null>(null);
 
     const handleGrantAllVendorAccess = async () => {
         if (!setVendors || vendors.length === 0) return;
@@ -276,7 +277,7 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                                                         <button 
                                                             onClick={() => handleVerifyVendor(vendor, 'VERIFIED')}
                                                             className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm transition-colors"
-                                                            title="Approve Onboarding"
+                                                            title="Approve Onboarding & KYC"
                                                         >
                                                             <Check size={12} /> Approve
                                                         </button>
@@ -291,16 +292,18 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                                                 ) : isApproved ? (
                                                     <button 
                                                         onClick={() => handleVerifyVendor(vendor, 'REJECTED')}
-                                                        className="px-2 py-1 border border-red-200 text-red-600 hover:bg-red-50 rounded text-[10px] font-bold uppercase"
+                                                        className="px-2.5 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded text-[10px] font-bold uppercase"
+                                                        title="Revoke KYC & Store Approval"
                                                     >
                                                         Revoke
                                                     </button>
                                                 ) : (
                                                     <button 
                                                         onClick={() => handleVerifyVendor(vendor, 'VERIFIED')}
-                                                        className="px-2 py-1 border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded text-[10px] font-bold uppercase"
+                                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-colors"
+                                                        title="Personally verify KYC from vendor even without applying"
                                                     >
-                                                        Re-Approve
+                                                        <ShieldCheck size={13} /> Verify KYC
                                                     </button>
                                                 )}
                                             </div>
@@ -438,23 +441,28 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                                                 <p className="text-[9px] font-bold uppercase text-gray-700 truncate">{docItem.title}</p>
                                                 {docItem.url ? (
                                                     <div className="space-y-1">
-                                                        <div className="h-16 bg-gray-100 rounded overflow-hidden border relative group">
+                                                        <div 
+                                                            onClick={() => setPreviewDoc({ title: `${inspectVendor.name} — ${docItem.title}`, url: docItem.url! })}
+                                                            className="h-16 bg-gray-100 rounded overflow-hidden border relative group cursor-pointer"
+                                                        >
                                                             {docItem.url.startsWith('data:image') || docItem.url.startsWith('http') ? (
-                                                                <img src={docItem.url} alt={docItem.title} className="w-full h-full object-cover" />
+                                                                <img src={docItem.url} alt={docItem.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                                             ) : (
                                                                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                                                                     <FileText size={20} />
                                                                 </div>
                                                             )}
+                                                            <div className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-[8px] font-bold uppercase">
+                                                                <Eye size={10} /> View
+                                                            </div>
                                                         </div>
-                                                        <a
-                                                            href={docItem.url}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-block w-full py-0.5 text-[8px] font-bold uppercase bg-black text-white rounded hover:bg-luxury-gold transition-colors"
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPreviewDoc({ title: `${inspectVendor.name} — ${docItem.title}`, url: docItem.url! })}
+                                                            className="w-full py-0.5 text-[8px] font-bold uppercase bg-black text-white rounded hover:bg-luxury-gold hover:text-black transition-colors"
                                                         >
-                                                            Open File
-                                                        </a>
+                                                            Inspect File
+                                                        </button>
                                                     </div>
                                                 ) : (
                                                     <div className="h-16 border border-dashed border-gray-300 rounded flex flex-col items-center justify-center text-[9px] text-gray-400 italic">
@@ -468,33 +476,78 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                             </div>
                         </div>
 
-                        <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                        <div className="p-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-3">
                             <button 
                                 onClick={() => setInspectVendor(null)}
-                                className="px-4 py-2 border border-gray-300 rounded text-xs font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-100"
+                                className="px-4 py-2 border border-gray-300 rounded text-xs font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-100 w-full sm:w-auto"
                             >
                                 Close
                             </button>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
                                 <button 
                                     onClick={async () => {
                                         await handleVerifyVendor(inspectVendor, 'REJECTED');
                                         setInspectVendor(null);
                                     }}
-                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm"
+                                    className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm"
                                 >
-                                    <X size={14} /> Decline Application
+                                    <X size={14} /> Decline
                                 </button>
                                 <button 
                                     onClick={async () => {
                                         await handleVerifyVendor(inspectVendor, 'VERIFIED');
                                         setInspectVendor(null);
                                     }}
-                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm"
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm"
+                                    title="Personally verify KYC from vendor even without applying"
                                 >
-                                    <Check size={14} /> Approve Store
+                                    <ShieldCheck size={14} /> Personally Verify KYC (Manual)
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Document Preview Lightbox Modal */}
+            {previewDoc && (
+                <div className="fixed inset-0 bg-black/85 z-[60] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white rounded-sm max-w-4xl w-full p-6 space-y-4 max-h-[92vh] overflow-y-auto shadow-2xl">
+                        <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+                            <div className="flex items-center gap-2">
+                                <FileText size={18} className="text-luxury-gold" />
+                                <h4 className="font-serif italic text-lg font-bold text-luxury-black">{previewDoc.title}</h4>
+                            </div>
+                            <button 
+                                onClick={() => setPreviewDoc(null)} 
+                                className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-black transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex items-center justify-center p-4 bg-gray-950 rounded border border-gray-800 min-h-[300px]">
+                            {previewDoc.url.startsWith('data:image') || previewDoc.url.startsWith('http') ? (
+                                <img src={previewDoc.url} alt="Document Preview" className="max-h-[65vh] object-contain rounded shadow-lg" />
+                            ) : (
+                                <iframe src={previewDoc.url} title="Document Preview" className="w-full h-[65vh] rounded bg-white" />
+                            )}
+                        </div>
+                        <div className="flex justify-between items-center pt-2">
+                            <a
+                                href={previewDoc.url}
+                                download="kyc-document"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-xs"
+                            >
+                                Download Original
+                            </a>
+                            <button 
+                                onClick={() => setPreviewDoc(null)} 
+                                className="px-6 py-2 bg-black hover:bg-luxury-gold hover:text-black text-white text-xs font-bold uppercase tracking-wider rounded-xs transition-colors"
+                            >
+                                Close Preview
+                            </button>
                         </div>
                     </div>
                 </div>

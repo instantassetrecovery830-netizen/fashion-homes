@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, addDoc, orderBy } from 'firebase/firestore';
 import { db } from './firebase.ts';
-import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Follower, AppNotification, CartItem, ChatMessage, DirectMessage, Review, UserRole, WaitlistEntry, SharedWishlist } from '../types.ts';
+import { Product, Vendor, Order, User, LandingPageContent, ContactSubmission, Follower, AppNotification, CartItem, ChatMessage, DirectMessage, Review, UserRole, WaitlistEntry, SharedWishlist, PayoutRecord } from '../types.ts';
 
 // Helper to convert Firestore docs to array
 const getArray = async (q: any) => {
@@ -73,16 +73,94 @@ export const fetchNotifications = async (userId?: string, userEmail?: string): P
     }
 };
 
+const DEFAULT_LANDING_CONTENT: LandingPageContent = {
+    hero: {
+        videoUrl: "https://videos.pexels.com/video-files/3205917/3205917-uhd_2560_1440_25fps.mp4",
+        posterUrl: "https://images.unsplash.com/photo-1605289355680-e66a36d2e680?q=80&w=2070&auto=format&fit=crop",
+        subtitle: "The New Vanguard",
+        titleLine1: "DIGITAL",
+        titleLine2: "AVANT-GARDE",
+        description: "Discover bespoke ready-to-wear, curated designer collections, and avant-garde couture from Africa's premier ateliers.",
+        buttonText: "Shop Collection",
+        secondaryButtonText: "Membership"
+    },
+    campaign: {
+        subtitle: "The Campaign",
+        title: "Urban Chronicles",
+        image1: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1887&auto=format&fit=crop",
+        image2: "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1888&auto=format&fit=crop",
+        image3: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop",
+        image4: "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1886&auto=format&fit=crop",
+        overlayText1: "Street Edition"
+    },
+    marquee: {
+        text: "Lagos • Accra • Nairobi • Cape Town • Heritage Reimagined • Pan-African Aesthetics"
+    },
+    designers: {
+        subtitle: "The Ateliers",
+        title: "Shop by Designer"
+    },
+    spotlight: {
+        title: "Editor's Picks"
+    },
+    featuredDesigners: [],
+    categories: [],
+    curatedCollections: [],
+    footer: {
+        aboutText: "Redefining luxury digital commerce through curation, technology, and sustainable innovation.",
+        links: [],
+        social: []
+    }
+} as any;
+
 export const fetchLandingContent = async (): Promise<LandingPageContent> => {
-    const d = await getDoc(doc(db, 'cms', 'main'));
-    if (d.exists()) return d.data() as LandingPageContent;
-    return { 
-        hero: { videoUrl: '', posterUrl: '', subtitle: '', titleLine1: '', titleLine2: '', buttonText: '' },
-        featuredDesigners: [],
-        categories: [],
-        curatedCollections: [],
-        footer: { aboutText: '', links: [], social: [] }
-    } as any;
+    let rawData: any = null;
+    try {
+        const d = await getDoc(doc(db, 'cms', 'main'));
+        if (d.exists()) rawData = d.data();
+        else {
+            const dAlt = await getDoc(doc(db, 'landing_content', 'main'));
+            if (dAlt.exists()) rawData = dAlt.data();
+        }
+    } catch (e) {
+        console.warn("Notice fetching landing content:", e);
+    }
+
+    if (!rawData) return DEFAULT_LANDING_CONTENT;
+
+    // Merge and ensure empty strings do not mask defaults
+    return {
+        ...DEFAULT_LANDING_CONTENT,
+        ...rawData,
+        hero: {
+            ...DEFAULT_LANDING_CONTENT.hero,
+            ...(rawData.hero || {}),
+            subtitle: (rawData.hero?.subtitle && rawData.hero.subtitle.trim()) || DEFAULT_LANDING_CONTENT.hero.subtitle,
+            titleLine1: (rawData.hero?.titleLine1 && rawData.hero.titleLine1.trim()) || DEFAULT_LANDING_CONTENT.hero.titleLine1,
+            titleLine2: (rawData.hero?.titleLine2 && rawData.hero.titleLine2.trim()) || DEFAULT_LANDING_CONTENT.hero.titleLine2,
+            description: (rawData.hero?.description && rawData.hero.description.trim()) || DEFAULT_LANDING_CONTENT.hero.description,
+            buttonText: (rawData.hero?.buttonText && rawData.hero.buttonText.trim()) || DEFAULT_LANDING_CONTENT.hero.buttonText,
+            secondaryButtonText: (rawData.hero?.secondaryButtonText && rawData.hero.secondaryButtonText.trim()) || DEFAULT_LANDING_CONTENT.hero.secondaryButtonText,
+            videoUrl: (rawData.hero?.videoUrl && rawData.hero.videoUrl.trim()) || DEFAULT_LANDING_CONTENT.hero.videoUrl,
+            posterUrl: (rawData.hero?.posterUrl && rawData.hero.posterUrl.trim()) || DEFAULT_LANDING_CONTENT.hero.posterUrl,
+        },
+        campaign: {
+            ...DEFAULT_LANDING_CONTENT.campaign,
+            ...(rawData.campaign || {}),
+            subtitle: (rawData.campaign?.subtitle && rawData.campaign.subtitle.trim()) || DEFAULT_LANDING_CONTENT.campaign.subtitle,
+            title: (rawData.campaign?.title && rawData.campaign.title.trim()) || DEFAULT_LANDING_CONTENT.campaign.title,
+        },
+        marquee: {
+            text: (rawData.marquee?.text && rawData.marquee.text.trim()) || DEFAULT_LANDING_CONTENT.marquee.text,
+        },
+        designers: {
+            subtitle: (rawData.designers?.subtitle && rawData.designers.subtitle.trim()) || DEFAULT_LANDING_CONTENT.designers.subtitle,
+            title: (rawData.designers?.title && rawData.designers.title.trim()) || DEFAULT_LANDING_CONTENT.designers.title,
+        },
+        spotlight: {
+            title: (rawData.spotlight?.title && rawData.spotlight.title.trim()) || DEFAULT_LANDING_CONTENT.spotlight.title,
+        }
+    };
 };
 
 export const fetchContactSubmissions = async (): Promise<ContactSubmission[]> => getArray(collection(db, 'contact_submissions')) as Promise<ContactSubmission[]>;
@@ -361,7 +439,11 @@ export const removeVoteFromDb = async (userId: string, productId: string) => {
 };
 
 export const updateLandingContentInDb = async (content: LandingPageContent) => {
-    await setDoc(doc(db, 'cms', 'main'), cleanData(content));
+    const cleaned = cleanData(content);
+    await Promise.allSettled([
+        setDoc(doc(db, 'cms', 'main'), cleaned, { merge: true }),
+        setDoc(doc(db, 'landing_content', 'main'), cleaned, { merge: true })
+    ]);
 };
 
 export const updateOrderStatusInDb = async (orderId: string, status: string) => updateDoc(doc(db, 'orders', orderId), { status });
@@ -456,4 +538,38 @@ export const fetchSharedWishlistFromDb = async (id: string): Promise<SharedWishl
         console.warn("Error fetching shared wishlist from DB:", e);
     }
     return null;
+};
+
+export const fetchVendorPayouts = async (vendorId?: string): Promise<PayoutRecord[]> => {
+    try {
+        let q;
+        if (vendorId) {
+            q = query(collection(db, 'payouts'), where('vendorId', '==', vendorId));
+        } else {
+            q = collection(db, 'payouts');
+        }
+        const records = await getArray(q) as PayoutRecord[];
+        return records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } catch (e) {
+        console.warn("Error fetching vendor payouts:", e);
+        return [];
+    }
+};
+
+export const createPayoutInDb = async (payout: PayoutRecord): Promise<void> => {
+    try {
+        await setDoc(doc(db, 'payouts', payout.id), cleanData(payout));
+    } catch (e) {
+        console.error("Error creating payout record in DB:", e);
+        throw e;
+    }
+};
+
+export const updatePayoutStatusInDb = async (payoutId: string, status: 'Completed' | 'Processing' | 'Pending'): Promise<void> => {
+    try {
+        await updateDoc(doc(db, 'payouts', payoutId), { status });
+    } catch (e) {
+        console.error("Error updating payout status in DB:", e);
+        throw e;
+    }
 };

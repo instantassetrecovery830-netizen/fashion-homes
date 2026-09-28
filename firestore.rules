@@ -66,6 +66,11 @@ service cloud.firestore {
       allow read, write: if true; // Allows guest & buyer checkout, updates, and order tracking
     }
 
+    // Vendor Payouts Collection
+    match /payouts/{payoutId} {
+      allow read, write: if true;
+    }
+
     // Notifications Collection
     match /notifications/{notificationId} {
       allow read, write: if true;

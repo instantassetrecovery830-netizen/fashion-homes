@@ -277,7 +277,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [newPassword]);
 
   const handleCMSUpdate = useCallback(async (customForm?: any) => {
-      const formToSave = customForm || cmsForm;
+      // Guard against synthetic React event objects passed by onClick handlers
+      const isEvent = customForm && (customForm.nativeEvent || customForm.target || customForm._reactName || typeof customForm.preventDefault === 'function');
+      const formToSave = (!isEvent && customForm) ? customForm : cmsForm;
       if (formToSave && onUpdateCMSContent) {
           await onUpdateCMSContent(formToSave);
       }
@@ -301,14 +303,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
               ...vendor, 
               verificationStatus: status,
               approvalStatus: status === 'VERIFIED' ? 'APPROVED' : 'REJECTED',
-              subscriptionStatus: status === 'VERIFIED' ? 'ACTIVE' : vendor.subscriptionStatus
+              subscriptionStatus: status === 'VERIFIED' ? 'ACTIVE' : vendor.subscriptionStatus,
+              kycDocuments: {
+                  ...vendor.kycDocuments,
+                  reviewedAt: new Date().toISOString(),
+                  adminNote: status === 'VERIFIED' ? 'Directly verified by Platform Admin (Manual Override)' : 'Rejected by Platform Admin'
+              }
           };
           await setVendors([updatedVendor]);
           setSelectedVendorForReview(null);
       }
   }, [setVendors]);
 
-  const handleImageUpload = useCallback((file: File, type: 'AVATAR' | 'COVER' | 'GALLERY' | 'VIDEO', index?: number) => {
+  const handleImageUpload = useCallback((file: File, type: 'AVATAR' | 'COVER' | 'GALLERY' | 'VIDEO' | 'HERO_BANNER' | 'STORY_IMAGE', index?: number) => {
       const reader = new FileReader();
       reader.onloadend = () => {
           const result = reader.result as string;
@@ -317,8 +324,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   setStorefrontForm({ ...storefrontForm, avatar: result });
               } else if (type === 'COVER') {
                   setStorefrontForm({ ...storefrontForm, coverImage: result });
+              } else if (type === 'HERO_BANNER') {
+                  setStorefrontForm({ ...storefrontForm, heroBanner: result });
               } else if (type === 'VIDEO') {
                   setStorefrontForm({ ...storefrontForm, videoUrl: result });
+              } else if (type === 'STORY_IMAGE') {
+                  const currentStoryImages = [...(storefrontForm.storyImages || [])];
+                  if (index !== undefined && index >= 0) {
+                      currentStoryImages[index] = result;
+                  } else {
+                      currentStoryImages.push(result);
+                  }
+                  setStorefrontForm({ ...storefrontForm, storyImages: currentStoryImages });
               } else if (type === 'GALLERY') {
                    // If index is provided, replace. If not (or -1), add.
                    const currentGallery = [...(storefrontForm.gallery || [])];
@@ -477,12 +494,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { id: 'FINANCE', label: 'Finance', icon: Wallet, roles: [UserRole.VENDOR] },
       { id: 'MARKETING', label: 'Marketing', icon: Tag, roles: [UserRole.VENDOR] },
       { id: 'SUBSCRIPTION', label: 'Subscription', icon: CreditCard, roles: [UserRole.ADMIN, UserRole.VENDOR] },
-      { id: 'KYC', label: 'KYC Verification', icon: ShieldCheck, roles: [UserRole.VENDOR] },
+      { id: 'KYC', label: 'KYC Verification', icon: ShieldCheck, roles: [UserRole.ADMIN, UserRole.VENDOR] },
       { id: 'SHIPPING', label: 'Delivery', icon: Truck, roles: [UserRole.VENDOR] },
       { id: 'USERS', label: 'Users', icon: Users, roles: [UserRole.ADMIN] },
       { id: 'FOLLOWERS', label: 'Followers', icon: Users, roles: [UserRole.VENDOR] },
       { id: 'VENDORS', label: 'Ateliers', icon: Store, roles: [UserRole.ADMIN] },
-      { id: 'VENDOR_REVIEW', label: 'Review Applications', icon: ShieldCheck, roles: [UserRole.ADMIN] },
+      { id: 'VENDOR_REVIEW', label: 'KYC & Applications', icon: ShieldCheck, roles: [UserRole.ADMIN] },
       { id: 'MESSAGES', label: 'Contact Forms', icon: Inbox, roles: [UserRole.ADMIN] },
       { id: 'WAITLIST', label: 'Waitlist', icon: Mail, roles: [UserRole.ADMIN, UserRole.VENDOR] },
       { id: 'STORE_DESIGN', label: 'Design Store', icon: Palette, roles: [UserRole.ADMIN] },
@@ -656,6 +673,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             coverInputRef={coverInputRef}
             galleryInputRef={galleryInputRef}
             videoInputRef={videoInputRef}
+            onNavigate={onNavigate}
+            onGoToKyc={() => setActiveTab('KYC')}
           />
         );
 

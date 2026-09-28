@@ -2,6 +2,88 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- Filter benign Vite websocket / HMR logs and mock HMR WebSocket in iframe preview environment -->
+    <script>
+      (function() {
+        if (typeof window !== 'undefined' && window.WebSocket) {
+          const OrigWebSocket = window.WebSocket;
+          window.WebSocket = function(url, protocols) {
+            const urlStr = String(url);
+            if (urlStr.includes('24678') || urlStr.includes('vite') || protocols === 'vite-hmr') {
+              const dummyWs = {
+                CONNECTING: 0,
+                OPEN: 1,
+                CLOSING: 2,
+                CLOSED: 3,
+                readyState: 1,
+                bufferedAmount: 0,
+                extensions: '',
+                protocol: protocols || '',
+                binaryType: 'blob',
+                url: urlStr,
+                onopen: null,
+                onclose: null,
+                onerror: null,
+                onmessage: null,
+                send: function() {},
+                close: function() {},
+                addEventListener: function(type, listener) {
+                  if (type === 'open') setTimeout(() => listener({ type: 'open' }), 10);
+                },
+                removeEventListener: function() {},
+                dispatchEvent: function() { return true; }
+              };
+              setTimeout(() => {
+                if (typeof dummyWs.onopen === 'function') dummyWs.onopen({ type: 'open' });
+              }, 10);
+              return dummyWs;
+            }
+            return new OrigWebSocket(url, protocols);
+          };
+          window.WebSocket.prototype = OrigWebSocket.prototype;
+          window.WebSocket.CONNECTING = 0;
+          window.WebSocket.OPEN = 1;
+          window.WebSocket.CLOSING = 2;
+          window.WebSocket.CLOSED = 3;
+        }
+
+        const suppressKeywords = ['[vite]', 'WebSocket', 'ws://', 'wss://', 'vite-hmr'];
+        const shouldSuppress = function(arg) {
+          if (!arg) return false;
+          const str = typeof arg === 'string' ? arg : (arg.message || String(arg));
+          for (let i = 0; i < suppressKeywords.length; i++) {
+            if (str.includes(suppressKeywords[i])) return true;
+          }
+          return false;
+        };
+
+        const origError = console.error;
+        console.error = function(...args) {
+          if (args.some(shouldSuppress)) return;
+          origError.apply(console, args);
+        };
+
+        const origWarn = console.warn;
+        console.warn = function(...args) {
+          if (args.some(shouldSuppress)) return;
+          origWarn.apply(console, args);
+        };
+
+        window.addEventListener('unhandledrejection', function(event) {
+          if (shouldSuppress(event.reason)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, true);
+
+        window.addEventListener('error', function(event) {
+          if (shouldSuppress(event.message) || shouldSuppress(event.error)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, true);
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MyFitStore | Luxury Fashion Ecosystem</title>

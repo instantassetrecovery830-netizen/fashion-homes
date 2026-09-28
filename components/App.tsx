@@ -15,7 +15,7 @@ import {
 } from '@/services/dataService';
 import { searchProductsByImage } from '../services/geminiService.ts';
 import { auth, onAuthStateChanged, signOut, db } from '../services/firebase.ts';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
 
 // Lazy Load Heavy Components for Performance
 const MarketplaceView = React.lazy(() => import('./MarketplaceView.tsx').then(m => ({ default: m.MarketplaceView })));
@@ -266,6 +266,13 @@ const App: React.FC = () => {
     }, (err) => {
         console.warn("Users listener notice:", err.message);
     });
+    const unsubCmsDoc = onSnapshot(doc(db, 'cms', 'main'), (docSnap) => {
+        if (docSnap.exists()) {
+            setCmsContent({ id: docSnap.id, ...docSnap.data() } as unknown as LandingPageContent);
+        }
+    }, (err) => {
+        console.warn("CMS doc listener notice:", err.message);
+    });
     const unsubContent = onSnapshot(collection(db, 'landing_content'), (snapshot) => {
         if (!snapshot.empty) {
             setCmsContent({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as unknown as LandingPageContent);
@@ -278,6 +285,7 @@ const App: React.FC = () => {
         unsubProducts();
         unsubVendors();
         unsubUsers();
+        unsubCmsDoc();
         unsubContent();
     };
   }, []);
@@ -771,8 +779,9 @@ const App: React.FC = () => {
   };
 
   const handleUpdateCMSContent = async (content: LandingPageContent) => {
+    setCmsContent(content);
     await updateLandingContentInDb(content);
-    await refreshData();
+    await refreshData(true);
   };
 
   const toggleFeatureFlag = (key: keyof FeatureFlags) => {

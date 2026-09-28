@@ -5,9 +5,10 @@ import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContex
 interface CurrencySelectorProps {
   compact?: boolean;
   className?: string;
+  isDark?: boolean;
 }
 
-export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ compact = false, className = '' }) => {
+export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ compact = false, className = '', isDark = false }) => {
   const { currency, setCurrency, rates, config, isLoadingRates, lastUpdated, refreshRates } = useCurrency();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -34,12 +35,16 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ compact = fa
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-          isOpen ? 'bg-luxury-gold text-white' : 'hover:bg-gray-100 text-gray-700 border border-gray-200'
+          isOpen 
+            ? 'bg-luxury-gold text-black font-bold shadow-md' 
+            : isDark 
+            ? 'text-white border border-white/50 hover:bg-white/10 hover:border-white backdrop-blur-xs' 
+            : 'text-luxury-black border border-gray-200 hover:bg-gray-100'
         }`}
         title="Change Currency & Region"
       >
         <span className="text-sm">{config.flag}</span>
-        <span>{config.code} ({config.symbol})</span>
+        <span className="font-bold">{config.code} ({config.symbol})</span>
         <ChevronDown size={12} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
